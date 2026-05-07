@@ -1,0 +1,171 @@
+package com.project.exe.common.constant;
+
+public final class MessageConstants {
+
+    private MessageConstants() {}
+
+    // Generic
+    public static final String MESSAGE_REQUIRED = "REQUIRED";
+    public static final String MESSAGE_INVALID = "INVALID";
+    public static final String MESSAGE_INVALID_FORMAT = "INVALID_FORMAT";
+    public static final String MESSAGE_NOT_FOUND = "NOT_FOUND";
+    public static final String MESSAGE_ALREADY_EXISTS = "ALREADY_EXISTS";
+    public static final String MESSAGE_TOO_LONG = "TOO_LONG";
+    public static final String MESSAGE_TOO_SHORT = "TOO_SHORT";
+    public static final String MESSAGE_MUST_BE_POSITIVE = "MUST_BE_POSITIVE";
+    public static final String MESSAGE_MUST_BE_NON_NEGATIVE = "MUST_BE_NON_NEGATIVE";
+    public static final String MESSAGE_OUT_OF_RANGE = "OUT_OF_RANGE";
+    public static final String MESSAGE_EXPIRED = "EXPIRED";
+    public static final String MESSAGE_DUPLICATE = "DUPLICATE";
+
+    // User / Auth
+    public static final String MESSAGE_USER_NOT_FOUND = "USER_NOT_FOUND";
+    public static final String MESSAGE_USER_INVALID = "USER_INVALID";
+    public static final String MESSAGE_USER_EMAIL_INVALID = "USER_EMAIL_INVALID";
+    public static final String MESSAGE_USER_EMAIL_REQUIRED = "USER_EMAIL_REQUIRED";
+    public static final String MESSAGE_USER_EMAIL_ALREADY_EXISTS = "USER_EMAIL_ALREADY_EXISTS";
+    public static final String MESSAGE_USER_SSO_REQUIRED = "USER_SSO_REQUIRED";
+    public static final String MESSAGE_ACHIEVEMENT_NOT_FOUND = "ACHIEVEMENT_NOT_FOUND";
+    public static final String MESSAGE_ACHIEVEMENT_INVALID = "ACHIEVEMENT_INVALID";
+    public static final String MESSAGE_ACHIEVEMENT_NAME_REQUIRED = "ACHIEVEMENT_NAME_REQUIRED";
+    public static final String MESSAGE_SCHEDULE_CATEGORY_NOT_FOUND = "SCHEDULE_CATEGORY_NOT_FOUND";
+    public static final String MESSAGE_SCHEDULE_CATEGORY_INVALID = "SCHEDULE_CATEGORY_INVALID";
+    public static final String MESSAGE_SCHEDULE_CATEGORY_NAME_REQUIRED = "SCHEDULE_CATEGORY_NAME_REQUIRED";
+    public static final String MESSAGE_COIN_PACKAGE_NOT_FOUND = "COIN_PACKAGE_NOT_FOUND";
+    public static final String MESSAGE_COIN_PACKAGE_INVALID = "COIN_PACKAGE_INVALID";
+    public static final String MESSAGE_COIN_PACKAGE_NAME_REQUIRED = "COIN_PACKAGE_NAME_REQUIRED";
+    public static final String MESSAGE_EMAIL_VERIFICATION_NOT_FOUND = "EMAIL_VERIFICATION_NOT_FOUND";
+    public static final String MESSAGE_EMAIL_VERIFICATION_INVALID = "EMAIL_VERIFICATION_INVALID";
+    public static final String MESSAGE_EMAIL_VERIFICATION_EXPIRED = "EMAIL_VERIFICATION_EXPIRED";
+    public static final String MESSAGE_EMAIL_VERIFICATION_ALREADY_USED = "EMAIL_VERIFICATION_ALREADY_USED";
+    public static final String MESSAGE_USER_MASTER_DATA_NOT_FOUND = "USER_MASTER_DATA_NOT_FOUND";
+    public static final String MESSAGE_USER_MASTER_DATA_INVALID = "USER_MASTER_DATA_INVALID";
+    public static final String MESSAGE_OAUTH_ACCOUNT_NOT_FOUND = "OAUTH_ACCOUNT_NOT_FOUND";
+    public static final String MESSAGE_OAUTH_ACCOUNT_INVALID = "OAUTH_ACCOUNT_INVALID";
+    public static final String MESSAGE_REFRESH_TOKEN_NOT_FOUND = "REFRESH_TOKEN_NOT_FOUND";
+    public static final String MESSAGE_REFRESH_TOKEN_INVALID = "REFRESH_TOKEN_INVALID";
+    public static final String MESSAGE_REFRESH_TOKEN_EXPIRED = "REFRESH_TOKEN_EXPIRED";
+    public static final String MESSAGE_USER_WALLET_NOT_FOUND = "USER_WALLET_NOT_FOUND";
+    public static final String MESSAGE_USER_WALLET_INVALID = "USER_WALLET_INVALID";
+    public static final String MESSAGE_TRANSACTION_NOT_FOUND = "TRANSACTION_NOT_FOUND";
+    public static final String MESSAGE_TRANSACTION_INVALID = "TRANSACTION_INVALID";
+    public static final String MESSAGE_USER_ACHIEVEMENT_NOT_FOUND = "USER_ACHIEVEMENT_NOT_FOUND";
+    public static final String MESSAGE_USER_ACHIEVEMENT_INVALID = "USER_ACHIEVEMENT_INVALID";
+    public static final String MESSAGE_PASSWORD_RESET_NOT_FOUND = "PASSWORD_RESET_NOT_FOUND";
+    public static final String MESSAGE_PASSWORD_RESET_INVALID = "PASSWORD_RESET_INVALID";
+    public static final String MESSAGE_PASSWORD_RESET_EXPIRED = "PASSWORD_RESET_EXPIRED";
+    public static final String MESSAGE_USER_PREFERENCES_NOT_FOUND = "USER_PREFERENCES_NOT_FOUND";
+    public static final String MESSAGE_USER_PREFERENCES_INVALID = "USER_PREFERENCES_INVALID";
+    public static final String MESSAGE_PAYMENT_TRANSACTION_NOT_FOUND = "PAYMENT_TRANSACTION_NOT_FOUND";
+    public static final String MESSAGE_PAYMENT_TRANSACTION_INVALID = "PAYMENT_TRANSACTION_INVALID";
+
+    // Chat
+    public static final String MESSAGE_CHAT_CONVERSATION_NOT_FOUND = "CHAT_CONVERSATION_NOT_FOUND";
+    public static final String MESSAGE_CHAT_CONVERSATION_INVALID = "CHAT_CONVERSATION_INVALID";
+    public static final String MESSAGE_CHAT_MESSAGE_NOT_FOUND = "CHAT_MESSAGE_NOT_FOUND";
+    public static final String MESSAGE_CHAT_MESSAGE_INVALID = "CHAT_MESSAGE_INVALID";
+    public static final String MESSAGE_CHAT_MESSAGE_TEXT_REQUIRED = "CHAT_MESSAGE_TEXT_REQUIRED";
+    public static final String MESSAGE_USER_ROOM_SLOT_NOT_FOUND = "USER_ROOM_SLOT_NOT_FOUND";
+    public static final String MESSAGE_USER_ROOM_SLOT_INVALID = "USER_ROOM_SLOT_INVALID";
+
+    // Rooms
+    public static final String MESSAGE_ROOM_NOT_FOUND = "ROOM_NOT_FOUND";
+    public static final String MESSAGE_ROOM_INVALID = "ROOM_INVALID";
+    public static final String MESSAGE_ROOM_TITLE_REQUIRED = "ROOM_TITLE_REQUIRED";
+    public static final String MESSAGE_ROOM_REQUEST_NOT_FOUND = "ROOM_REQUEST_NOT_FOUND";
+    public static final String MESSAGE_ROOM_REQUEST_INVALID = "ROOM_REQUEST_INVALID";
+    public static final String MESSAGE_ROOM_REQUEST_GOAL_REQUIRED = "ROOM_REQUEST_GOAL_REQUIRED";
+    public static final String MESSAGE_ROOM_MEMBER_NOT_FOUND = "ROOM_MEMBER_NOT_FOUND";
+    public static final String MESSAGE_ROOM_MEMBER_INVALID = "ROOM_MEMBER_INVALID";
+    public static final String MESSAGE_ROOM_POST_NOT_FOUND = "ROOM_POST_NOT_FOUND";
+    public static final String MESSAGE_ROOM_POST_INVALID = "ROOM_POST_INVALID";
+    public static final String MESSAGE_ROOM_POST_CONTENT_REQUIRED = "ROOM_POST_CONTENT_REQUIRED";
+    public static final String MESSAGE_STUDY_SESSION_NOT_FOUND = "STUDY_SESSION_NOT_FOUND";
+    public static final String MESSAGE_STUDY_SESSION_INVALID = "STUDY_SESSION_INVALID";
+    public static final String MESSAGE_ROOM_ACTIVITY_NOT_FOUND = "ROOM_ACTIVITY_NOT_FOUND";
+    public static final String MESSAGE_ROOM_ACTIVITY_INVALID = "ROOM_ACTIVITY_INVALID";
+
+    // Documents / Learning
+    public static final String MESSAGE_DOCUMENT_NOT_FOUND = "DOCUMENT_NOT_FOUND";
+    public static final String MESSAGE_DOCUMENT_INVALID = "DOCUMENT_INVALID";
+    public static final String MESSAGE_DOCUMENT_TITLE_REQUIRED = "DOCUMENT_TITLE_REQUIRED";
+    public static final String MESSAGE_DOCUMENT_FILE_PATH_REQUIRED = "DOCUMENT_FILE_PATH_REQUIRED";
+    public static final String MESSAGE_SUMMARY_NOT_FOUND = "SUMMARY_NOT_FOUND";
+    public static final String MESSAGE_SUMMARY_INVALID = "SUMMARY_INVALID";
+    public static final String MESSAGE_FLASHCARD_REVIEW_NOT_FOUND = "FLASHCARD_REVIEW_NOT_FOUND";
+    public static final String MESSAGE_FLASHCARD_REVIEW_INVALID = "FLASHCARD_REVIEW_INVALID";
+    public static final String MESSAGE_MINDMAP_NOT_FOUND = "MINDMAP_NOT_FOUND";
+    public static final String MESSAGE_MINDMAP_INVALID = "MINDMAP_INVALID";
+    public static final String MESSAGE_MINDMAP_TITLE_REQUIRED = "MINDMAP_TITLE_REQUIRED";
+    public static final String MESSAGE_QUIZ_NOT_FOUND = "QUIZ_NOT_FOUND";
+    public static final String MESSAGE_QUIZ_INVALID = "QUIZ_INVALID";
+    public static final String MESSAGE_QUIZ_TITLE_REQUIRED = "QUIZ_TITLE_REQUIRED";
+    public static final String MESSAGE_QUIZ_QUESTION_NOT_FOUND = "QUIZ_QUESTION_NOT_FOUND";
+    public static final String MESSAGE_QUIZ_QUESTION_INVALID = "QUIZ_QUESTION_INVALID";
+    public static final String MESSAGE_QUIZ_QUESTION_TEXT_REQUIRED = "QUIZ_QUESTION_TEXT_REQUIRED";
+    public static final String MESSAGE_FLASHCARD_NOT_FOUND = "FLASHCARD_NOT_FOUND";
+    public static final String MESSAGE_FLASHCARD_INVALID = "FLASHCARD_INVALID";
+    public static final String MESSAGE_QUIZ_ATTEMPT_NOT_FOUND = "QUIZ_ATTEMPT_NOT_FOUND";
+    public static final String MESSAGE_QUIZ_ATTEMPT_INVALID = "QUIZ_ATTEMPT_INVALID";
+    public static final String MESSAGE_QUIZ_ANALYTICS_NOT_FOUND = "QUIZ_ANALYTICS_NOT_FOUND";
+    public static final String MESSAGE_QUIZ_ANALYTICS_INVALID = "QUIZ_ANALYTICS_INVALID";
+
+    // Schedules / Notes
+    public static final String MESSAGE_SCHEDULE_NOT_FOUND = "SCHEDULE_NOT_FOUND";
+    public static final String MESSAGE_SCHEDULE_INVALID = "SCHEDULE_INVALID";
+    public static final String MESSAGE_SCHEDULE_TITLE_REQUIRED = "SCHEDULE_TITLE_REQUIRED";
+    public static final String MESSAGE_SCHEDULE_EXCEPTION_NOT_FOUND = "SCHEDULE_EXCEPTION_NOT_FOUND";
+    public static final String MESSAGE_SCHEDULE_EXCEPTION_INVALID = "SCHEDULE_EXCEPTION_INVALID";
+    public static final String MESSAGE_QUICK_NOTE_NOT_FOUND = "QUICK_NOTE_NOT_FOUND";
+    public static final String MESSAGE_QUICK_NOTE_INVALID = "QUICK_NOTE_INVALID";
+    public static final String MESSAGE_QUICK_NOTE_CONTENT_REQUIRED = "QUICK_NOTE_CONTENT_REQUIRED";
+
+    // Teams / Projects / Tasks
+    public static final String MESSAGE_TEAM_NOT_FOUND = "TEAM_NOT_FOUND";
+    public static final String MESSAGE_TEAM_INVALID = "TEAM_INVALID";
+    public static final String MESSAGE_TEAM_NAME_REQUIRED = "TEAM_NAME_REQUIRED";
+    public static final String MESSAGE_TEAM_MEMBER_NOT_FOUND = "TEAM_MEMBER_NOT_FOUND";
+    public static final String MESSAGE_TEAM_MEMBER_INVALID = "TEAM_MEMBER_INVALID";
+    public static final String MESSAGE_PROJECT_NOT_FOUND = "PROJECT_NOT_FOUND";
+    public static final String MESSAGE_PROJECT_INVALID = "PROJECT_INVALID";
+    public static final String MESSAGE_PROJECT_NAME_REQUIRED = "PROJECT_NAME_REQUIRED";
+    public static final String MESSAGE_TASK_NOT_FOUND = "TASK_NOT_FOUND";
+    public static final String MESSAGE_TASK_INVALID = "TASK_INVALID";
+    public static final String MESSAGE_TASK_TITLE_REQUIRED = "TASK_TITLE_REQUIRED";
+    public static final String MESSAGE_TASK_ASSIGNMENT_NOT_FOUND = "TASK_ASSIGNMENT_NOT_FOUND";
+    public static final String MESSAGE_TASK_ASSIGNMENT_INVALID = "TASK_ASSIGNMENT_INVALID";
+    public static final String MESSAGE_TASK_DEPENDENCY_NOT_FOUND = "TASK_DEPENDENCY_NOT_FOUND";
+    public static final String MESSAGE_TASK_DEPENDENCY_INVALID = "TASK_DEPENDENCY_INVALID";
+    public static final String MESSAGE_TASK_COMMENT_NOT_FOUND = "TASK_COMMENT_NOT_FOUND";
+    public static final String MESSAGE_TASK_COMMENT_INVALID = "TASK_COMMENT_INVALID";
+    public static final String MESSAGE_TASK_COMMENT_CONTENT_REQUIRED = "TASK_COMMENT_CONTENT_REQUIRED";
+    public static final String MESSAGE_TASK_ACTIVITY_NOT_FOUND = "TASK_ACTIVITY_NOT_FOUND";
+    public static final String MESSAGE_TASK_ACTIVITY_INVALID = "TASK_ACTIVITY_INVALID";
+    public static final String MESSAGE_TASK_ATTACHMENT_NOT_FOUND = "TASK_ATTACHMENT_NOT_FOUND";
+    public static final String MESSAGE_TASK_ATTACHMENT_INVALID = "TASK_ATTACHMENT_INVALID";
+    public static final String MESSAGE_TASK_ATTACHMENT_TITLE_REQUIRED = "TASK_ATTACHMENT_TITLE_REQUIRED";
+    public static final String MESSAGE_TASK_ATTACHMENT_URL_REQUIRED = "TASK_ATTACHMENT_URL_REQUIRED";
+
+    // Meetings
+    public static final String MESSAGE_MEETING_NOT_FOUND = "MEETING_NOT_FOUND";
+    public static final String MESSAGE_MEETING_INVALID = "MEETING_INVALID";
+    public static final String MESSAGE_MEETING_TITLE_REQUIRED = "MEETING_TITLE_REQUIRED";
+    public static final String MESSAGE_MEETING_PARTICIPANT_NOT_FOUND = "MEETING_PARTICIPANT_NOT_FOUND";
+    public static final String MESSAGE_MEETING_PARTICIPANT_INVALID = "MEETING_PARTICIPANT_INVALID";
+    public static final String MESSAGE_MEETING_SUMMARY_NOT_FOUND = "MEETING_SUMMARY_NOT_FOUND";
+    public static final String MESSAGE_MEETING_SUMMARY_INVALID = "MEETING_SUMMARY_INVALID";
+    public static final String MESSAGE_MEETING_NOTE_NOT_FOUND = "MEETING_NOTE_NOT_FOUND";
+    public static final String MESSAGE_MEETING_NOTE_INVALID = "MEETING_NOTE_INVALID";
+    public static final String MESSAGE_MEETING_NOTE_CONTENT_REQUIRED = "MEETING_NOTE_CONTENT_REQUIRED";
+
+    // Notifications / System
+    public static final String MESSAGE_NOTIFICATION_NOT_FOUND = "NOTIFICATION_NOT_FOUND";
+    public static final String MESSAGE_NOTIFICATION_INVALID = "NOTIFICATION_INVALID";
+    public static final String MESSAGE_NOTIFICATION_TITLE_REQUIRED = "NOTIFICATION_TITLE_REQUIRED";
+    public static final String MESSAGE_NOTIFICATION_MESSAGE_REQUIRED = "NOTIFICATION_MESSAGE_REQUIRED";
+    public static final String MESSAGE_AUDIT_LOG_NOT_FOUND = "AUDIT_LOG_NOT_FOUND";
+    public static final String MESSAGE_AUDIT_LOG_INVALID = "AUDIT_LOG_INVALID";
+    public static final String MESSAGE_APP_CONFIG_NOT_FOUND = "APP_CONFIG_NOT_FOUND";
+    public static final String MESSAGE_APP_CONFIG_INVALID = "APP_CONFIG_INVALID";
+    public static final String MESSAGE_APP_CONFIG_KEY_REQUIRED = "APP_CONFIG_KEY_REQUIRED";
+}

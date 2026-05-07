@@ -1,0 +1,57 @@
+export const reportedUsersData = [
+  {
+    username: 'noahb',
+    email: 'noahb@example.com',
+    plan: 'Pro',
+    status: 'Active',
+    reportCount: 7,
+    reason: 'Spam links in chat',
+    latestRoom: 'Math 101 Sprint',
+    latestReportAt: '2026-07-21 09:14',
+    priorWarnings: 2,
+    accountCreatedAt: '2025-02-13',
+  },
+  {
+    username: 'cynthiag',
+    email: 'cynthia.g@example.com',
+    plan: 'Premium',
+    status: 'Active',
+    reportCount: 4,
+    reason: 'Toxic messages',
+    latestRoom: 'Frontend Debug Night',
+    latestReportAt: '2026-07-20 18:35',
+    priorWarnings: 1,
+    accountCreatedAt: '2024-11-08',
+  },
+  {
+    username: 'tonyr',
+    email: 'tony.r@example.com',
+    plan: 'Basic',
+    status: 'Active',
+    reportCount: 3,
+    reason: 'Harassment in rooms',
+    latestRoom: 'Exam Prep Group A',
+    latestReportAt: '2026-07-19 21:07',
+    priorWarnings: 0,
+    accountCreatedAt: '2025-05-26',
+  },
+  {
+    username: 'mikel',
+    email: 'mikel@example.com',
+    plan: 'Basic',
+    status: 'Active',
+    reportCount: 2,
+    reason: 'Posting external ads',
+    latestRoom: 'Physics Peer Help',
+    latestReportAt: '2026-07-18 07:42',
+    priorWarnings: 1,
+    accountCreatedAt: '2025-03-02',
+  },
+]
+
+export const bannedUsersData = [
+  { username: 'annam', banReason: 'Repeated abuse', banDate: '2026-02-03', type: 'Permanent' },
+  { username: 'linaq', banReason: 'Spam behavior', banDate: '2026-03-11', type: 'Temporary' },
+  { username: 'zoet', banReason: 'Account sharing fraud', banDate: '2026-01-19', type: 'Temporary' },
+]
+

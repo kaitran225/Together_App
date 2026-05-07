@@ -1,0 +1,43 @@
+# Simple Frontend Dockerfile without Nginx
+# When Docker Build Context is FE/ (e.g. on Render), paths are relative to FE/.
+FROM node:20-alpine AS build
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY package.json ./
+COPY package-lock.json* ./
+RUN npm install --no-audit --no-fund && npm cache clean --force
+
+# Copy frontend source and build
+COPY . .
+
+# Optional: build args for Vite env (e.g. API URL)
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ARG VITE_USE_MOCK
+ENV VITE_USE_MOCK=$VITE_USE_MOCK
+
+RUN npm run build
+
+# Production stage with simple Node.js server
+FROM node:20-alpine AS final
+WORKDIR /app
+
+# Install serve for static files and wget for health checks
+RUN npm install -g serve && apk add --no-cache wget
+
+# Copy built frontend
+COPY --from=build /app/frontend/dist ./dist
+
+# Non-root user
+RUN adduser -D -s /bin/sh appuser && \
+    chown -R appuser /app
+
+USER appuser
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+CMD ["serve", "-s", "dist", "-l", "3000"]

@@ -1,0 +1,247 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens: Gen Z bento — flat solids, no gradients in UI primitives */
+@theme {
+  --default-border-width: 0px;
+
+  /* Typography */
+  --font-sans: 'Lexend', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Liberation Mono', ui-monospace, monospace;
+
+  /* Neutral — softened light mode scale */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  /* Single prepared palette (liquorice/sunshine/cream/blossom/flame/orange/pear/sky/lilac) */
+  --pal-liquorice: #241C17;
+  --pal-sunshine: #FFC01D;
+  --pal-cream: #FCF3E3;
+  --pal-blossom: #F2A6A8;
+  --pal-flame: #DE6B38;
+  --pal-orange: #FF9947;
+  --pal-pear: #8FC766;
+  --pal-sky: #5CB5F2;
+  --pal-lilac: #A896F2;
+  --color-cream-100: #f1f3ec;
+  --color-cream-200: #e5e8de;
+  --color-cream-300: #d4d9cb;
+
+  /* Semantic — bento / Gen Z solids */
+  --color-primary: #b9e600;
+  --color-primary-hover: #a8cf00;
+  --color-primary-foreground: #000000;
+  --color-accent: var(--pal-sky);
+  --color-accent-muted: var(--color-cream-300);
+  --color-surface: var(--color-cream-100);
+  --color-background: var(--color-cream-200);
+  --color-highlight: var(--pal-sunshine);
+  --color-highlight-hover: #f2b20f;
+  --color-focus-area: var(--pal-lilac);
+  --color-success: var(--pal-pear);
+  --color-warning: var(--pal-orange);
+  --color-error: var(--pal-flame);
+  --color-border: rgba(15, 23, 42, 0.26);
+  --color-border-strong: rgba(15, 23, 42, 0.28);
+  --color-charcoal: var(--color-cream-300);
+
+  /* Flat “gradient” tokens = solid (legacy class names only) */
+  --gradient-brand: var(--color-primary);
+  --gradient-atlitude-1: var(--color-surface);
+  --gradient-atlitude-2: var(--color-accent);
+  --gradient-atlitude-3: var(--color-focus-area);
+  --gradient-atlitude-4: var(--color-highlight);
+  --gradient-mindful-01: var(--color-surface);
+  --gradient-mindful-02: var(--color-accent-muted);
+  --gradient-mindful-03: var(--color-accent);
+  --gradient-mindful-04: var(--color-charcoal);
+  --gradient-mindful-05: var(--color-background);
+  --gradient-sunset: var(--color-highlight);
+  --gradient-ocean: var(--color-accent);
+  --gradient-twilight: var(--color-focus-area);
+  --gradient-frost: var(--color-warning);
+  --gradient-ember: var(--color-error);
+
+  /* Spacing (slightly tighter for resized app) */
+  --spacing-section: 1.25rem;
+  --spacing-container: 1.25rem;
+  --radius-card: 2rem;
+  --radius-button: 9999px;
+  --shadow-card: none;
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: none;
+  --shadow-4: none;
+  --shadow-5: none;
+  --shadow-6: none;
+  --shadow-7: none;
+  --shadow-8: none;
+  --shadow-9: none;
+  --shadow-10: none;
+}
+
+/* Base */
+@layer base {
+  html {
+    font-size: 14px;
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-neutral-900);
+    margin: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  #root {
+    min-height: 100vh;
+  }
+  /* Smooth scrolling for overflow areas */
+  .scroll-smooth {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Focus visible for a11y */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+  /* Default transition for interactive elements (color/shadow only; components add transform) */
+  button:not(:disabled),
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button, a, [role="button"], input, select, textarea,
+    * {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+  /* Dark theme overrides */
+  .dark {
+    --color-neutral-50: #0a0a0a;
+    --color-neutral-100: #141414;
+    --color-neutral-200: #242424;
+    --color-neutral-300: #333333;
+    --color-neutral-400: #737373;
+    --color-neutral-500: #a3a3a3;
+    --color-neutral-600: #d4d4d4;
+    --color-neutral-700: #e5e5e5;
+    --color-neutral-800: #f0f0f0;
+    --color-neutral-900: #fafafa;
+    --color-background: #000000;
+    --color-surface: #1a1a1a;
+    --color-accent-muted: #242424;
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-border-strong: rgba(255, 255, 255, 0.14);
+    --color-charcoal: #2a2a2a;
+  }
+  .dark .label-study {
+    @apply text-neutral-400;
+  }
+}
+
+/* Label: uppercase, bold, wide tracking (bento) */
+.label-study {
+  @apply text-xs font-bold uppercase tracking-[0.2em] text-neutral-400;
+}
+
+/* Legacy “gradient” utility names = flat solids (no CSS gradients in UI) */
+@layer components {
+  html:not(.dark) .bg-white { background-color: var(--color-cream-100) !important; }
+  html:not(.dark) .text-white { color: var(--color-cream-300) !important; }
+  html:not(.dark) .border-white { border-color: var(--color-cream-300) !important; }
+  html:not(.dark) .bg-white\/5 { background-color: color-mix(in srgb, var(--color-cream-300) 5%, transparent) !important; }
+  html:not(.dark) .bg-white\/10 { background-color: color-mix(in srgb, var(--color-cream-300) 10%, transparent) !important; }
+  html:not(.dark) .bg-white\/15 { background-color: color-mix(in srgb, var(--color-cream-300) 15%, transparent) !important; }
+  html:not(.dark) .bg-white\/20 { background-color: color-mix(in srgb, var(--color-cream-300) 20%, transparent) !important; }
+  html:not(.dark) .bg-white\/80 { background-color: color-mix(in srgb, var(--color-cream-100) 80%, transparent) !important; }
+  html:not(.dark) .bg-white\/90 { background-color: color-mix(in srgb, var(--color-cream-100) 90%, transparent) !important; }
+  html:not(.dark) .text-white\/90 { color: color-mix(in srgb, var(--color-cream-300) 90%, transparent) !important; }
+  html:not(.dark) .text-white\/95 { color: color-mix(in srgb, var(--color-cream-300) 95%, transparent) !important; }
+  html:not(.dark) .border-white\/10 { border-color: color-mix(in srgb, var(--color-cream-300) 35%, transparent) !important; }
+  html:not(.dark) .border-white\/15 { border-color: color-mix(in srgb, var(--color-cream-300) 45%, transparent) !important; }
+  html:not(.dark) .border-white\/20 { border-color: color-mix(in srgb, var(--color-cream-300) 55%, transparent) !important; }
+  .bg-gradient-brand { background-color: var(--gradient-brand); }
+  .bg-gradient-atlitude-1 { background-color: var(--gradient-atlitude-1); }
+  .bg-gradient-atlitude-2 { background-color: var(--gradient-atlitude-2); }
+  .bg-gradient-atlitude-3 { background-color: var(--gradient-atlitude-3); }
+  .bg-gradient-atlitude-4 { background-color: var(--gradient-atlitude-4); }
+  .bg-gradient-mindful-01 { background-color: var(--gradient-mindful-01); }
+  .bg-gradient-mindful-02 { background-color: var(--gradient-mindful-02); }
+  .bg-gradient-mindful-03 { background-color: var(--gradient-mindful-03); }
+  .bg-gradient-mindful-04 { background-color: var(--gradient-mindful-04); }
+  .bg-gradient-mindful-05 { background-color: var(--gradient-mindful-05); }
+  .bg-gradient-sunset { background-color: var(--gradient-sunset); }
+  .bg-gradient-ocean { background-color: var(--gradient-ocean); }
+  .bg-gradient-twilight { background-color: var(--gradient-twilight); }
+  .bg-gradient-frost { background-color: var(--gradient-frost); }
+  .bg-gradient-ember { background-color: var(--gradient-ember); }
+  .text-gradient-brand {
+    color: var(--color-primary);
+  }
+  .shadow-1 { box-shadow: var(--shadow-1); }
+  .shadow-2 { box-shadow: var(--shadow-2); }
+  .shadow-3 { box-shadow: var(--shadow-3); }
+  .shadow-4 { box-shadow: var(--shadow-4); }
+  .shadow-5 { box-shadow: var(--shadow-5); }
+  .shadow-6 { box-shadow: var(--shadow-6); }
+  .shadow-7 { box-shadow: var(--shadow-7); }
+  .shadow-8 { box-shadow: var(--shadow-8); }
+  .shadow-9 { box-shadow: var(--shadow-9); }
+  .shadow-10 { box-shadow: var(--shadow-10); }
+
+  /* Animation & effect utilities */
+  .transition-interactive {
+    transition: color 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out, box-shadow 200ms ease-out, transform 200ms ease-out, opacity 200ms ease-out;
+  }
+  .hover-lift:hover {
+    transform: translateY(-1px);
+  }
+  .hover-lift:active {
+    transform: translateY(0);
+  }
+  .active-scale:active {
+    transform: scale(0.98);
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.25s ease-out forwards;
+  }
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out forwards;
+  }
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out forwards;
+  }
+}

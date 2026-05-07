@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: exe101-common
+  datasource:
+    url: jdbc:postgresql://localhost:5432/exe101
+    username: postgres
+    password: 12345
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      idle-timeout: 30000
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 20000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: vuongvo297@gmail.com
+    password: rmhb saaj pilq svzr
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+
+  jwt:
+    expiration: 3600
+    refresh-token-expiration: 604800
+
+
+# Lightweight AI (Gemini 2.0 Flash). Override in service profiles.
+ai:
+  provider: gemini
+  model: gemini-2.0-flash
+  api-key: ${AI_API_KEY:}
+  base-url: https://generativelanguage.googleapis.com
+  enabled: true
+
+logging:
+  level:
+    org.springframework.security: INFO

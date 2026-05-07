@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: exe101-auth
+  profiles:
+    active: local
+  config:
+    import: "optional:classpath:application-common.yaml"
+
+server:
+  port: 8081
+
+# OAuth2 Authorization Server
+spring.security.oauth2.authorizationserver:
+  issuer: http://localhost:8081
+  endpoint:
+    authorization-uri: http://localhost:8081/oauth2/authorize
+    token-uri: http://localhost:8081/oauth2/token
+    jwk-set-uri: http://localhost:8081/oauth2/jwks
+  client:
+    exe101-web:
+      registration:
+        client-id: exe101-web
+        client-secret: secret
+        client-authentication-methods:
+          - client_secret_basic
+        authorization-grant-types:
+          - authorization_code
+          - refresh_token
+        redirect-uris:
+          - http://localhost:5173/callback
+          - http://localhost:5173
+        scopes:
+          - openid
+          - read
+          - write
+
+#---
+#spring:
+#  config:
+#    activate-on-profile: local
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/auth

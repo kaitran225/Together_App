@@ -1,0 +1,8 @@
+export { default as StudyRoomDiscovery } from './pages/StudyRoomDiscovery'
+export { default as CreateRoom } from './pages/CreateRoom'
+export { default as CreateNewRoomStudy } from './pages/CreateNewRoomStudy'
+export { default as RecommendRoomMatching } from './pages/RecommendRoomMatching'
+export { default as StudyRoom } from './pages/StudyRoom'
+export { default as StudyRoomDashboard } from './pages/StudyRoomDashboard'
+export { default as FocusRoom } from './pages/FocusRoom'
+export { default as FocusRoomDialog } from './pages/FocusRoomDialog'

@@ -1,0 +1,6 @@
+export { default as BoardPage } from './pages/BoardPage'
+export { default as SprintBoard } from './pages/SprintBoard'
+export { default as SprintMemberBoard } from './pages/SprintMemberBoard'
+export { default as AllTeams } from './pages/AllTeams'
+export { default as TeamManagement } from './pages/TeamManagement'
+export { default as ScrumBoard } from './pages/ScrumBoard'

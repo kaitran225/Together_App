@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: exe101-workflow
+  profiles:
+    active: local
+  config:
+    import: "optional:classpath:application-common.yaml"
+
+server:
+  port: 8082
+
+spring.security.oauth2.resourceserver.jwt:
+  issuer-uri: http://localhost:8081
+  jwk-set-uri: http://localhost:8081/oauth2/jwks
+
+#---
+#spring:
+#  config:
+#    activate-on-profile: local
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/workflow

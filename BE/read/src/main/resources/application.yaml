@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: exe101-read
+  profiles:
+    active: local
+  config:
+    import: "optional:classpath:application-common.yaml"
+
+server:
+  port: 8083
+
+# Validate JWT from auth service
+spring.security.oauth2.resourceserver.jwt:
+  issuer-uri: http://localhost:8081
+  jwk-set-uri: http://localhost:8081/oauth2/jwks
+
+#---
+#spring:
+#  config:
+#    activate-on-profile: local
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/read
