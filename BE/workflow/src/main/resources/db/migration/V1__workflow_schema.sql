@@ -249,7 +249,7 @@ CREATE TABLE "documents" (
   "page_count" INT,
   "word_count" INT,
   "language" VARCHAR,
-  "tags" "TEXT[]",
+  "tags" VARCHAR,
   "search_vector" tsvector,
   "metadata" JSONB,
   "last_accessed_at" TIMESTAMP,
