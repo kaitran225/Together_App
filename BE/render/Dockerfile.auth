@@ -27,7 +27,6 @@ USER spring:spring
 
 COPY --from=builder /src/auth/target/*.jar /app/app.jar
 
-ENV SPRING_PROFILES_ACTIVE=dev
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport"
 
 EXPOSE 10000

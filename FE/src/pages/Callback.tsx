@@ -20,7 +20,7 @@ export default function Callback() {
       client_id: 'exe101-web',
       client_secret: 'secret',
     })
-    fetch('http://localhost:8081/oauth2/token', {
+    fetch('http://localhost:8880/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),

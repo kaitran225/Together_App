@@ -22,9 +22,9 @@ Default Spring profile in images: dev (SPRING_PROFILES_ACTIVE=dev). Override in 
 
 Health paths:
   auth:      /swagger-ui/index.html
-  email:     /health
+  email:     /health or /api/v1/email/health  (Swagger: /swagger-ui/index.html)
   workflow:  /api/v1/workflow/health
   read:      /api/v1/read/health
-  cronjob:   /actuator/health
+  cronjob:   /actuator/health or /api/v1/cronjob/health  (Swagger: /swagger-ui/index.html)
 
 If your Git repo root is only the backend (no BE/ wrapper), leave Root Directory empty and adjust Dockerfile paths accordingly.

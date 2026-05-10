@@ -3,7 +3,7 @@ import { getFakeMeResponse } from '../mocks/user'
 
 export type { ApiResponse, MeResponse } from '../types/dto'
 
-const AUTH_ISSUER = 'http://localhost:8081'
+const AUTH_ISSUER = 'http://localhost:8880'
 
 /** Set VITE_USE_MOCK=true in .env to use fake user and health responses without backend. */
 const useMock = import.meta.env.VITE_USE_MOCK === 'true'
@@ -31,7 +31,7 @@ export const authApi = {
 export const readApi = {
   async health(): Promise<ApiResponse<{ service: string; status: string }>> {
     if (useMock) return Promise.resolve({ success: true, data: { service: 'read', status: 'UP' } })
-    const r = await fetch('http://localhost:8083/api/v1/read/health')
+    const r = await fetch('http://localhost:8882/api/v1/read/health')
     return r.json()
   },
 }
@@ -39,7 +39,7 @@ export const readApi = {
 export const workflowApi = {
   async health(): Promise<ApiResponse<{ service: string; status: string }>> {
     if (useMock) return Promise.resolve({ success: true, data: { service: 'workflow', status: 'UP' } })
-    const r = await fetch('http://localhost:8082/api/v1/workflow/health')
+    const r = await fetch('http://localhost:8881/api/v1/workflow/health')
     return r.json()
   },
 }

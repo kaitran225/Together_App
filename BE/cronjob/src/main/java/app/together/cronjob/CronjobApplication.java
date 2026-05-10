@@ -4,7 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Ops-style app: Actuator {@code /actuator/health} only (no domain jobs in baseline).
+ * Ops-style app: JSON health at {@code /api/v1/cronjob/health}, Actuator {@code /actuator/health}
+ * (no domain jobs in baseline).
  */
 @SpringBootApplication
 public class CronjobApplication {

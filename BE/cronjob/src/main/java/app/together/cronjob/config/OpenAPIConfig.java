@@ -1,4 +1,4 @@
-package app.together.workflow.config;
+package app.together.cronjob.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -12,11 +12,12 @@ import java.util.List;
 
 @Configuration
 public class OpenAPIConfig {
+
     private Server createServer(String url, String description) {
-            Server server = new Server();
-            server.setUrl(url);
-            server.setDescription(description);
-            return server;
+        Server server = new Server();
+        server.setUrl(url);
+        server.setDescription(description);
+        return server;
     }
 
     private Contact createContact() {
@@ -35,19 +36,18 @@ public class OpenAPIConfig {
     }
 
     @Bean
-    OpenAPI myOpenAPI() {
+    OpenAPI cronjobOpenAPI() {
         return new OpenAPI()
                 .info(createAppInfo())
                 .servers(List.of(
-                        createServer("/",
-                                "This service (same host and port as this running instance)")));
+                        createServer("/", "This service (same host and port as this running instance)")));
     }
 
     @Bean
-    GroupedOpenApi authApi(){
+    GroupedOpenApi cronjobApi() {
         return GroupedOpenApi.builder()
-                .group("workflow-service")
-                .packagesToScan("app.together.workflow.controller")
+                .group("cronjob-service")
+                .packagesToScan("app.together.cronjob.controller")
                 .build();
     }
 }

@@ -6,10 +6,10 @@ Spring Boot microservices backend + Vite React frontend (from [SRS](.guide/SRS.m
 
 - **BE/** – Maven multi-module backend (Java 21, Spring Boot 3.4)
   - **common** – Shared config, security (JWT resource server), DTOs, exception handling
-  - **auth** (port **8081**) – OAuth2 Authorization Server, users, JWT issuance
-  - **read** (port **8083**) – Read service (documents, schedules, quizzes – to be extended)
-  - **workflow** (port **8082**) – Workflow service (rooms, tasks, teams, meetings – to be extended)
-- **frontend/** – Vite + React 19 + TypeScript, React Router
+  - **auth** (port **8880**) – OAuth2 Authorization Server, users, JWT issuance
+  - **workflow** (port **8881**) – Workflow service (rooms, tasks, teams, meetings – to be extended)
+  - **read** (port **8882**) – Read service (documents, schedules, quizzes – to be extended)
+- **FE/** – Vite + React 19 + TypeScript, React Router
 
 ## Backend – Getting started
 
@@ -24,9 +24,9 @@ Spring Boot microservices backend + Vite React frontend (from [SRS](.guide/SRS.m
 
 3. **Run services** (each in its own terminal):
    ```bash
-   cd BE/auth && ../mvnw.cmd spring-boot:run      # 8081
-   cd BE/read && ../mvnw.cmd spring-boot:run       # 8083
-   cd BE/workflow && ../mvnw.cmd spring-boot:run   # 8082
+   cd BE/auth && ../mvnw.cmd spring-boot:run      # 8880
+   cd BE/workflow && ../mvnw.cmd spring-boot:run  # 8881
+   cd BE/read && ../mvnw.cmd spring-boot:run      # 8882
    ```
 
    With `local` profile, the **read** service uses `ddl-auto: update`; auth/workflow use `validate` with Flyway where enabled.
@@ -34,20 +34,20 @@ Spring Boot microservices backend + Vite React frontend (from [SRS](.guide/SRS.m
 ## Frontend – Getting started
 
 ```bash
-cd frontend
+cd FE
 npm install
 npm run dev
 ```
 
 - App: http://localhost:5173  
-- **Login** uses OAuth2 authorization code flow with auth service (8081). Redirect URIs include `http://localhost:5173/callback`.  
-- **Dashboard** calls auth `/api/v1/users/me` (proxied to 8081) and health endpoints on read (8083) and workflow (8082).
+- **Login** uses OAuth2 authorization code flow with auth service (**8880**). Redirect URIs include `http://localhost:5173/callback`.  
+- **Dashboard** calls auth `/api/v1/users/me` (proxied to **8880**) and health endpoints on workflow (**8881**) and read (**8882**).
 
 ## Configuration
 
 - **Auth** – OAuth2 client `exe101-web` / `secret`; CORS allows `http://localhost:5173`.  
-- **Read / Workflow** – Validate JWT via `http://localhost:8081/oauth2/jwks`.  
-- Frontend proxy in `vite.config.ts`: `/api` → `http://localhost:8081`.
+- **Read / Workflow** – Validate JWT via `http://localhost:8880/oauth2/jwks`.  
+- Frontend proxy in `FE/vite.config.ts`: `/api` and `/oauth2` → `http://localhost:8880`.
 
 ## Tech stack
 

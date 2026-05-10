@@ -29,30 +29,28 @@ public class OpenAPIConfig {
             return server;
     }
 
-    private Contact CreateContact(){
+    private Contact createContact() {
         return new Contact()
-                .email("Exe.com.edu")
-                .name("Dev")
-                .url("https:exe.com.edu");
+                .email("together@app.com")
+                .name("Together App")
+                .url("https://together-app.com");
     }
 
-    private Info CreateAppInfo(){
+    private Info createAppInfo() {
         return new Info()
-                .title("Exe FPTU")
+                .title("Together App")
                 .version("1.0")
-                .contact(CreateContact())
-                .description("This is a Spring boot app for Exe FPTU");
+                .contact(createContact())
+                .description("This is a Spring boot app for Together App");
     }
 
     @Bean
     OpenAPI myOpenAPI() {
         return new OpenAPI()
-                .info(CreateAppInfo())
+                .info(createAppInfo())
                 .servers(List.of(
-                        createServer("http://localhost:8081",
-                                "Server URL in Development environment"),
-                        createServer("https://together-app-auth.onrender.com",
-                                "Server URL in Production environment")))
+                        createServer("/",
+                                "This service (same host and port as this running instance)")))
                 .addSecurityItem(
                         new SecurityRequirement().addList("Bearer Authentication"))
                 .components(new Components()

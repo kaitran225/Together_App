@@ -1,4 +1,5 @@
 # Email microservice (SMTP). Root Directory: BE | Dockerfile Path: render/Dockerfile.email
+# Health: /health or /api/v1/email/health | Swagger: /swagger-ui/index.html
 
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /src
@@ -24,7 +25,6 @@ USER spring:spring
 
 COPY --from=builder /src/email/target/*.jar /app/app.jar
 
-ENV SPRING_PROFILES_ACTIVE=dev
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport"
 
 EXPOSE 10000
