@@ -155,7 +155,7 @@ function ScrumBoardContent() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelected({ task, columnId: col.id, taskIndex: i })}
-                    className="w-full !justify-start text-left p-2 bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] shadow-none relative hover:border-primary/40 transition-colors"
+                    className="w-full !justify-start text-left p-2 bg-white rounded-md border border-[var(--color-border)] shadow-none relative hover:border-primary/40 transition-colors"
                   >
                     {task.flagged && (
                       <span className="absolute top-1 right-1 text-neutral-400" aria-hidden>

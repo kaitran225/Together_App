@@ -11,12 +11,12 @@ interface AuthLayoutProps {
  */
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className="h-screen grid grid-cols-[6fr_4fr] overflow-hidden bg-[var(--color-background)]">
+    <div className="h-screen grid grid-cols-[6fr_4fr] overflow-hidden bg-transparent">
       <AuthSidebar />
-      <div className="flex flex-col min-w-0 m-3 gap-3 bg-[var(--color-background)]">
+      <div className="flex flex-col min-w-0 m-3 gap-3 bg-transparent">
         <AuthHeaderBar />
         <div className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)] shadow-none">
-          <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-[var(--color-background)] p-6 md:p-8">
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto bg-transparent p-6 md:p-8">
             {children}
           </div>
         </div>

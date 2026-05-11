@@ -4,42 +4,42 @@
  * All names are descriptive (no brand names).
  */
 
-/** Palette A: dark, cream, slate, green, amber */
+/** Palette A: dark, neutral, midnight, mint, amber */
 export const jenny = {
-  dark: '#171717',
-  cream: '#FCF3E3',
-  slate: '#64748b',
-  green: '#708C69',
-  amber: '#F8A258',
+  dark: '#2a2a2a',
+  cream: '#f7f7f7',
+  slate: '#191970',
+  green: '#2ea857',
+  amber: '#ffb114',
 } as const
 
-/** Palette B: ink, indigo-deep, violet, lavender, indigo */
+/** Palette B: ink, midnight, purple, lavender, blue */
 export const purple = {
-  ink: '#171717',
-  indigoDeep: '#4c1d95',
-  violet: '#7546E8',
-  lavender: '#C8B3F6',
-  indigo: '#6366f1',
+  ink: '#2a2a2a',
+  indigoDeep: '#191970',
+  violet: '#9400d3',
+  lavender: '#e1e1ff',
+  indigo: '#85b8fd',
 } as const
 
-/** Palette C: surface-light, pink-light, violet, blue, blue-deep, indigo-deep */
+/** Palette C: surface-light, lavender, purple, blue, midnight, midnight-deep */
 export const atlitude = {
-  surfaceLight: '#fafafa',
-  pinkLight: '#FFCCF2',
-  violet: '#977DFF',
-  blue: '#0033FF',
-  blueDeep: '#0600AB',
-  indigoDeep: '#4c1d95',
+  surfaceLight: '#ffffff',
+  pinkLight: '#e1e1ff',
+  violet: '#9400d3',
+  blue: '#85b8fd',
+  blueDeep: '#191970',
+  indigoDeep: '#191970',
 } as const
 
-/** Palette D: surface-alt, gray-light, surface-muted, indigo, violet-deep, dark */
+/** Palette D: surface-alt, lavender, surface-muted, blue, purple, dark */
 export const mindful = {
-  surfaceAlt: '#fafafa',
-  grayLight: '#ececec',
-  surfaceMuted: '#fafafa',
-  indigo: '#6366f1',
-  violetDeep: '#463699',
-  dark: '#171717',
+  surfaceAlt: '#f7f7f7',
+  grayLight: '#e1e1ff',
+  surfaceMuted: '#ffffff',
+  indigo: '#85b8fd',
+  violetDeep: '#9400d3',
+  dark: '#2a2a2a',
 } as const
 
 export const palettes = { jenny, purple, atlitude, mindful } as const
@@ -70,19 +70,19 @@ export const gradientBrand = `linear-gradient(in oklch to right, ${atlitude.viol
  * Semantic colors: used by the app for backgrounds, text, buttons, etc.
  */
 export const semantic = {
-  primary: atlitude.violet,
+  primary: atlitude.blue,
   primaryHover: purple.indigoDeep,
   accent: atlitude.blue,
   accentMuted: atlitude.surfaceLight,
   surface: atlitude.surfaceLight,
-  background: '#fafafa',
+  background: '#f7f7f7',
   highlight: jenny.amber,
-  highlightHover: '#ea580c',
-  success: '#059669',
-  warning: '#ea580c',
-  error: '#b91c1c',
-  border: '#d4d4d4',
-  primaryForeground: '#ffffff',
+  highlightHover: '#ffc757',
+  success: jenny.green,
+  warning: '#ffc757',
+  error: '#ff5c1c',
+  border: 'rgba(25, 25, 112, 0.18)',
+  primaryForeground: '#0f172a',
 } as const
 
 export const gradientsExtra = {

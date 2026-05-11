@@ -12,7 +12,7 @@ export function AppLayout() {
   const location = useLocation()
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-background)]">
+    <div className="min-h-screen flex flex-col bg-transparent">
       <header className="bg-[var(--color-surface)] border-b border-white/10 px-4 py-3 md:px-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">

@@ -24,37 +24,38 @@
   --color-neutral-800: #1e293b;
   --color-neutral-900: #0f172a;
 
-  /* Single prepared palette (liquorice/sunshine/cream/blossom/flame/orange/pear/sky/lilac) */
-  --pal-liquorice: #241C17;
-  --pal-sunshine: #FFC01D;
-  --pal-cream: #FCF3E3;
-  --pal-blossom: #F2A6A8;
-  --pal-flame: #DE6B38;
-  --pal-orange: #FF9947;
-  --pal-pear: #8FC766;
-  --pal-sky: #5CB5F2;
-  --pal-lilac: #A896F2;
-  --color-cream-100: #f1f3ec;
-  --color-cream-200: #e5e8de;
-  --color-cream-300: #d4d9cb;
+  /* Single prepared palette (lavender/blue/purple/midnight/white/neutral/warm/mint) */
+  --pal-liquorice: #2a2a2a;
+  --pal-sunshine: #ffb114;
+  --pal-cream: #f7f7f7;
+  --pal-blossom: #e1e1ff;
+  --pal-flame: #ff5c1c;
+  --pal-orange: #ffc757;
+  --pal-pear: #2ea857;
+  --pal-sky: #85b8fd;
+  --pal-lilac: #e1e1ff;
+  --color-cream-100: #ffffff;
+  --color-cream-200: #f7f7f7;
+  --color-cream-300: #e1e1ff;
 
-  /* Semantic — bento / Gen Z solids */
-  --color-primary: #b9e600;
-  --color-primary-hover: #a8cf00;
-  --color-primary-foreground: #000000;
+  /* Semantic — palette from provided table */
+  --color-primary: #85b8fd;
+  --color-primary-hover: #191970;
+  --color-primary-foreground: #0f172a;
   --color-accent: var(--pal-sky);
   --color-accent-muted: var(--color-cream-300);
   --color-surface: var(--color-cream-100);
   --color-background: var(--color-cream-200);
   --color-highlight: var(--pal-sunshine);
-  --color-highlight-hover: #f2b20f;
+  --color-highlight-hover: var(--pal-orange);
   --color-focus-area: var(--pal-lilac);
   --color-success: var(--pal-pear);
   --color-warning: var(--pal-orange);
   --color-error: var(--pal-flame);
-  --color-border: rgba(15, 23, 42, 0.26);
-  --color-border-strong: rgba(15, 23, 42, 0.28);
-  --color-charcoal: var(--color-cream-300);
+  --color-border: rgba(25, 25, 112, 0.18);
+  --color-border-strong: rgba(25, 25, 112, 0.3);
+  --color-charcoal: var(--color-cream-200);
+  --background-page: var(--color-background);
 
   /* Flat “gradient” tokens = solid (legacy class names only) */
   --gradient-brand: var(--color-primary);
@@ -99,7 +100,7 @@
     scroll-behavior: smooth;
   }
   body {
-    background: var(--color-background);
+    background: var(--background-page);
     color: var(--color-neutral-900);
     margin: 0;
     min-height: 100vh;
@@ -154,11 +155,13 @@
     --color-border: rgba(255, 255, 255, 0.08);
     --color-border-strong: rgba(255, 255, 255, 0.14);
     --color-charcoal: #2a2a2a;
+    --background-page: #000000;
   }
   .dark .label-study {
     @apply text-neutral-400;
   }
 }
+
 
 /* Label: uppercase, bold, wide tracking (bento) */
 .label-study {

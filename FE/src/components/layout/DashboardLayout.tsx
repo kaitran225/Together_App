@@ -16,7 +16,7 @@ interface DashboardLayoutProps {
  */
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <div className="h-screen flex overflow-hidden bg-[var(--color-background)]">
+    <div className="h-screen flex overflow-hidden bg-transparent">
       <DashboardSidebar />
       <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 gap-3">
         <DashboardHeader />

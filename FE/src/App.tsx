@@ -78,7 +78,7 @@ export default function App() {
   const defaultAuthedRoute = user?.role === 'ADMIN' ? '/admin' : '/dashboard'
 
   return (
-    <div className={isStandalone ? 'min-h-screen bg-neutral-100 dark:bg-neutral-900' : ''}>
+    <div className={isStandalone ? 'min-h-screen' : ''}>
       <Routes>
         <Route path="/" element={<Navigate to={isAuthenticated ? defaultAuthedRoute : '/welcome'} replace />} />
         <Route path="/login" element={<Navigate to="/welcome" replace />} />
