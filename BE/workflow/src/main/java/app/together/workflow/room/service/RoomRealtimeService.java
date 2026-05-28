@@ -19,7 +19,7 @@ public class RoomRealtimeService {
     private static final String ROOM_SIGNAL_USER_QUEUE = "/queue/room-signals";
     private static final String SIGNAL_TYPE_PREFIX = "SIGNAL_";
 
-    private final RoomService roomService;
+    private final RoomEventFactory roomEventFactory;
     private final SimpMessagingTemplate messagingTemplate;
 
     public void signal(SignalMessage message) {
@@ -27,7 +27,7 @@ public class RoomRealtimeService {
 
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         Long roomId = parseRoomId(message.roomId());
-        RoomEvent event = roomService.buildEvent(
+        RoomEvent event = roomEventFactory.create(
                 roomId,
                 SIGNAL_TYPE_PREFIX + message.type().trim().toUpperCase(),
                 currentUserSso,
