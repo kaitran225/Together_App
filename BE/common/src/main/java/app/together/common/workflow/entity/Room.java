@@ -1,12 +1,16 @@
 package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
+import app.together.common.workflow.enums.RoomType;
 
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.Instant;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "rooms")
@@ -52,6 +56,25 @@ public class Room extends BaseAuditEntity {
     @Column(name = "status")
     String status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type", nullable = false, length = 32)
+    RoomType roomType;
+
+    @Column(name = "base_members")
+    Integer baseMembers;
+
+    @Column(name = "extra_members_purchased")
+    Integer extraMembersPurchased;
+
+    @Column(name = "enable_audio")
+    Boolean enableAudio;
+
+    @Column(name = "enable_video")
+    Boolean enableVideo;
+
+    @Column(name = "enable_chat")
+    Boolean enableChat;
+
     @Column(name = "activated_at")
     Instant activatedAt;
 
@@ -64,8 +87,13 @@ public class Room extends BaseAuditEntity {
     @Column(name = "closed_by")
     String closedBy;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
+
+    @Version
+    @Column(name = "version")
+    Long version;
 
     @Column(name = "deleted_at")
     Instant deletedAt;

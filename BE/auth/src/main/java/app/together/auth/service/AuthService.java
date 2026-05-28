@@ -129,7 +129,7 @@ public class AuthService {
         User user = tokenService.validateRefreshToken(refreshToken)
                 .orElseThrow(() -> new UnauthorizedException(
                         MessageConstants.MESSAGE_REFRESH_TOKEN_INVALID,
-                        MessageConstants.MESSAGE_REFRESH_TOKEN_INVALID));
+                        ErrorCodes.UNAUTHORIZED_TOKEN));
 
         tokenService.revokeRefreshToken(refreshToken);
         return buildLoginResponse(user);
@@ -158,36 +158,36 @@ public class AuthService {
         if (request == null || request.token() == null || request.token().isBlank()) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_PASSWORD_RESET_TOKEN_REQUIRED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_INVALID);
+                    ErrorCodes.VALIDATION_FAILED_TOKEN);
         }
         if (request.newPassword() == null || request.newPassword().isBlank()) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_USER_NEW_PASSWORD_REQUIRED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_INVALID);
+                    ErrorCodes.VALIDATION_FAILED);
         }
 
         String tokenHash = tokenService.hashToken(request.token());
         PasswordReset reset = passwordResetRepository.findByResetTokenHash(tokenHash)
                 .orElseThrow(() -> new BadRequestException(
                         MessageConstants.MESSAGE_PASSWORD_RESET_INVALID,
-                        MessageConstants.MESSAGE_PASSWORD_RESET_INVALID));
+                        ErrorCodes.VALIDATION_FAILED_TOKEN));
 
         if (reset.getUsedAt() != null) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_PASSWORD_RESET_TOKEN_USED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_INVALID);
+                    ErrorCodes.VALIDATION_FAILED_TOKEN);
         }
 
         if (reset.getExpiresAt().isBefore(Instant.now())) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_PASSWORD_RESET_EXPIRED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_EXPIRED);
+                    ErrorCodes.EXPIRED_TOKEN);
         }
 
         User user = userRepository.findById(reset.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.USER_NOT_FOUND));
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
@@ -203,7 +203,7 @@ public class AuthService {
         User user = userRepository.findByUserSso(userSso)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.NOT_FOUND));
         return userMapper.toDto(user);
     }
 
@@ -287,7 +287,7 @@ public class AuthService {
         if (rawToken == null || rawToken.isBlank()) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID);
+                    ErrorCodes.EMAIL_VERIFICATION_INVALID);
         }
 
         String hashedToken = tokenService.hashToken(rawToken);
@@ -295,7 +295,7 @@ public class AuthService {
         EmailVerification verification = emailVerificationRepository.findByVerificationCode(hashedToken)
                 .orElseThrow(() -> new BadRequestException(
                         MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID,
-                        MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID));
+                        ErrorCodes.EMAIL_VERIFICATION_INVALID));
 
         ensureEmailVerificationAttemptsAllowed(verification);
 
@@ -303,20 +303,20 @@ public class AuthService {
             rejectEmailVerificationAttempt(
                     verification,
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_ALREADY_USED,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_ALREADY_USED);
+                    ErrorCodes.EMAIL_VERIFICATION_ALREADY_USED);
         }
 
         if (verification.getExpiresAt().isBefore(Instant.now())) {
             rejectEmailVerificationAttempt(
                     verification,
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_EXPIRED,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_EXPIRED);
+                    ErrorCodes.EMAIL_VERIFICATION_ALREADY_USED);
         }
 
         User user = userRepository.findById(verification.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.NOT_FOUND));
 
         user.setEmailVerified(true);
         user.setStatus(UserStatus.ACTIVE.toString());
@@ -330,7 +330,7 @@ public class AuthService {
         if (emailVerificationAttempts(verification) >= 5) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID);
+                    ErrorCodes.EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS);
         }
     }
 
@@ -345,7 +345,7 @@ public class AuthService {
         if (verification.getAttempts() >= 5) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID);
+                    ErrorCodes.EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS);
         }
 
         throw new BadRequestException(message, errorCode);
@@ -367,12 +367,12 @@ public class AuthService {
         User user = userRepository.findByUserSso(userSsoOrNull)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.USER_NOT_FOUND));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_USER_OLD_PASSWORD_INCORRECT,
-                    MessageConstants.MESSAGE_USER_OLD_PASSWORD_INCORRECT);
+                    ErrorCodes.INVALID);
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));

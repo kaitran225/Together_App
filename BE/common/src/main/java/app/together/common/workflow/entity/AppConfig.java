@@ -43,7 +43,7 @@ public class AppConfig extends BaseAuditEntity {
     @Column(name = "rollout_percentage")
     Integer rolloutPercentage;
 
-    @Column(name = "target_users", columnDefinition = "bigint[]")
+    @Column(name = "target_users", columnDefinition = "JSONB")
     String targetUsers;
 
     @Column(name = "feature_type")

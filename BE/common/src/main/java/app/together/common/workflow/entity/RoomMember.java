@@ -44,6 +44,10 @@ public class RoomMember extends BaseAuditEntity {
     @Column(name = "joined_at")
     Instant joinedAt;
 
+    @Version
+    @Column(name = "version")
+    Long version;
+
     @Column(name = "left_at")
     Instant leftAt;
 }

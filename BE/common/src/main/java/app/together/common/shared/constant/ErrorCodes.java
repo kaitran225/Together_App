@@ -15,6 +15,12 @@ public final class ErrorCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
     public static final String AI_SERVICE_ERROR = "AI_SERVICE_ERROR";
+    public static final String EMAIL_VERIFICATION_INVALID = "EMAIL_VERIFICATION_INVALID";
+    public static final String EMAIL_VERIFICATION_ALREADY_USED = "EMAIL_VERIFICATION_ALREADY_USED";
+    public static final String EMAIL_VERIFICATION_EXPIRED = "EMAIL_VERIFICATION_EXPIRED";
+    public static final String EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS = "EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS";
+    public static final String EMAIL_VERIFICATION_NOT_FOUND = "EMAIL_VERIFICATION_NOT_FOUND";
+    public static final String INVALID = "INVALID";
 
     // Authentication Error Codes
     public static final String INVALID_TOKEN = "INVALID_TOKEN";

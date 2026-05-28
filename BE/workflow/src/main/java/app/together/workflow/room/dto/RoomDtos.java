@@ -19,6 +19,12 @@ public final class RoomDtos {
             Boolean isPublic,
             Boolean isPremium,
             Integer maxMembers,
+            String roomType,
+            Boolean enableAudio,
+            Boolean enableVideo,
+            Boolean enableChat,
+            Integer baseMembers,
+            Integer extraMembersPurchased,
             Instant activatedAt,
             Instant expiresAt,
             Instant closedAt,
@@ -44,11 +50,18 @@ public final class RoomDtos {
             Integer goalDurationDays,
             Integer maxMembers,
             Boolean isPremium,
-            Boolean isPublic
+            Boolean isPublic,
+            String roomType
     ) {
     }
 
     public record JoinRoomRequest(String inviteCode) {
+    }
+
+    public record RoomMemberActionRequest(String targetUserSso) {
+    }
+
+    public record TransferOwnerRequest(String targetUserSso) {
     }
 
     public record SignalMessage(
@@ -62,11 +75,32 @@ public final class RoomDtos {
     }
 
     public record RoomEvent(
+            String eventId,
+            String correlationId,
+            Integer version,
             String roomId,
             String type,
             String actor,
             Instant at,
             Object payload
+    ) {
+    }
+
+    public record IceServerResponse(
+            List<String> urls,
+            String username,
+            String credential
+    ) {
+    }
+
+    public record RoomWebRtcConfigResponse(
+            Long roomId,
+            String roomType,
+            Boolean enableAudio,
+            Boolean enableVideo,
+            Boolean enableChat,
+            Integer maxMembers,
+            List<IceServerResponse> iceServers
     ) {
     }
 }

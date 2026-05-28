@@ -35,7 +35,7 @@ public class CoinPackage extends BaseAuditEntity {
     Integer bonusCoins;
 
     @Column(name = "price_vnd", nullable = false, precision = 10, scale = 2)
-    BigDecimal priceVnd;
+    Long priceVnd;
 
     @Column(name = "is_popular")
     Boolean isPopular;
