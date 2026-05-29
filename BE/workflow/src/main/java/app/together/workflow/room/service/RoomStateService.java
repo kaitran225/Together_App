@@ -1,14 +1,13 @@
 package app.together.workflow.room.service;
 
 import app.together.common.auth.enums.RoomRole;
-import app.together.common.shared.constant.MessageConstants;
-import app.together.common.shared.exception.BadRequestException;
 import app.together.common.workflow.entity.Room;
 import app.together.common.workflow.entity.RoomMember;
 import app.together.common.workflow.enums.RoomStatus;
 import app.together.common.workflow.enums.RoomType;
 import app.together.common.workflow.repository.RoomMemberRepository;
 import app.together.common.workflow.repository.RoomRepository;
+import app.together.workflow.room.config.RoomMediaProperties;
 import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -27,27 +26,18 @@ public class RoomStateService {
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
     private final RoomValidator roomValidator;
+    private final RoomMediaProperties roomMediaProperties;
 
     public Room buildRoom(CreateRoomRequest request, boolean isPublic, String userSso, Instant now) {
         RoomType roomType = roomValidator.resolveRoomType(request);
-        int baseMembers = resolveDefaultMaxMembers(request, roomType);
-        boolean enableAudio = RoomType.TEAM.equals(roomType);
-        boolean enableVideo = true;
-        boolean enableChat = true;
+        RoomMediaProperties.Profile profile = roomMediaProperties.profileFor(roomType);
+        Integer maxMembers = resolveMaxMembers(request, profile, roomType);
 
         Room room = Room.builder()
                 .title(trimToNull(request.title()))
                 .description(trimToNull(request.description()))
-                .goalDescription(trimToNull(request.goalDescription()))
-                .goalDurationDays(request.goalDurationDays())
-                .maxMembers(baseMembers)
+                .maxMembers(maxMembers)
                 .roomType(roomType)
-                .baseMembers(baseMembers)
-                .extraMembersPurchased(0)
-                .enableAudio(enableAudio)
-                .enableVideo(enableVideo)
-                .enableChat(enableChat)
-                .isPremium(Boolean.TRUE.equals(request.isPremium()))
                 .isPublic(isPublic)
                 .inviteCode(isPublic ? null : generateInviteCode())
                 .status(RoomStatus.OPEN.name())
@@ -139,13 +129,11 @@ public class RoomStateService {
                 .build());
     }
 
-    private int resolveDefaultMaxMembers(CreateRoomRequest request, RoomType roomType) {
-        int defaultMaxMembers = RoomType.TEAM.equals(roomType) ? 6 : 10;
-        if (request.maxMembers() == null || request.maxMembers() <= 0) {
-            return defaultMaxMembers;
+    private Integer resolveMaxMembers(CreateRoomRequest request, RoomMediaProperties.Profile profile, RoomType roomType) {
+        if (request.maxMembers() != null && request.maxMembers() > 0) {
+            return request.maxMembers();
         }
-        roomValidator.validateMaxMembersForRoomType(request.maxMembers(), roomType);
-        return request.maxMembers();
+        return profile.defaultMaxMembers();
     }
 
     private String generateInviteCode() {

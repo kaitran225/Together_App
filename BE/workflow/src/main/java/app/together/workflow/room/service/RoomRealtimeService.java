@@ -10,6 +10,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -18,8 +20,8 @@ public class RoomRealtimeService {
     private static final String ROOM_SIGNAL_TOPIC_PREFIX = "/topic/rooms/";
     private static final String ROOM_SIGNAL_USER_QUEUE = "/queue/room-signals";
     private static final String SIGNAL_TYPE_PREFIX = "SIGNAL_";
+    private static final int EVENT_VERSION = 1;
 
-    private final RoomEventFactory roomEventFactory;
     private final SimpMessagingTemplate messagingTemplate;
 
     public void signal(SignalMessage message) {
@@ -27,7 +29,7 @@ public class RoomRealtimeService {
 
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         Long roomId = parseRoomId(message.roomId());
-        RoomEvent event = roomEventFactory.create(
+        RoomEvent event = createEvent(
                 roomId,
                 SIGNAL_TYPE_PREFIX + message.type().trim().toUpperCase(),
                 currentUserSso,
@@ -50,6 +52,18 @@ public class RoomRealtimeService {
         if (!StringUtils.hasText(message.type())) {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_SIGNAL_TYPE_REQUIRED);
         }
+    }
+
+    private RoomEvent createEvent(Long roomId, String type, String actor, Object payload) {
+        return new RoomEvent(
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                EVENT_VERSION,
+                String.valueOf(roomId),
+                type,
+                actor,
+                Instant.now(),
+                payload);
     }
 
     private Long parseRoomId(String roomId) {

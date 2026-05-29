@@ -11,6 +11,8 @@ import app.together.common.workflow.entity.RoomMember;
 import app.together.common.workflow.entity.RoomMemberId;
 import app.together.common.workflow.repository.RoomMemberRepository;
 import app.together.common.workflow.repository.RoomRepository;
+import app.together.workflow.manager.room.RoomDomainManager;
+import app.together.workflow.manager.room.RoomDomainManagerRegistry;
 import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.JoinRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
@@ -37,6 +39,8 @@ public class RoomService {
     private final RoomStateService roomStateService;
     private final RoomResponseMapper roomResponseMapper;
     private final RoomEventHandler roomEventHandler;
+    private final RoomJoinPolicyService roomJoinPolicyService;
+    private final RoomDomainManagerRegistry roomDomainManagerRegistry;
 
     public RoomResponse createRoom(String userSso, CreateRoomRequest request) {
         permissionCheckService.requireSystemPermission(Permission.ROOM_CREATE);
@@ -45,18 +49,17 @@ public class RoomService {
         Instant now = Instant.now();
         boolean isPublic = Boolean.TRUE.equals(request.isPublic());
         Room room = roomRepository.save(roomStateService.buildRoom(request, isPublic, userSso, now));
-        roomStateService.createOwnerMember(roomMemberRepository, room.getRoomId(), userSso, now);
+        roomDomainManager(room).createOwnerMember(roomMemberRepository, room.getRoomId(), userSso, now);
         return toRoomResponse(room);
     }
 
     public RoomResponse joinRoom(Long roomId, String userSso, JoinRoomRequest request) {
         permissionCheckService.requireSystemPermission(Permission.ROOM_JOIN);
-        roomValidator.validateJoinRequest(roomId, userSso);
+        roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireJoinableRoom(roomId);
-        roomValidator.ensureRoomIsJoinable(room, request);
+        roomJoinPolicyService.ensureRoomIsJoinable(room, request);
         roomGuardService.requireRoomHasCapacity(room);
-        roomValidator.validateJoinPolicyByRoomType(room);
 
         Instant now = Instant.now();
         RoomMember member = roomMemberRepository.findById(new RoomMemberId(roomId, userSso))
@@ -71,7 +74,7 @@ public class RoomService {
 
     public RoomResponse leaveRoom(Long roomId, String userSso) {
         permissionCheckService.requireSystemPermission(Permission.ROOM_CHAT);
-        roomValidator.validateMemberAction(roomId, userSso);
+        roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireRoom(roomId);
         roomGuardService.requireRoomOpenOrFull(room);
@@ -91,7 +94,7 @@ public class RoomService {
 
     public RoomResponse closeRoom(Long roomId, String userSso) {
         permissionCheckService.requireRoomRole(Permission.ROOM_DELETE, RoomRole.HOST);
-        roomValidator.validateOwnerAction(roomId, userSso);
+        roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireRoom(roomId);
         RoomMember host = roomGuardService.requireHost(roomId, userSso);
@@ -101,7 +104,7 @@ public class RoomService {
         roomStateService.closeRoom(room, userSso, now);
 
         List<RoomMember> members = roomMemberRepository.findByRoomId(roomId);
-        roomStateService.deactivateActiveMembers(members, now);
+        roomDomainManager(room).deactivateActiveMembers(members, now);
         roomMemberRepository.saveAll(members);
         roomEventHandler.record(roomId, "ROOM_CLOSED", userSso, room.getStatus());
         return toRoomResponse(room);
@@ -109,13 +112,13 @@ public class RoomService {
 
     public RoomResponse openRoom(Long roomId, String userSso) {
         permissionCheckService.requireRoomRole(Permission.ROOM_MODERATE, RoomRole.HOST);
-        roomValidator.validateOwnerAction(roomId, userSso);
+        roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireRoom(roomId);
         RoomMember host = roomGuardService.requireHost(roomId, userSso);
         roomGuardService.requireHost(host);
 
-        roomValidator.validateRoomCanBeOpened(room);
+        roomGuardService.requireRoomClosedOrDraft(room);
         roomStateService.openRoom(room);
         roomEventHandler.record(roomId, "ROOM_OPENED", userSso, room.getStatus());
         return toRoomResponse(room);
@@ -123,7 +126,7 @@ public class RoomService {
 
     public RoomResponse kickMember(Long roomId, String userSso, RoomMemberActionRequest request) {
         permissionCheckService.requireRoomRole(Permission.ROOM_KICK_MEMBER, RoomRole.HOST);
-        roomValidator.validateOwnerAction(roomId, userSso);
+        roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireRoom(roomId);
         RoomMember host = roomGuardService.requireHost(roomId, userSso);
@@ -146,7 +149,7 @@ public class RoomService {
 
     public RoomResponse transferOwner(Long roomId, String userSso, RoomMemberActionRequest request) {
         permissionCheckService.requireRoomRole(Permission.ROOM_MODERATE, RoomRole.HOST);
-        roomValidator.validateOwnerAction(roomId, userSso);
+        roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireRoom(roomId);
         RoomMember currentHost = roomGuardService.requireHost(roomId, userSso);
@@ -160,7 +163,7 @@ public class RoomService {
         }
 
         RoomMember targetMember = roomGuardService.requireTargetActiveMember(roomId, targetUserSso);
-        roomStateService.transferOwner(currentHost, targetMember);
+        roomDomainManager(room).transferOwner(currentHost, targetMember);
         roomMemberRepository.save(targetMember);
         roomMemberRepository.save(currentHost);
 
@@ -186,5 +189,9 @@ public class RoomService {
 
     private RoomResponse toRoomResponse(Room room) {
         return roomResponseMapper.toRoomResponse(room, roomMemberRepository.findByRoomId(room.getRoomId()));
+    }
+
+    private RoomDomainManager roomDomainManager(Room room) {
+        return roomDomainManagerRegistry.getRequired(room.getRoomType());
     }
 }

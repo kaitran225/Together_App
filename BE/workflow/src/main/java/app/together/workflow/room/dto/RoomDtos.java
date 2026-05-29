@@ -17,14 +17,8 @@ public final class RoomDtos {
             String inviteCode,
             String status,
             Boolean isPublic,
-            Boolean isPremium,
             Integer maxMembers,
             String roomType,
-            Boolean enableAudio,
-            Boolean enableVideo,
-            Boolean enableChat,
-            Integer baseMembers,
-            Integer extraMembersPurchased,
             Instant activatedAt,
             Instant expiresAt,
             Instant closedAt,
@@ -99,8 +93,25 @@ public final class RoomDtos {
             Boolean enableAudio,
             Boolean enableVideo,
             Boolean enableChat,
+            Boolean enableMic,
             Integer maxMembers,
+            String videoResolution,
             List<IceServerResponse> iceServers
+    ) {
+    }
+
+    public record RoomTimelineResponse(
+            Long roomId,
+            List<RoomTimelineItem> events
+    ) {
+    }
+
+    public record RoomTimelineItem(
+            Long roomId,
+            String eventType,
+            String actorSso,
+            String payload,
+            Instant eventAt
     ) {
     }
 }

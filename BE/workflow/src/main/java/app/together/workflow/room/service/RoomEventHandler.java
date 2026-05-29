@@ -2,6 +2,8 @@ package app.together.workflow.room.service;
 
 import app.together.common.workflow.entity.RoomEventEntity;
 import app.together.common.workflow.repository.RoomEventRepository;
+import app.together.workflow.room.dto.RoomDtos.RoomTimelineItem;
+import app.together.workflow.room.dto.RoomDtos.RoomTimelineResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +29,15 @@ public class RoomEventHandler {
     }
 
     @Transactional(readOnly = true)
-    public List<RoomEventEntity> findTimeline(Long roomId) {
-        return roomEventRepository.findByRoomIdOrderByEventAtDesc(roomId);
+    public RoomTimelineResponse findTimeline(Long roomId) {
+        List<RoomTimelineItem> items = roomEventRepository.findByRoomIdOrderByEventAtDesc(roomId).stream()
+                .map(event -> new RoomTimelineItem(
+                        event.getRoomId(),
+                        event.getEventType(),
+                        event.getActorSso(),
+                        event.getPayload(),
+                        event.getEventAt()))
+                .toList();
+        return new RoomTimelineResponse(roomId, items);
     }
 }

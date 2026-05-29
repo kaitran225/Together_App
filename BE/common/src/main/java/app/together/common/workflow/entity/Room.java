@@ -35,17 +35,8 @@ public class Room extends BaseAuditEntity {
     @Column(columnDefinition = "TEXT")
     String description;
 
-    @Column(name = "goal_description", columnDefinition = "TEXT")
-    String goalDescription;
-
-    @Column(name = "goal_duration_days")
-    Integer goalDurationDays;
-
     @Column(name = "max_members")
     Integer maxMembers;
-
-    @Column(name = "is_premium")
-    Boolean isPremium;
 
     @Column(name = "is_public")
     Boolean isPublic;
@@ -59,21 +50,6 @@ public class Room extends BaseAuditEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "room_type", nullable = false, length = 32)
     RoomType roomType;
-
-    @Column(name = "base_members")
-    Integer baseMembers;
-
-    @Column(name = "extra_members_purchased")
-    Integer extraMembersPurchased;
-
-    @Column(name = "enable_audio")
-    Boolean enableAudio;
-
-    @Column(name = "enable_video")
-    Boolean enableVideo;
-
-    @Column(name = "enable_chat")
-    Boolean enableChat;
 
     @Column(name = "activated_at")
     Instant activatedAt;

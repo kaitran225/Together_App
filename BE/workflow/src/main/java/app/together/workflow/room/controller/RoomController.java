@@ -6,7 +6,9 @@ import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.JoinRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomResponse;
+import app.together.workflow.room.dto.RoomDtos.RoomTimelineResponse;
 import app.together.workflow.room.dto.RoomDtos.RoomWebRtcConfigResponse;
+import app.together.workflow.room.service.RoomEventHandler;
 import app.together.workflow.room.service.RoomService;
 import app.together.workflow.room.service.RoomWebRtcConfigService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class RoomController {
 
     private final RoomService roomService;
     private final RoomWebRtcConfigService roomWebRtcConfigService;
+    private final RoomEventHandler roomEventHandler;
 
     @PostMapping
     public ApiResponse<RoomResponse> createRoom(@RequestBody CreateRoomRequest request) {
@@ -75,6 +78,11 @@ public class RoomController {
     @GetMapping("/{roomId}/webrtc-config")
     public ApiResponse<RoomWebRtcConfigResponse> getWebRtcConfig(@PathVariable Long roomId) {
         return ApiResponse.ok(roomWebRtcConfigService.getConfig(roomId));
+    }
+
+    @GetMapping("/{roomId}/timeline")
+    public ApiResponse<RoomTimelineResponse> getTimeline(@PathVariable Long roomId) {
+        return ApiResponse.ok(roomEventHandler.findTimeline(roomId));
     }
 
     private String requireCurrentUserSso() {

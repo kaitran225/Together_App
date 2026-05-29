@@ -17,7 +17,6 @@ public final class RoomDtos {
             String inviteCode,
             String status,
             Boolean isPublic,
-            Boolean isPremium,
             Integer maxMembers,
             Instant activatedAt,
             Instant expiresAt,

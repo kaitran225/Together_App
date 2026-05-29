@@ -5,6 +5,7 @@ import app.together.common.shared.exception.BadRequestException;
 import app.together.common.workflow.entity.Room;
 import app.together.common.workflow.enums.RoomStatus;
 import app.together.common.workflow.repository.RoomRepository;
+import app.together.workflow.room.config.RoomMediaProperties;
 import app.together.workflow.room.dto.RoomDtos.IceServerResponse;
 import app.together.workflow.room.dto.RoomDtos.RoomWebRtcConfigResponse;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.util.List;
 public class RoomWebRtcConfigService {
 
     private final RoomRepository roomRepository;
+    private final RoomMediaProperties roomMediaProperties;
 
     @Value("${app.webrtc.stun-urls:stun:stun.l.google.com:19302}")
     private String stunUrls;
@@ -45,13 +47,16 @@ public class RoomWebRtcConfigService {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_INVALID);
         }
 
+        RoomMediaProperties.Profile profile = roomMediaProperties.profileFor(room.getRoomType());
         return new RoomWebRtcConfigResponse(
                 room.getRoomId(),
                 room.getRoomType() == null ? null : room.getRoomType().name(),
-                room.getEnableAudio(),
-                room.getEnableVideo(),
-                room.getEnableChat(),
+                profile.audioEnabled(),
+                profile.videoEnabled(),
+                profile.chatEnabled(),
+                profile.micEnabled(),
                 room.getMaxMembers(),
+                profile.videoResolution(),
                 buildIceServers());
     }
 

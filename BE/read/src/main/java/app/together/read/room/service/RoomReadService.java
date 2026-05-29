@@ -49,7 +49,6 @@ public class RoomReadService {
                 room.getInviteCode(),
                 room.getStatus(),
                 room.getIsPublic(),
-                room.getIsPremium(),
                 room.getMaxMembers(),
                 room.getActivatedAt(),
                 room.getExpiresAt(),
