@@ -5,6 +5,7 @@ RUN apk add --no-cache curl
 COPY gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY gateway/app ./app
+COPY gateway/static ./static
 COPY templates ./templates
 ENV AI_TEMPLATES_DIR=/app/templates
 ENV PYTHONUNBUFFERED=1

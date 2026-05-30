@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Together AI — Test UI</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #1a1d27;
+      --border: #2d3348;
+      --text: #e8eaef;
+      --muted: #9aa3b5;
+      --accent: #6c8cff;
+      --ok: #3dd68c;
+      --bad: #f07178;
+      --user: #2a3558;
+      --bot: #1e2433;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+    header nav a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      margin-left: 1rem;
+    }
+    main {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      height: calc(100vh - 4rem);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: end;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      flex: 1;
+      min-width: 10rem;
+    }
+    input, select, textarea, button {
+      font: inherit;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      padding: 0.5rem 0.65rem;
+    }
+    textarea { resize: vertical; min-height: 2.5rem; }
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      padding: 0.55rem 1rem;
+    }
+    button.secondary {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text);
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .health { font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; }
+    .dot.ok { background: var(--ok); }
+    .dot.bad { background: var(--bad); }
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      min-height: 12rem;
+    }
+    .msg {
+      max-width: 90%;
+      padding: 0.65rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.user { align-self: flex-end; background: var(--user); }
+    .msg.assistant { align-self: flex-start; background: var(--bot); border: 1px solid var(--border); }
+    .msg.error { align-self: stretch; background: #3a2226; border: 1px solid var(--bad); color: #ffc9c9; }
+    .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+    .composer { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .composer textarea { flex: 1; }
+    #status { font-size: 0.8rem; color: var(--muted); min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Together AI — Gateway test</h1>
+    <nav>
+      <a href="/health" target="_blank">Health JSON</a>
+      <a href="/docs" target="_blank">Swagger</a>
+    </nav>
+  </header>
+  <main>
+    <section class="panel health" id="health">Loading health…</section>
+
+    <section class="panel row">
+      <label style="flex: 2;">
+        X-Internal-Api-Key
+        <input type="password" id="apiKey" placeholder="dev-internal-ai-key" autocomplete="off" />
+      </label>
+      <label>
+        LLM
+        <select id="llm">
+          <option value="smol">smol</option>
+          <option value="qwen">qwen</option>
+        </select>
+      </label>
+      <button type="button" class="secondary" id="clearBtn">Clear chat</button>
+    </section>
+
+    <section class="panel" id="chat" aria-live="polite"></section>
+
+    <section class="composer">
+      <textarea id="input" rows="2" placeholder="Type a message…"></textarea>
+      <button type="button" id="sendBtn">Send</button>
+    </section>
+    <p id="status"></p>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "together_ai_test_api_key";
+    const apiKeyEl = document.getElementById("apiKey");
+    const llmEl = document.getElementById("llm");
+    const chatEl = document.getElementById("chat");
+    const inputEl = document.getElementById("input");
+    const sendBtn = document.getElementById("sendBtn");
+    const statusEl = document.getElementById("status");
+    const healthEl = document.getElementById("health");
+
+    /** @type {{role: string, content: string}[]} */
+    let history = [];
+
+    apiKeyEl.value = localStorage.getItem(STORAGE_KEY) || "";
+    apiKeyEl.addEventListener("change", () => {
+      localStorage.setItem(STORAGE_KEY, apiKeyEl.value.trim());
+    });
+
+    function addMessage(role, content, meta) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      const body = document.createElement("div");
+      body.textContent = content;
+      div.appendChild(body);
+      if (meta) {
+        const m = document.createElement("div");
+        m.className = "meta";
+        m.textContent = meta;
+        div.appendChild(m);
+      }
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    async function refreshHealth() {
+      try {
+        const r = await fetch("/health");
+        const d = await r.json();
+        const smol = d.llm_smol ? "ok" : "bad";
+        const qwen = d.llm_qwen ? "ok" : "bad";
+        healthEl.innerHTML =
+          `<span><span class="dot ${smol}"></span>llm_smol: ${d.llm_smol}</span>` +
+          `<span><span class="dot ${qwen}"></span>llm_qwen: ${d.llm_qwen}</span>` +
+          `<span class="muted">smol → ${d.llm_smol_url || "—"}</span>` +
+          `<span class="muted">qwen → ${d.llm_qwen_url || "—"}</span>`;
+      } catch (e) {
+        healthEl.textContent = "Health check failed: " + e.message;
+      }
+    }
+
+    async function send() {
+      const text = inputEl.value.trim();
+      const key = apiKeyEl.value.trim();
+      if (!text) return;
+      if (!key) {
+        statusEl.textContent = "Set X-Internal-Api-Key first.";
+        return;
+      }
+      localStorage.setItem(STORAGE_KEY, key);
+      addMessage("user", text);
+      inputEl.value = "";
+      sendBtn.disabled = true;
+      statusEl.textContent = "Waiting for LLM (may take 30–60s on cold start)…";
+
+      const payload = {
+        message: text,
+        llm: llmEl.value,
+        context: history.length ? { chatHistory: history } : undefined,
+      };
+
+      try {
+        const r = await fetch("/api/v1/internal/ai/message", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Internal-Api-Key": key,
+          },
+          body: JSON.stringify(payload),
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const detail = body.detail || JSON.stringify(body);
+          addMessage("error", "HTTP " + r.status + ": " + detail);
+          statusEl.textContent = "Request failed.";
+          return;
+        }
+        const reply = body.chatReply || "(empty reply)";
+        history.push({ role: "user", content: text });
+        history.push({ role: "assistant", content: reply });
+        addMessage("assistant", reply, "llm: " + (body.llm || llmEl.value));
+        statusEl.textContent = "Done.";
+      } catch (e) {
+        addMessage("error", e.message);
+        statusEl.textContent = "Network error.";
+      } finally {
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", send);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send();
+      }
+    });
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      history = [];
+      chatEl.innerHTML = "";
+      statusEl.textContent = "Chat cleared.";
+    });
+
+    refreshHealth();
+    setInterval(refreshHealth, 30000);
+  </script>
+</body>
+</html>

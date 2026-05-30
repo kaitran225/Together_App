@@ -112,6 +112,7 @@ First start downloads GGUF into the image at build time; cold start may take 1â€
 - SmolLM: http://localhost:8896/health  
 - Qwen: http://localhost:8897/health  
 - Gateway: http://localhost:8898/health  
+- **Test UI:** http://localhost:8898/ (chat + health; set `X-Internal-Api-Key`)  
 - **Swagger UI:** http://localhost:8898/docs (or `/swagger-ui/index.html`)  
 - **OpenAPI JSON:** http://localhost:8898/openapi.json  
 

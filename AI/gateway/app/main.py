@@ -19,10 +19,12 @@ from app.template_loader import load_by_tool_name, load_index
 from app.tool_applier import apply_tool
 from app.tool_executor import run_agent, run_chat, suggest_events_from_calendar
 from app.workflow_apply_client import is_configured, persist_applied
+from app.test_ui import register_test_ui
 from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
 
 app = create_app()
 attach_openapi(app)
+register_test_ui(app)
 
 INTERNAL_KEY = os.getenv("AI_SERVICE_INTERNAL_API_KEY", "")
 
@@ -255,7 +257,9 @@ def _to_message_response(result: dict[str, Any], llm: str) -> AiMessageResponse:
 @app.get("/api/v1/ai/health", tags=["Health"])
 async def health() -> dict[str, Any]:
     smol_ok = qwen_ok = False
-    async with httpx.AsyncClient(timeout=8.0) as client:
+    smol_err: str | None = None
+    qwen_err: str | None = None
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         for url, name in ((SMOL_URL, "smol"), (QWEN_URL, "qwen")):
             try:
                 r = await client.get(f"{url}/health")
@@ -264,13 +268,27 @@ async def health() -> dict[str, Any]:
                         smol_ok = True
                     else:
                         qwen_ok = True
-            except httpx.HTTPError:
-                pass
+                else:
+                    msg = f"HTTP {r.status_code}"
+                    if name == "smol":
+                        smol_err = msg
+                    else:
+                        qwen_err = msg
+            except httpx.HTTPError as e:
+                msg = str(e) or type(e).__name__
+                if name == "smol":
+                    smol_err = msg
+                else:
+                    qwen_err = msg
     return {
         "status": "UP",
         "service": "ai-service",
         "llm_smol": smol_ok,
         "llm_qwen": qwen_ok,
+        "llm_smol_url": SMOL_URL,
+        "llm_qwen_url": QWEN_URL,
+        "llm_smol_error": smol_err,
+        "llm_qwen_error": qwen_err,
     }
 
 
