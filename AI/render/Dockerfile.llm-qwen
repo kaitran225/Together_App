@@ -11,6 +11,6 @@ COPY --from=model /models/model.gguf /models/model.gguf
 COPY shared/start-llama.sh /start-llama.sh
 RUN chmod +x /start-llama.sh
 WORKDIR /app
-ENV LLAMA_CTX=256 LLAMA_THREADS=2 LLAMA_BATCH=128
+ENV LLAMA_CTX=256000 LLAMA_THREADS=4 LLAMA_BATCH=128000
 EXPOSE 10000
 ENTRYPOINT ["/start-llama.sh"]
