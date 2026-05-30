@@ -28,7 +28,7 @@ Health paths:
   auth:      /swagger-ui/index.html
   email:     /health or /api/v1/email/health  (Swagger: /swagger-ui/index.html)
   llm-smol / llm-qwen:  /health
-  ai-gateway: /health or /api/v1/ai/health
+  ai-gateway: /health or /api/v1/ai/health  (Swagger: /docs or /swagger-ui/index.html)
   workflow:  /api/v1/workflow/health
   read:      /api/v1/read/health
   cronjob:   /actuator/health or /api/v1/cronjob/health  (Swagger: /swagger-ui/index.html)

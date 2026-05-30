@@ -81,6 +81,11 @@ def main() -> int:
     }
     for p in sorted(required):
         check(f"route {p}", p in paths)
+    check("openapi.json", "/openapi.json" in paths)
+    check("swagger /docs", "/docs" in paths)
+
+    schema = app.openapi()
+    check("security InternalApiKey", "InternalApiKey" in schema.get("components", {}).get("securitySchemes", {}))
 
     print()
     if ERRORS:

@@ -10,16 +10,19 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.llm_client import LlmChoice, QWEN_URL, SMOL_URL, resolve_llm
+from app.openapi_config import attach_openapi, create_app
 from app.template_loader import load_by_tool_name, load_index
 from app.tool_applier import apply_tool
 from app.tool_executor import run_agent, run_chat, suggest_events_from_calendar
 from app.workflow_apply_client import is_configured, persist_applied
 from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
 
-app = FastAPI(title="Together AI Service", version="2.0")
+app = create_app()
+attach_openapi(app)
 
 INTERNAL_KEY = os.getenv("AI_SERVICE_INTERNAL_API_KEY", "")
 
@@ -235,8 +238,8 @@ def _to_message_response(result: dict[str, Any], llm: str) -> AiMessageResponse:
     )
 
 
-@app.get("/health")
-@app.get("/api/v1/ai/health")
+@app.get("/health", tags=["Health"])
+@app.get("/api/v1/ai/health", tags=["Health"])
 async def health() -> dict[str, Any]:
     smol_ok = qwen_ok = False
     async with httpx.AsyncClient(timeout=8.0) as client:
@@ -258,7 +261,18 @@ async def health() -> dict[str, Any]:
     }
 
 
-@app.get("/api/v1/internal/ai/templates")
+@app.get("/swagger-ui/index.html", include_in_schema=False)
+async def swagger_ui_compat() -> RedirectResponse:
+    """Same path as Spring Boot services (email, workflow)."""
+    return RedirectResponse(url="/docs")
+
+
+@app.get("/swagger-ui.html", include_in_schema=False)
+async def swagger_ui_compat_alt() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
+
+
+@app.get("/api/v1/internal/ai/templates", tags=["Templates"])
 def list_templates(
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
 ) -> dict[str, Any]:
@@ -281,7 +295,7 @@ def list_templates(
     return {"version": index.get("version"), "tools": items}
 
 
-@app.get("/api/v1/internal/ai/templates/{tool_name}")
+@app.get("/api/v1/internal/ai/templates/{tool_name}", tags=["Templates"])
 def get_template(
     tool_name: str,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -290,7 +304,7 @@ def get_template(
     return load_by_tool_name(tool_name)
 
 
-@app.get("/api/v1/internal/ai/actions", response_model=ActionListResponse)
+@app.get("/api/v1/internal/ai/actions", response_model=ActionListResponse, tags=["Actions"])
 def action_list(
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
 ) -> ActionListResponse:
@@ -321,7 +335,7 @@ def action_list(
     return ActionListResponse(actions=actions)
 
 
-@app.post("/api/v1/internal/ai/message", response_model=AiMessageResponse)
+@app.post("/api/v1/internal/ai/message", response_model=AiMessageResponse, tags=["Chat"])
 async def get_message(
     body: MessageRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -344,7 +358,11 @@ async def get_message(
     return _to_message_response(result, choice.value)
 
 
-@app.post("/api/v1/internal/ai/message/attachments", response_model=AiMessageResponse)
+@app.post(
+    "/api/v1/internal/ai/message/attachments",
+    response_model=AiMessageResponse,
+    tags=["Chat"],
+)
 async def get_message_with_attachments(
     body: MessageWithAttachmentsRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -369,7 +387,7 @@ async def get_message_with_attachments(
     return _to_message_response(result, choice.value)
 
 
-@app.post("/api/v1/internal/ai/agent", response_model=AiMessageResponse)
+@app.post("/api/v1/internal/ai/agent", response_model=AiMessageResponse, tags=["Tool Agent"])
 async def tool_agent(
     body: AgentRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -403,7 +421,7 @@ async def tool_agent(
     )
 
 
-@app.post("/api/v1/internal/ai/apply", response_model=ApplyToolResponse)
+@app.post("/api/v1/internal/ai/apply", response_model=ApplyToolResponse, tags=["Apply"])
 async def apply_tool_endpoint(
     body: ApplyToolRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -448,7 +466,7 @@ async def apply_tool_endpoint(
     return ApplyToolResponse(appliedArtifact=artifact, persisted=persisted)
 
 
-@app.post("/api/v1/internal/ai/calendar/events", response_model=CalendarEventsResponse)
+@app.post("/api/v1/internal/ai/calendar/events", response_model=CalendarEventsResponse, tags=["Calendar"])
 async def get_event_list(
     body: CalendarEventsRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -472,7 +490,7 @@ async def get_event_list(
 # --- Legacy endpoints ---
 
 
-@app.post("/api/v1/internal/ai/chat", response_model=ChatResponse)
+@app.post("/api/v1/internal/ai/chat", response_model=ChatResponse, tags=["Legacy"])
 async def chat_legacy(
     body: ChatRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
@@ -493,7 +511,7 @@ async def chat_legacy(
     return ChatResponse(reply=result.get("chatReply") or "", llm=choice.value)
 
 
-@app.post("/api/v1/internal/ai/quiz/generate", response_model=QuizGenerateResponse)
+@app.post("/api/v1/internal/ai/quiz/generate", response_model=QuizGenerateResponse, tags=["Legacy"])
 async def quiz_generate_legacy(
     body: QuizGenerateRequest,
     x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),

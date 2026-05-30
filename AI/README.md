@@ -112,6 +112,10 @@ First start downloads GGUF into the image at build time; cold start may take 1â€
 - SmolLM: http://localhost:8896/health  
 - Qwen: http://localhost:8897/health  
 - Gateway: http://localhost:8898/health  
+- **Swagger UI:** http://localhost:8898/docs (or `/swagger-ui/index.html`)  
+- **OpenAPI JSON:** http://localhost:8898/openapi.json  
+
+In Swagger, click **Authorize** and set `X-Internal-Api-Key` (default local: `dev-internal-ai-key`).
 
 ```bash
 curl -X POST http://localhost:8898/api/v1/internal/ai/chat \
