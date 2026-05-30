@@ -7,11 +7,15 @@ from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
 
 
 def build_chat_system(personality: str | None, context_block: str) -> str:
-    tone = personality.strip() if personality and personality.strip() else "helpful study tutor"
-    return (
-        f"You are a Premium AI Tutor ({tone}). Answer clearly for students.\n"
-        f"{context_block}"
+    tone = personality.strip() if personality and personality.strip() else "friendly study tutor"
+    rules = (
+        "You are a helpful AI tutor. Reply in plain conversational text only.\n"
+        "Do not use JSON, markdown code fences, or repeat the same sentence.\n"
+        "Keep answers concise (1–4 sentences) unless the user asks for detail.\n"
     )
+    if context_block:
+        return f"{rules}Tone: {tone}.\n\n{context_block}"
+    return f"{rules}Tone: {tone}."
 
 
 def _tool_prompt_block(tool_name: str) -> str:

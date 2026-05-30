@@ -75,8 +75,8 @@ Runs **real small models** in Docker via [llama.cpp](https://github.com/ggml-org
 
 | Container | Model | GGUF size | Typical idle RSS* |
 |-----------|--------|-----------|-------------------|
-| `llm-smol` | DogeAI2.5-0.2B Q4_K_S | ~238MB | ~220–300MB |
-| `llm-qwen` | Qwen2.5-0.2B Q4_K_S | ~199MB | ~200–280MB |
+| `llm-smol` | SmolLM-135M-**Instruct** Q8_0 | ~145MB | ~180–260MB |
+| `llm-qwen` | Qwen2.5-0.5B-**Instruct** Q4_K_S | ~368MB | ~280–400MB |
 | `ai-gateway` | (router only, Python) | — | ~50–80MB |
 
 \*Idle = model **mmap**’d + `llama-server` with `-c 4096 -t 2 -np 1`. Lower `LLAMA_CTX` on Render if OOM.
@@ -131,8 +131,16 @@ Direct OpenAI-compatible API on each LLM:
 ```bash
 curl http://localhost:8896/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Hi"}],"max_tokens":64}'
+  -d '{"messages":[{"role":"user","content":"Hi"}],"max_tokens":128,"temperature":0.7,"repeat_penalty":1.15,"top_p":0.9}'
 ```
+
+### Testing in LM Studio / llama.cpp UI
+
+If you load `model.gguf` directly (not via gateway), use the **Instruct** files from the Dockerfiles and set:
+
+- Temperature **0.7**, Top P **0.9**, Repeat penalty **1.15**
+- Max tokens **256–512** (avoid unlimited — causes long JSON spam on weak models)
+- Do **not** use base `Qwen2.5-0.2B` / `DogeAI2.5-0.2B` for chat
 
 ## Memory tuning (Render 512MB)
 
@@ -140,10 +148,11 @@ Set on each LLM service:
 
 | Variable | Default | Notes |
 |----------|---------|--------|
-| `LLAMA_CTX` | `4096` | KV cache size; lower if OOM on Render |
+| `LLAMA_CTX` | `2048` | KV cache size; lower if OOM on Render |
 | `LLAMA_THREADS` | `2` | Match Render CPU |
 | `LLAMA_BATCH` | `128` | Lower if OOM during inference |
-| `AI_MAX_TOKENS` | `0` | `0` = no reply cap; set e.g. `512` to limit output length |
+| `AI_MAX_TOKENS` | `512` | Cap reply length; stops runaway JSON/text |
+| `AI_REPEAT_PENALTY` | `1.15` | Reduces repetitive outputs |
 
 Pass prior turns in `context.chatHistory` (`user` / `assistant`). Document/calendar/behavior context is not truncated.
 

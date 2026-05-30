@@ -3,7 +3,7 @@ from typing import Any
 
 import httpx
 
-from app.llm_client import LlmChoice, complete
+from app.llm_client import LlmChoice, complete, complete_chat
 from app.prompt_builder import build_agent_system, build_chat_system, build_context_block
 from app.tool_applier import AppliedArtifact, apply_tool
 from app.tool_validator import MAX_RETRIES, parse_and_validate
@@ -26,7 +26,7 @@ async def run_chat(
         tokens.extend(attachment_excerpts)
     ctx = build_context_block(tokens, calendar_json, user_behavior)
     system = build_chat_system(personality, ctx)
-    reply = await complete(llm, message, system, chat_history=chat_history)
+    reply = await complete_chat(llm, message, system, chat_history=chat_history)
     return {
         "actionType": ActionType.CHAT.value,
         "valid": True,
