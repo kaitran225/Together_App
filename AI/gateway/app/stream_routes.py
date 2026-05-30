@@ -4,8 +4,11 @@ from __future__ import annotations
 import httpx
 from fastapi import Header
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.chat_history_util import sanitize_history_turns, sanitize_openai_messages
 from app.llm_client import CHAT_STOP, LlmChoice, chat_mode, resolve_llm
 from app.llm_stream import stream_llm_sse
 from app.sse_util import SSE_HEADERS, sse_encode
@@ -21,9 +24,16 @@ def _streaming_response(gen) -> StreamingResponse:
 
 
 class ProxyChatRequest(BaseModel):
-    messages: list[dict[str, str]] = Field(min_length=1)
+    model_config = ConfigDict(extra="ignore")
+
+    messages: list[dict[str, Any]] = Field(min_length=1)
     llm: LlmChoice | None = None
     max_tokens: int | None = None
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _clean_messages(cls, v: Any) -> list[dict[str, str]]:
+        return sanitize_openai_messages(v)
 
 
 def register_stream_routes(app, *, require_internal_key, ctx_from_message) -> None:
@@ -42,6 +52,9 @@ def register_stream_routes(app, *, require_internal_key, ctx_from_message) -> No
             if body.chat_history
             else None
         )
+        # Current turn is body.message; history must not include it again
+        if history and history[-1].get("role") == "user" and history[-1].get("content") == body.message:
+            history = history[:-1] or None
         messages = messages_for_fast_chat(
             body.message,
             chat_history=history,

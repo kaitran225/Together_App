@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.llm_client import (
     LlmChoice,
@@ -27,6 +27,7 @@ from app.llm_client import (
     resolve_llm,
     using_compose_default_urls,
 )
+from app.chat_history_util import sanitize_history_turns
 from app.llm_http import close_http_client
 from app.openapi_config import attach_openapi, create_app
 from app.template_loader import load_by_tool_name, load_index
@@ -80,6 +81,12 @@ class AiContext(BaseModel):
     user_behavior: Any | None = Field(default=None, alias="userBehavior")
     chat_history: list[ChatTurn] | None = Field(default=None, alias="chatHistory")
 
+    @field_validator("chat_history", mode="before")
+    @classmethod
+    def _clean_chat_history(cls, v: Any) -> Any:
+        cleaned = sanitize_history_turns(v)
+        return cleaned
+
 
 class MessageRequest(BaseModel):
     message: str = Field(min_length=1)
@@ -97,6 +104,18 @@ class FastChatRequest(BaseModel):
     chat_history: list[ChatTurn] | None = Field(default=None, alias="chatHistory")
     max_tokens: int | None = Field(default=None, ge=16, le=2048)
     system: str | None = None
+
+    @field_validator("chat_history", mode="before")
+    @classmethod
+    def _clean_chat_history(cls, v: Any) -> Any:
+        return sanitize_history_turns(v)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def _strip_message(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 class MessageWithAttachmentsRequest(BaseModel):

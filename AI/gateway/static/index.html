@@ -473,6 +473,31 @@
       return { div, body, meta };
     }
 
+    function formatApiDetail(detail) {
+      if (detail == null) return "unknown error";
+      if (typeof detail === "string") return detail;
+      if (Array.isArray(detail)) {
+        return detail
+          .map((d) => {
+            const loc = (d.loc || []).filter((x) => x !== "body").join(".");
+            return (loc ? loc + ": " : "") + (d.msg || JSON.stringify(d));
+          })
+          .join("; ");
+      }
+      if (typeof detail === "object") return JSON.stringify(detail);
+      return String(detail);
+    }
+
+    function sanitizeHistory(h) {
+      return (h || []).filter(
+        (t) =>
+          t &&
+          t.content &&
+          String(t.content).trim() &&
+          ["system", "user", "assistant"].includes(String(t.role || "").toLowerCase())
+      ).map((t) => ({ role: String(t.role).toLowerCase(), content: String(t.content).trim() }));
+    }
+
     /** POST + read SSE (event: token | done | error). */
     async function postSSE(url, payload, headers) {
       const t0 = performance.now();
@@ -483,8 +508,7 @@
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        const detail = err.detail || (typeof err === "string" ? err : JSON.stringify(err));
-        throw new Error("HTTP " + r.status + ": " + detail);
+        throw new Error("HTTP " + r.status + ": " + formatApiDetail(err.detail || err));
       }
       const { div, body, meta } = createStreamingBubble();
       const reader = r.body.getReader();
@@ -593,17 +617,22 @@
       const mode = modeEl.value;
       const llm = llmEl.value;
       const headers = { "X-Internal-Api-Key": key };
+      const prior = sanitizeHistory(history);
 
       try {
         if (mode === "fast") {
           const result = await postSSE(
             "/api/v1/internal/ai/chat/fast/stream",
-            { message: text, llm, chatHistory: history.length ? history : undefined },
+            {
+              message: text,
+              llm,
+              ...(prior.length ? { chatHistory: prior } : {}),
+            },
             headers
           );
           finishStreamTurn(text, result, "fast");
         } else if (mode === "direct") {
-          const messages = history.concat([{ role: "user", content: text }]);
+          const messages = prior.concat([{ role: "user", content: text }]);
           const result = await postSSE(
             "/api/v1/ai/proxy/chat/stream",
             { messages, llm },
@@ -616,7 +645,7 @@
             {
               message: text,
               llm,
-              context: history.length ? { chatHistory: history } : undefined,
+              ...(prior.length ? { context: { chatHistory: prior } } : {}),
             },
             headers
           );
