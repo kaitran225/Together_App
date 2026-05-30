@@ -9,7 +9,13 @@ from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
 def build_chat_system_lite(personality: str | None, context_block: str) -> str:
     """Short system prompt — fewer prompt tokens, faster on small models."""
     tone = personality.strip() if personality and personality.strip() else "tutor"
-    base = f"You are a helpful {tone}. Reply briefly in plain text."
+    base = (
+        f"You are a helpful {tone}. "
+        "Reply only to the user's latest message. "
+        "Stay on the same topic as the conversation. "
+        "Do not change subject or invent a new question. "
+        "Use plain text, no JSON."
+    )
     if context_block:
         return f"{base}\n\n{context_block}"
     return base

@@ -188,8 +188,8 @@ async def structure_messages(
 
 
 def _format_user_turn(text: str) -> str:
-    """Light structure so small instruct models stay on-topic."""
+    """Prefix the user turn only — never put 'Answer' in the user message (models continue it)."""
     body = text.strip()
     if body.startswith("## "):
         return body
-    return f"## Question\n{body}\n\n## Answer"
+    return f"User: {body}"
