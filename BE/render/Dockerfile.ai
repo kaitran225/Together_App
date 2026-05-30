@@ -1,0 +1,13 @@
+# AI gateway (routes to 2 LLM services). Repo root | Dockerfile Path: BE/render/Dockerfile.ai
+
+FROM python:3.12-alpine
+WORKDIR /app
+RUN apk add --no-cache curl
+COPY AI/gateway/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY AI/gateway/app ./app
+COPY AI/templates ./templates
+ENV AI_TEMPLATES_DIR=/app/templates
+ENV PYTHONUNBUFFERED=1
+EXPOSE 10000
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

@@ -14,15 +14,21 @@ Each image runs:
   then mvnw -f common/pom.xml install (if the service depends on common)
   then mvnw -f <service>/pom.xml package
 
-Suggested names: together-auth, together-email, together-workflow, together-read, together-cronjob
+Suggested names: together-auth, together-email, together-llm-smol, together-llm-qwen, together-ai, together-workflow, together-read, together-cronjob
 
   Dockerfile Path: render/Dockerfile.email  (set MAIL_*, EMAIL_SERVICE_INTERNAL_API_KEY on the email service)
+  AI on-device LLMs (~300MB idle each, 512MB Render free — see AI/README.md):
+    render/Dockerfile.ai-smol  → LLAMA_CTX=256, LLAMA_THREADS=2
+    render/Dockerfile.ai-qwen  → same
+    render/Dockerfile.ai       → LLM_SMOL_URL, LLM_QWEN_URL, AI_SERVICE_INTERNAL_API_KEY
 
 Default Spring profile in images: dev (SPRING_PROFILES_ACTIVE=dev). Override in Render Environment if needed.
 
 Health paths:
   auth:      /swagger-ui/index.html
   email:     /health or /api/v1/email/health  (Swagger: /swagger-ui/index.html)
+  llm-smol / llm-qwen:  /health
+  ai-gateway: /health or /api/v1/ai/health
   workflow:  /api/v1/workflow/health
   read:      /api/v1/read/health
   cronjob:   /actuator/health or /api/v1/cronjob/health  (Swagger: /swagger-ui/index.html)

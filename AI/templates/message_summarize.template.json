@@ -1,0 +1,20 @@
+{
+  "tool": "MESSAGE_SUMMARIZE",
+  "version": "1",
+  "artifact": "SUMMARY",
+  "llmInstructions": "Reply with ONLY one JSON object. summaryType is brief or detailed.",
+  "template": {
+    "tool": "MESSAGE_SUMMARIZE",
+    "summary": {
+      "content": "",
+      "summaryType": "brief"
+    }
+  },
+  "example": {
+    "tool": "MESSAGE_SUMMARIZE",
+    "summary": {
+      "content": "Three key points from the notes...",
+      "summaryType": "brief"
+    }
+  }
+}
