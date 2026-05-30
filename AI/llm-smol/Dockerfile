@@ -1,9 +1,9 @@
-# LLM #1 — SmolLM2-360M Q4_K_M (~271MB). bartowski quant; official HF repo only ships q8_0.
+# LLM #1 — SmolLM-135M-Instruct Q8_0 (~145MB). Official HuggingFaceTB GGUF repo.
 FROM alpine:3.20 AS model
 RUN apk add --no-cache curl
 RUN mkdir -p /models \
  && curl -fsSL -o /models/model.gguf \
-  "https://huggingface.co/bartowski/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf"
+  "https://huggingface.co/HuggingFaceTB/smollm-135M-instruct-v0.2-Q8_0-GGUF/resolve/main/smollm-135m-instruct-add-basics-q8_0.gguf"
 
 FROM --platform=linux/amd64 ghcr.io/ggml-org/llama.cpp:server
 COPY --from=model /models/model.gguf /models/model.gguf

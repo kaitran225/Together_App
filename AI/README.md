@@ -75,8 +75,8 @@ Runs **real small models** in Docker via [llama.cpp](https://github.com/ggml-org
 
 | Container | Model | GGUF size | Typical idle RSS* |
 |-----------|--------|-----------|-------------------|
-| `llm-smol` | SmolLM2-360M-Instruct Q4_K_M | ~230MB | ~280–320MB |
-| `llm-qwen` | Qwen2.5-0.5B-Instruct Q4_K_S | ~350MB | ~300–380MB |
+| `llm-smol` | SmolLM-135M-Instruct Q8_0 | ~145MB | ~180–240MB |
+| `llm-qwen` | Qwen2.5-0.2B Q8_0 | ~246MB | ~220–300MB |
 | `ai-gateway` | (router only, Python) | — | ~50–80MB |
 
 \*Idle = model **mmap**’d + `llama-server` with `-c 256 -t 2 -np 1`. Spikes during generation; keep `AI_MAX_TOKENS` low on Render.

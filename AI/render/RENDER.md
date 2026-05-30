@@ -37,12 +37,10 @@ WORKFLOW_SERVICE_INTERNAL_API_KEY=<workflow-secret>
 
 ## Build note
 
-First deploy downloads GGUF models during Docker build (5–15 min).
+First deploy downloads GGUF models during Docker build (3–10 min).
 
-- **Smol:** `bartowski/SmolLM2-360M-Instruct-GGUF` → `SmolLM2-360M-Instruct-Q4_K_M.gguf` (~271MB)
-- **Qwen:** `Qwen/Qwen2.5-0.5B-Instruct-GGUF` → `qwen2.5-0.5b-instruct-q4_0.gguf` (~428MB)
-
-The official `HuggingFaceTB/SmolLM2-360M-Instruct-GGUF` repo only ships `q8_0`; older `Q4_K_M` filenames return 404.
+- **Smol:** `HuggingFaceTB/smollm-135M-instruct-v0.2-Q8_0-GGUF` → `smollm-135m-instruct-add-basics-q8_0.gguf` (~145MB)
+- **Qwen:** `mradermacher/Qwen2.5-0.2B-GGUF` → `Qwen2.5-0.2B.Q8_0.gguf` (~246MB)
 
 ## Local equivalent
 
