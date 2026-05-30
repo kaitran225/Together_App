@@ -5,10 +5,11 @@ RUN mkdir -p /models \
  && curl -fsSL -o /models/model.gguf \
   "https://huggingface.co/bartowski/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf"
 
-FROM ghcr.io/ggml-org/llama.cpp:server
+FROM --platform=linux/amd64 ghcr.io/ggml-org/llama.cpp:server
 COPY --from=model /models/model.gguf /models/model.gguf
 COPY shared/start-llama.sh /start-llama.sh
 RUN chmod +x /start-llama.sh
+WORKDIR /app
 ENV LLAMA_MODEL_PATH=/models/model.gguf
 ENV LLAMA_CTX=256
 ENV LLAMA_THREADS=2
