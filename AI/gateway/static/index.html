@@ -3,179 +3,387 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Together AI — Test UI</title>
+  <title>llama.cpp — Together AI</title>
   <style>
     :root {
-      --bg: #0f1117;
-      --panel: #1a1d27;
-      --border: #2d3348;
-      --text: #e8eaef;
-      --muted: #9aa3b5;
-      --accent: #6c8cff;
-      --ok: #3dd68c;
-      --bad: #f07178;
-      --user: #2a3558;
-      --bot: #1e2433;
+      --bg: #0d0d0d;
+      --surface: #141414;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --muted: #888;
+      --accent: #4a9eff;
+      --user-bg: #1f2a3a;
+      --bot-bg: #1a1a1a;
+      --fast: #3dd68c;
+      --ok: #e8c547;
+      --slow: #f5a623;
+      --very-slow: #f07178;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
     body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-    }
-    header {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem 1.5rem;
-      align-items: center;
-      justify-content: space-between;
-    }
-    header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-    header nav a {
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 0.9rem;
-      margin-left: 1rem;
-    }
-    main {
-      max-width: 52rem;
-      margin: 0 auto;
-      padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      height: calc(100vh - 4rem);
+      overflow: hidden;
     }
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0.85rem 1rem;
+    .top-links {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      z-index: 5;
+      font-size: 0.7rem;
     }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      align-items: end;
-    }
-    label {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      font-size: 0.75rem;
-      color: var(--muted);
+    .top-links a { color: var(--muted); margin-left: 0.75rem; text-decoration: none; }
+    .top-links a:hover { color: var(--accent); }
+    .layout {
       flex: 1;
-      min-width: 10rem;
+      display: flex;
+      min-height: 0;
     }
-    input, select, textarea, button {
-      font: inherit;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--text);
-      padding: 0.5rem 0.65rem;
+    .chat-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
     }
-    textarea { resize: vertical; min-height: 2.5rem; }
-    button {
-      cursor: pointer;
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-      font-weight: 600;
-      padding: 0.55rem 1rem;
-    }
-    button.secondary {
-      background: transparent;
-      border-color: var(--border);
-      color: var(--text);
-    }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .health { font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
-    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; }
-    .dot.ok { background: var(--ok); }
-    .dot.bad { background: var(--bad); }
     #chat {
       flex: 1;
       overflow-y: auto;
+      padding: 1.5rem 1rem 0.5rem;
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
-      min-height: 12rem;
+      gap: 0.75rem;
     }
     .msg {
-      max-width: 90%;
-      padding: 0.65rem 0.85rem;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      line-height: 1.45;
+      max-width: min(42rem, 92%);
+      padding: 0.6rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      line-height: 1.5;
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .msg.user { align-self: flex-end; background: var(--user); }
-    .msg.assistant { align-self: flex-start; background: var(--bot); border: 1px solid var(--border); }
-    .msg.error { align-self: stretch; background: #3a2226; border: 1px solid var(--bad); color: #ffc9c9; }
-    .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
-    .composer { display: flex; gap: 0.5rem; align-items: flex-end; }
-    .composer textarea { flex: 1; }
-    #status { font-size: 0.8rem; color: var(--muted); min-height: 1.2em; }
+    .msg.user { align-self: flex-end; background: var(--user-bg); }
+    .msg.assistant { align-self: flex-start; background: var(--bot-bg); border: 1px solid var(--border); }
+    .msg.error { align-self: stretch; border: 1px solid var(--very-slow); color: #ffc9c9; }
+    .msg .meta { font-size: 0.65rem; color: var(--muted); margin-top: 0.35rem; }
+    .bottom-bar {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      padding: 0.35rem 0.75rem 0.6rem;
+    }
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      align-items: center;
+    }
+    .stats strong { color: var(--text); font-weight: 500; }
+    .badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .badge.fast { background: #1a3d2e; color: var(--fast); }
+    .badge.ok { background: #3d361a; color: var(--ok); }
+    .badge.slow { background: #3d2a1a; color: var(--slow); }
+    .badge.very_slow { background: #3d2226; color: var(--very-slow); }
+    .health-dots { display: flex; gap: 0.5rem; align-items: center; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot.on { background: var(--fast); }
+    .dot.off { background: var(--very-slow); }
+    .input-row {
+      display: flex;
+      gap: 0.45rem;
+      align-items: flex-end;
+    }
+    select, input, textarea, button {
+      font: inherit;
+      font-size: 0.8rem;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    select, input { padding: 0.4rem 0.5rem; }
+    textarea {
+      flex: 1;
+      resize: none;
+      min-height: 2.2rem;
+      max-height: 8rem;
+      padding: 0.45rem 0.55rem;
+      line-height: 1.4;
+    }
+    button {
+      cursor: pointer;
+      padding: 0.45rem 0.85rem;
+      background: #2a2a2a;
+      border-color: #444;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .model-pill {
+      max-width: 11rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.72rem;
+      padding: 0.4rem 0.55rem;
+      cursor: pointer;
+      background: #1e1e1e;
+    }
+    .metrics-panel {
+      width: 18rem;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      transition: width 0.15s, margin 0.15s;
+    }
+    .metrics-panel.collapsed {
+      width: 0;
+      border: none;
+      overflow: hidden;
+    }
+    .metrics-panel header {
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+    }
+    .metrics-panel header button {
+      padding: 0.2rem 0.45rem;
+      font-size: 0.65rem;
+    }
+    .metrics-table-wrap {
+      flex: 1;
+      overflow: auto;
+      font-size: 0.62rem;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 0.3rem 0.4rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); position: sticky; top: 0; background: var(--surface); }
+    .metrics-summary {
+      padding: 0.45rem 0.65rem;
+      font-size: 0.65rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+    .settings {
+      display: none;
+      padding: 0.5rem 0.75rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .settings.open { display: flex; }
+    .settings label { display: flex; flex-direction: column; gap: 0.2rem; color: var(--muted); flex: 1; min-width: 10rem; }
+    .settings input { width: 100%; }
+    .toggle-metrics {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      writing-mode: vertical-rl;
+      padding: 0.5rem 0.25rem;
+      font-size: 0.65rem;
+      border-radius: 4px 0 0 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-right: none;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    @media (max-width: 720px) {
+      .metrics-panel { position: fixed; right: 0; top: 0; bottom: 0; z-index: 10; box-shadow: -4px 0 12px #0008; }
+      .metrics-panel.collapsed { width: 0; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Together AI — Gateway test</h1>
-    <nav>
-      <a href="/health" target="_blank">Health JSON</a>
-      <a href="/docs" target="_blank">Swagger</a>
-    </nav>
-  </header>
-  <main>
-    <section class="panel health" id="health">Loading health…</section>
+  <div class="top-links">
+    <a href="/health" target="_blank">health</a>
+    <a href="/docs" target="_blank">api</a>
+  </div>
 
-    <section class="panel row">
-      <label style="flex: 2;">
-        X-Internal-Api-Key
-        <input type="password" id="apiKey" placeholder="dev-internal-ai-key" autocomplete="off" />
-      </label>
-      <label>
-        LLM
-        <select id="llm">
-          <option value="smol">smol</option>
-          <option value="qwen">qwen</option>
-        </select>
-      </label>
-      <button type="button" class="secondary" id="clearBtn">Clear chat</button>
-    </section>
+  <div class="layout">
+    <div class="chat-wrap">
+      <div id="chat" aria-live="polite"></div>
 
-    <section class="panel" id="chat" aria-live="polite"></section>
+      <footer class="bottom-bar">
+        <div class="stats">
+          <span class="health-dots" id="healthDots" title="LLM backends"></span>
+          <span>Context: <strong id="ctxUsed">0</strong> / <strong id="ctxMax">2048</strong></span>
+          <span>Output: <strong id="outTok">0</strong> tok</span>
+          <span>Speed: <strong id="speed">—</strong> t/s</span>
+          <span>Latency: <strong id="latency">—</strong></span>
+          <span class="badge" id="ratingBadge">—</span>
+        </div>
 
-    <section class="composer">
-      <textarea id="input" rows="2" placeholder="Type a message…"></textarea>
-      <button type="button" id="sendBtn">Send</button>
-    </section>
-    <p id="status"></p>
-  </main>
+        <div class="settings" id="settings">
+          <label>
+            X-Internal-Api-Key
+            <input type="password" id="apiKey" autocomplete="off" />
+          </label>
+          <label>
+            Mode
+            <select id="mode">
+              <option value="gateway">Gateway (workflow chat)</option>
+              <option value="direct">Direct (llama-server)</option>
+            </select>
+          </label>
+          <button type="button" id="benchBtn">Benchmark LLMs</button>
+          <button type="button" id="clearMetricsBtn">Clear metrics</button>
+        </div>
+
+        <div class="input-row">
+          <button type="button" class="model-pill" id="modelBtn" title="Switch model">…</button>
+          <select id="llm" style="display:none" aria-hidden="true">
+            <option value="smol">smol</option>
+            <option value="qwen">qwen</option>
+          </select>
+          <textarea id="input" rows="1" placeholder="Send a message"></textarea>
+          <button type="button" id="settingsBtn" title="Settings">⚙</button>
+          <button type="button" class="primary" id="sendBtn">Send</button>
+        </div>
+      </footer>
+    </div>
+
+    <aside class="metrics-panel" id="metricsPanel">
+      <header>
+        <span>API metrics</span>
+        <button type="button" id="collapseMetrics">×</button>
+      </header>
+      <div class="metrics-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Mode</th>
+              <th>LLM</th>
+              <th>ms</th>
+              <th>out</th>
+              <th>t/s</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="metricsBody"></tbody>
+        </table>
+      </div>
+      <div class="metrics-summary" id="metricsSummary">No requests yet.</div>
+    </aside>
+  </div>
+
+  <button type="button" class="toggle-metrics" id="openMetrics">metrics</button>
 
   <script>
     const STORAGE_KEY = "together_ai_test_api_key";
+    const METRICS_KEY = "together_ai_metrics_v1";
+
     const apiKeyEl = document.getElementById("apiKey");
     const llmEl = document.getElementById("llm");
+    const modelBtn = document.getElementById("modelBtn");
+    const modeEl = document.getElementById("mode");
     const chatEl = document.getElementById("chat");
     const inputEl = document.getElementById("input");
     const sendBtn = document.getElementById("sendBtn");
-    const statusEl = document.getElementById("status");
-    const healthEl = document.getElementById("health");
+    const settingsEl = document.getElementById("settings");
+    const metricsBody = document.getElementById("metricsBody");
+    const metricsSummary = document.getElementById("metricsSummary");
+    const metricsPanel = document.getElementById("metricsPanel");
 
-    /** @type {{role: string, content: string}[]} */
     let history = [];
+    /** @type {{label:string, id:string}[]} */
+    let modelLabels = { smol: "smol", qwen: "qwen" };
+    let ctxMax = 2048;
+    let lastOutTok = 0;
+    let lastSpeed = null;
+    let healthHintShown = false;
+    /** @type {object[]} */
+    let metricsLog = JSON.parse(sessionStorage.getItem(METRICS_KEY) || "[]");
 
-    apiKeyEl.value = localStorage.getItem(STORAGE_KEY) || "";
-    apiKeyEl.addEventListener("change", () => {
-      localStorage.setItem(STORAGE_KEY, apiKeyEl.value.trim());
-    });
+    function syncMetricsToggle() {
+      document.getElementById("openMetrics").style.display =
+        metricsPanel.classList.contains("collapsed") ? "block" : "none";
+    }
+
+    function estTokens(text) {
+      return Math.max(1, Math.ceil((text || "").length / 4));
+    }
+
+    function contextUsed() {
+      return history.reduce((n, t) => n + estTokens(t.content), 0);
+    }
+
+    function updateStatusBar(metrics) {
+      document.getElementById("ctxUsed").textContent = String(contextUsed());
+      document.getElementById("ctxMax").textContent = String(ctxMax);
+      const out = metrics?.completion_tokens ?? lastOutTok;
+      document.getElementById("outTok").textContent = String(out);
+      const tps = metrics?.tokens_per_second ?? lastSpeed;
+      document.getElementById("speed").textContent = tps != null ? String(tps) : "—";
+      const ms = metrics?.latency_ms;
+      document.getElementById("latency").textContent = ms != null ? ms + " ms" : "—";
+      const badge = document.getElementById("ratingBadge");
+      const rating = metrics?.rating || "—";
+      badge.textContent = rating;
+      badge.className = "badge " + (rating === "—" ? "" : rating);
+    }
+
+    function saveMetrics() {
+      sessionStorage.setItem(METRICS_KEY, JSON.stringify(metricsLog.slice(-50)));
+      renderMetricsTable();
+    }
+
+    function recordMetric(row) {
+      metricsLog.push(row);
+      saveMetrics();
+    }
+
+    function renderMetricsTable() {
+      metricsBody.innerHTML = "";
+      const rows = metricsLog.slice().reverse().slice(0, 30);
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML =
+          "<td>" + r.time + "</td>" +
+          "<td>" + r.mode + "</td>" +
+          "<td>" + r.llm + "</td>" +
+          "<td>" + r.ms + "</td>" +
+          "<td>" + (r.outTok ?? "—") + "</td>" +
+          "<td>" + (r.tps ?? "—") + "</td>" +
+          '<td><span class="badge ' + r.rating + '">' + r.rating + "</span></td>";
+        metricsBody.appendChild(tr);
+      }
+      if (!metricsLog.length) {
+        metricsSummary.textContent = "No requests yet.";
+        return;
+      }
+      const avg = metricsLog.reduce((s, r) => s + r.ms, 0) / metricsLog.length;
+      const fast = metricsLog.filter((r) => r.rating === "fast").length;
+      const slow = metricsLog.filter((r) => ["slow", "very_slow"].includes(r.rating)).length;
+      metricsSummary.textContent =
+        metricsLog.length + " calls · avg " + Math.round(avg) + " ms · " +
+        fast + " fast · " + slow + " slow";
+    }
 
     function addMessage(role, content, meta) {
       const div = document.createElement("div");
@@ -193,23 +401,56 @@
       chatEl.scrollTop = chatEl.scrollHeight;
     }
 
-    async function refreshHealth() {
+    function syncModelBtn() {
+      const id = llmEl.value;
+      modelBtn.textContent = modelLabels[id] || id;
+    }
+
+    modelBtn.addEventListener("click", () => {
+      llmEl.value = llmEl.value === "smol" ? "qwen" : "smol";
+      syncModelBtn();
+    });
+    llmEl.addEventListener("change", syncModelBtn);
+
+    async function loadUiConfig() {
       try {
-        const r = await fetch("/health");
+        const r = await fetch("/api/v1/ai/ui-config");
         const d = await r.json();
-        const smol = d.llm_smol ? "ok" : "bad";
-        const qwen = d.llm_qwen ? "ok" : "bad";
-        let html =
-          `<span><span class="dot ${smol}"></span>llm_smol: ${d.llm_smol}</span>` +
-          `<span><span class="dot ${qwen}"></span>llm_qwen: ${d.llm_qwen}</span>` +
-          `<span class="muted">smol → ${d.llm_smol_url || "—"}</span>` +
-          `<span class="muted">qwen → ${d.llm_qwen_url || "—"}</span>`;
-        if (d.hint) {
-          html += `<span style="color:#f07178;width:100%">${d.hint}</span>`;
+        ctxMax = d.contextSize || 2048;
+        document.getElementById("ctxMax").textContent = String(ctxMax);
+        if (d.models) {
+          modelLabels = {
+            smol: d.models.smol?.label || "smol",
+            qwen: d.models.qwen?.label || "qwen",
+          };
         }
-        healthEl.innerHTML = html;
+        const stored = localStorage.getItem(STORAGE_KEY);
+        apiKeyEl.value = stored || d.defaultApiKey || "";
+        if (d.defaultLlm) llmEl.value = d.defaultLlm;
+        syncModelBtn();
       } catch (e) {
-        healthEl.textContent = "Health check failed: " + e.message;
+        apiKeyEl.value = localStorage.getItem(STORAGE_KEY) || "dev-internal-ai-key";
+        syncModelBtn();
+      }
+    }
+
+    async function refreshHealth() {
+      const dots = document.getElementById("healthDots");
+      try {
+        const t0 = performance.now();
+        const r = await fetch("/health");
+        const healthMs = Math.round(performance.now() - t0);
+        const d = await r.json();
+        dots.innerHTML =
+          '<span class="dot ' + (d.llm_smol ? "on" : "off") + '" title="smol"></span>' +
+          '<span class="dot ' + (d.llm_qwen ? "on" : "off") + '" title="qwen"></span>' +
+          '<span style="margin-left:0.25rem">health ' + healthMs + "ms</span>";
+        if (d.hint && !healthHintShown) {
+          healthHintShown = true;
+          addMessage("error", d.hint);
+        }
+      } catch (e) {
+        dots.innerHTML = '<span style="color:var(--very-slow)">health err</span>';
       }
     }
 
@@ -218,49 +459,187 @@
       const key = apiKeyEl.value.trim();
       if (!text) return;
       if (!key) {
-        statusEl.textContent = "Set X-Internal-Api-Key first.";
+        addMessage("error", "Set API key in settings (⚙).");
         return;
       }
       localStorage.setItem(STORAGE_KEY, key);
       addMessage("user", text);
       inputEl.value = "";
       sendBtn.disabled = true;
-      statusEl.textContent = "Waiting for LLM (may take 30–60s on cold start)…";
-
-      const payload = {
-        message: text,
-        llm: llmEl.value,
-        context: history.length ? { chatHistory: history } : undefined,
-      };
+      const mode = modeEl.value;
+      const llm = llmEl.value;
+      const t0 = performance.now();
 
       try {
-        const r = await fetch("/api/v1/internal/ai/message", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Internal-Api-Key": key,
-          },
-          body: JSON.stringify(payload),
-        });
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          const detail = body.detail || JSON.stringify(body);
-          addMessage("error", "HTTP " + r.status + ": " + detail);
-          statusEl.textContent = "Request failed.";
-          return;
+        if (mode === "direct") {
+          const messages = history.concat([{ role: "user", content: text }]);
+          const r = await fetch("/api/v1/ai/proxy/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Internal-Api-Key": key,
+            },
+            body: JSON.stringify({ messages, llm }),
+          });
+          const body = await r.json().catch(() => ({}));
+          const latencyMs = Math.round(performance.now() - t0);
+          if (!r.ok) {
+            addMessage("error", "HTTP " + r.status + ": " + (body.detail || JSON.stringify(body)));
+            recordMetric({
+              time: new Date().toLocaleTimeString(),
+              mode: "direct",
+              llm,
+              ms: latencyMs,
+              rating: "very_slow",
+            });
+            return;
+          }
+          const m = body.metrics || {};
+          const reply = body.content || "(empty)";
+          history.push({ role: "user", content: text });
+          history.push({ role: "assistant", content: reply });
+          lastOutTok = m.completion_tokens ?? estTokens(reply);
+          lastSpeed = m.tokens_per_second ?? null;
+          const meta =
+            (m.latency_ms != null ? m.latency_ms + " ms" : latencyMs + " ms") +
+            (m.tokens_per_second != null ? " · " + m.tokens_per_second + " t/s" : "") +
+            " · " + (m.rating || "—");
+          addMessage("assistant", reply, meta);
+          updateStatusBar(m);
+          recordMetric({
+            time: new Date().toLocaleTimeString(),
+            mode: "direct",
+            llm,
+            ms: Math.round(m.latency_ms ?? latencyMs),
+            outTok: lastOutTok,
+            tps: lastSpeed,
+            rating: m.rating || "ok",
+          });
+        } else {
+          const payload = {
+            message: text,
+            llm,
+            context: history.length ? { chatHistory: history } : undefined,
+          };
+          const r = await fetch("/api/v1/internal/ai/message", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Internal-Api-Key": key,
+            },
+            body: JSON.stringify(payload),
+          });
+          const body = await r.json().catch(() => ({}));
+          const latencyMs = Math.round(performance.now() - t0);
+          if (!r.ok) {
+            addMessage("error", "HTTP " + r.status + ": " + (body.detail || JSON.stringify(body)));
+            recordMetric({
+              time: new Date().toLocaleTimeString(),
+              mode: "gateway",
+              llm,
+              ms: latencyMs,
+              rating: "very_slow",
+            });
+            return;
+          }
+          if (body.errors?.length) {
+            addMessage("error", body.errors.join("; "));
+          }
+          const reply = (body.chatReply && body.chatReply.trim()) || null;
+          if (!reply) {
+            addMessage(
+              "error",
+              "Empty reply from gateway. Check Direct mode or redeploy gateway after the stop-token fix."
+            );
+            recordMetric({
+              time: new Date().toLocaleTimeString(),
+              mode: "gateway",
+              llm: body.llm || llm,
+              ms: Math.round(body.metrics?.latency_ms ?? latencyMs),
+              rating: "very_slow",
+            });
+            return;
+          }
+          history.push({ role: "user", content: text });
+          history.push({ role: "assistant", content: reply });
+          const m = body.metrics || {};
+          lastOutTok = m.completion_tokens ?? estTokens(reply);
+          lastSpeed = m.tokens_per_second ?? (
+            lastOutTok && m.latency_ms ? +(lastOutTok / (m.latency_ms / 1000)).toFixed(2) : null
+          );
+          const meta =
+            (m.latency_ms != null ? m.latency_ms + " ms" : latencyMs + " ms") +
+            (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
+            " · " + (m.rating || "—") +
+            " · gateway";
+          addMessage("assistant", reply, meta);
+          updateStatusBar({
+            ...m,
+            completion_tokens: lastOutTok,
+            tokens_per_second: lastSpeed,
+          });
+          recordMetric({
+            time: new Date().toLocaleTimeString(),
+            mode: "gateway",
+            llm: body.llm || llm,
+            ms: Math.round(m.latency_ms ?? latencyMs),
+            outTok: lastOutTok,
+            tps: lastSpeed,
+            rating: m.rating || "ok",
+          });
         }
-        const reply = body.chatReply || "(empty reply)";
-        history.push({ role: "user", content: text });
-        history.push({ role: "assistant", content: reply });
-        addMessage("assistant", reply, "llm: " + (body.llm || llmEl.value));
-        statusEl.textContent = "Done.";
+        updateStatusBar();
       } catch (e) {
         addMessage("error", e.message);
-        statusEl.textContent = "Network error.";
       } finally {
         sendBtn.disabled = false;
         inputEl.focus();
       }
+    }
+
+    async function benchmark() {
+      const key = apiKeyEl.value.trim();
+      if (!key) return;
+      sendBtn.disabled = true;
+      addMessage("assistant", "Running benchmark (health + 1-token direct chat per LLM)…");
+      await refreshHealth();
+      for (const llm of ["smol", "qwen"]) {
+        const t0 = performance.now();
+        try {
+          const r = await fetch("/api/v1/ai/proxy/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Internal-Api-Key": key,
+            },
+            body: JSON.stringify({
+              messages: [{ role: "user", content: "Say hi in one word." }],
+              llm,
+              max_tokens: 16,
+            }),
+          });
+          const body = await r.json();
+          const ms = Math.round(performance.now() - t0);
+          const m = body.metrics || { latency_ms: ms, rating: "ok" };
+          recordMetric({
+            time: new Date().toLocaleTimeString(),
+            mode: "bench",
+            llm,
+            ms: Math.round(m.latency_ms ?? ms),
+            outTok: m.completion_tokens,
+            tps: m.tokens_per_second,
+            rating: m.rating || (r.ok ? "ok" : "very_slow"),
+          });
+          addMessage(
+            "assistant",
+            llm + ": " + (r.ok ? (body.content || "ok") : JSON.stringify(body.detail || body)),
+            (m.latency_ms ?? ms) + " ms · " + (m.rating || "—")
+          );
+        } catch (e) {
+          addMessage("error", llm + " bench: " + e.message);
+        }
+      }
+      sendBtn.disabled = false;
     }
 
     sendBtn.addEventListener("click", send);
@@ -270,13 +649,32 @@
         send();
       }
     });
-    document.getElementById("clearBtn").addEventListener("click", () => {
-      history = [];
-      chatEl.innerHTML = "";
-      statusEl.textContent = "Chat cleared.";
+    document.getElementById("settingsBtn").addEventListener("click", () => {
+      settingsEl.classList.toggle("open");
+    });
+    apiKeyEl.addEventListener("change", () => {
+      localStorage.setItem(STORAGE_KEY, apiKeyEl.value.trim());
+    });
+    document.getElementById("benchBtn").addEventListener("click", benchmark);
+    document.getElementById("clearMetricsBtn").addEventListener("click", () => {
+      metricsLog = [];
+      saveMetrics();
+    });
+    document.getElementById("collapseMetrics").addEventListener("click", () => {
+      metricsPanel.classList.add("collapsed");
+      syncMetricsToggle();
+    });
+    document.getElementById("openMetrics").addEventListener("click", () => {
+      metricsPanel.classList.remove("collapsed");
+      syncMetricsToggle();
     });
 
-    refreshHealth();
+    loadUiConfig().then(() => {
+      refreshHealth();
+      renderMetricsTable();
+      updateStatusBar();
+      syncMetricsToggle();
+    });
     setInterval(refreshHealth, 30000);
   </script>
 </body>

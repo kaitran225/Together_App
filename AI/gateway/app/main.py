@@ -5,13 +5,14 @@ FE: LLM Chatbox + LLM Tool Agent (JSON templates → validate → apply)
 BE: getMessage, getMessage+attachments, actionList, getEventList; Tool Executioner + Prompt Builder
 """
 import os
+import time
 from enum import Enum
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.llm_client import (
     LlmChoice,
@@ -25,6 +26,7 @@ from app.llm_client import (
 from app.openapi_config import attach_openapi, create_app
 from app.template_loader import load_by_tool_name, load_index
 from app.tool_applier import apply_tool
+from app.metrics_util import build_metrics
 from app.tool_executor import run_agent, run_chat, suggest_events_from_calendar
 from app.workflow_apply_client import is_configured, persist_applied
 from app.test_ui import register_test_ui
@@ -57,11 +59,15 @@ class ChatTurn(BaseModel):
 
 
 class AiContext(BaseModel):
+    """Matches Java `AiContextDto` (camelCase JSON from FE / Feign)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
     personality: str | None = None
-    document_tokens: list[str] | None = None
+    document_tokens: list[str] | None = Field(default=None, alias="documentTokens")
     calendar: Any | None = None
-    user_behavior: Any | None = None
-    chat_history: list[ChatTurn] | None = None
+    user_behavior: Any | None = Field(default=None, alias="userBehavior")
+    chat_history: list[ChatTurn] | None = Field(default=None, alias="chatHistory")
 
 
 class MessageRequest(BaseModel):
@@ -114,6 +120,15 @@ class AppliedArtifactResponse(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class RequestMetrics(BaseModel):
+    latency_ms: float
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    tokens_per_second: float | None = None
+    rating: str
+
+
 class AiMessageResponse(BaseModel):
     actionType: str
     chatReply: str | None = None
@@ -125,6 +140,7 @@ class AiMessageResponse(BaseModel):
     retryCount: int = 0
     llm: str
     errors: list[str] | None = None
+    metrics: RequestMetrics | None = None
 
 
 class ApplyToolResponse(BaseModel):
@@ -251,7 +267,16 @@ async def _enrich_response(
     )
 
 
-def _to_message_response(result: dict[str, Any], llm: str) -> AiMessageResponse:
+def _to_message_response(
+    result: dict[str, Any],
+    llm: str,
+    *,
+    latency_ms: float | None = None,
+) -> AiMessageResponse:
+    metrics: RequestMetrics | None = None
+    if latency_ms is not None:
+        raw = build_metrics(latency_ms)
+        metrics = RequestMetrics(**raw)
     return AiMessageResponse(
         actionType=result.get("actionType", ActionType.CHAT.value),
         chatReply=result.get("chatReply"),
@@ -263,6 +288,7 @@ def _to_message_response(result: dict[str, Any], llm: str) -> AiMessageResponse:
         retryCount=result.get("retryCount", 0),
         llm=llm,
         errors=result.get("errors"),
+        metrics=metrics,
     )
 
 
@@ -399,6 +425,7 @@ async def get_message(
     _require_internal_key(x_internal_api_key)
     choice = resolve_llm(body.llm)
     personality, docs, cal, behavior, history = _ctx(body.context)
+    t0 = time.perf_counter()
     try:
         result = await run_chat(
             body.message,
@@ -411,7 +438,8 @@ async def get_message(
         )
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
-    return _to_message_response(result, choice.value)
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+    return _to_message_response(result, choice.value, latency_ms=latency_ms)
 
 
 @app.post(

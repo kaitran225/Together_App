@@ -27,6 +27,15 @@ async def run_chat(
     ctx = build_context_block(tokens, calendar_json, user_behavior)
     system = build_chat_system(personality, ctx)
     reply = await complete_chat(llm, message, system, chat_history=chat_history)
+    if not reply.strip():
+        return {
+            "actionType": ActionType.CHAT.value,
+            "valid": False,
+            "chatReply": None,
+            "toolJson": None,
+            "retryCount": 0,
+            "errors": ["LLM returned an empty reply. Try Direct mode or another model."],
+        }
     return {
         "actionType": ActionType.CHAT.value,
         "valid": True,

@@ -1,6 +1,8 @@
 import logging
 import os
+import time
 from enum import Enum
+from typing import Any
 
 import httpx
 
@@ -90,12 +92,14 @@ def _build_payload(
     if cap > 0:
         payload["max_tokens"] = cap
     if stop:
-        payload["stop"] = stop
+        cleaned = [s for s in stop if s and str(s).strip()]
+        if cleaned:
+            payload["stop"] = cleaned
     return payload
 
 
-# Plain chat only — stops JSON loops on small instruct models
-CHAT_STOP = ["", "<|endoftext|>", "\n\nUser:", "\n\nHuman:"]
+# Plain chat only — do NOT include "" (matches immediately → empty replies on llama-server)
+CHAT_STOP = ["<|endoftext|>", "<|end|>", "\n\nUser:", "\n\nHuman:"]
 
 
 async def complete(
@@ -127,7 +131,39 @@ async def complete(
     choices = data.get("choices") or []
     if not choices:
         raise httpx.HTTPError("Empty LLM response")
-    return (choices[0].get("message", {}).get("content") or "").strip()
+    content = _extract_assistant_text(choices[0])
+    if not content.strip() and stop:
+        logger.warning(
+            "LLM returned empty content with stop=%s; retrying without stop sequences",
+            stop,
+        )
+        payload_retry = _build_payload(messages, max_tokens=max_tokens, stop=None)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            res = await client.post(
+                f"{llm_base(choice)}/v1/chat/completions",
+                json=payload_retry,
+            )
+            res.raise_for_status()
+            data = res.json()
+        choices = data.get("choices") or []
+        if choices:
+            content = _extract_assistant_text(choices[0])
+    if not content.strip():
+        finish = (choices[0] if choices else {}).get("finish_reason")
+        raise httpx.HTTPError(f"LLM returned empty content (finish_reason={finish!r})")
+    return content.strip()
+
+
+def _extract_assistant_text(choice: dict[str, Any]) -> str:
+    msg = choice.get("message") or {}
+    for key in ("content", "text"):
+        val = msg.get(key)
+        if val is not None and str(val).strip():
+            return str(val)
+    text = choice.get("text")
+    if text is not None and str(text).strip():
+        return str(text)
+    return ""
 
 
 async def complete_chat(
@@ -146,3 +182,24 @@ async def complete_chat(
         max_tokens=max_tokens,
         stop=CHAT_STOP,
     )
+
+
+async def chat_completions(
+    choice: LlmChoice,
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int | None = None,
+    stop: list[str] | None = CHAT_STOP,
+) -> dict[str, Any]:
+    """Raw OpenAI-compatible response from llama-server plus request timing."""
+    payload = _build_payload(messages, max_tokens=max_tokens, stop=stop)
+    t0 = time.perf_counter()
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        res = await client.post(
+            f"{llm_base(choice)}/v1/chat/completions",
+            json=payload,
+        )
+        res.raise_for_status()
+        data = res.json()
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+    return {"data": data, "latency_ms": latency_ms}
