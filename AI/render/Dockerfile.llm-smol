@@ -5,7 +5,7 @@ RUN curl -fsSL -o /models/model.gguf \
 
 FROM ghcr.io/ggml-org/llama.cpp:server
 COPY --from=model /models/model.gguf /models/model.gguf
-COPY AI/shared/start-llama.sh /start-llama.sh
+COPY shared/start-llama.sh /start-llama.sh
 RUN chmod +x /start-llama.sh
 ENV LLAMA_CTX=256 LLAMA_THREADS=2 LLAMA_BATCH=128
 EXPOSE 10000
