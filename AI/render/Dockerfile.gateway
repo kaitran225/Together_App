@@ -1,11 +1,11 @@
-# Render: repo root | Dockerfile Path: AI/render/Dockerfile.gateway
+# Render: Root Directory = AI | Dockerfile Path = render/Dockerfile.gateway
 FROM python:3.12-alpine
 WORKDIR /app
 RUN apk add --no-cache curl
-COPY AI/gateway/requirements.txt .
+COPY gateway/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY AI/gateway/app ./app
-COPY AI/templates ./templates
+COPY gateway/app ./app
+COPY templates ./templates
 ENV AI_TEMPLATES_DIR=/app/templates
 ENV PYTHONUNBUFFERED=1
 EXPOSE 10000

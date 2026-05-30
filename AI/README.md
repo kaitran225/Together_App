@@ -149,13 +149,13 @@ If `llm-qwen` OOMs on free tier, deploy only `llm-smol` + gateway, or set `LLAMA
 
 ## Render.com (free tier)
 
-Deploy **3** Docker Web Services (repo root):
+**Root Directory: `AI`** — full steps in [render/RENDER.md](render/RENDER.md).
 
-| Service | Dockerfile | Health |
-|---------|------------|--------|
-| together-llm-smol | `AI/render/Dockerfile.llm-smol` | `/health` |
-| together-llm-qwen | `AI/render/Dockerfile.llm-qwen` | `/health` |
-| together-ai | `AI/render/Dockerfile.gateway` | `/health` |
+| Service | Dockerfile (from `AI/`) | Health |
+|---------|-------------------------|--------|
+| together-llm-smol | `render/Dockerfile.llm-smol` | `/health` |
+| together-llm-qwen | `render/Dockerfile.llm-qwen` | `/health` |
+| together-ai | `render/Dockerfile.gateway` | `/health` |
 
 Gateway env:
 

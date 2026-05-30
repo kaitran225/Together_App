@@ -1,8 +1,8 @@
-# LLM #1 — SmolLM2-360M Q4 (~230MB weights). Target ~280–320MB RSS idle on Render 512MB.
+# LLM #1 — SmolLM2-360M Q4_K_M (~271MB). bartowski quant; official HF repo only ships q8_0.
 FROM alpine:3.20 AS model
 RUN apk add --no-cache curl
 RUN curl -fsSL -o /models/model.gguf \
-  "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf"
+  "https://huggingface.co/bartowski/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf"
 
 FROM ghcr.io/ggml-org/llama.cpp:server
 COPY --from=model /models/model.gguf /models/model.gguf
