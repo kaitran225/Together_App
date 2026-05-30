@@ -67,6 +67,7 @@ async def stream_llm_sse(
     max_tokens: int | None = None,
     stop: list[str] | None = None,
     fast: bool = False,
+    structure: dict[str, Any] | None = None,
 ) -> AsyncIterator[bytes]:
     """
     Gateway SSE: token events as they arrive, then done with full reply + metrics.
@@ -107,7 +108,21 @@ async def stream_llm_sse(
     if not reply:
         yield sse_encode("error", {"detail": "LLM returned empty stream"})
         return
-    yield sse_encode(
-        "done",
-        {"reply": reply, "llm": choice.value, "metrics": metrics},
-    )
+    done_payload: dict[str, Any] = {
+        "reply": reply,
+        "llm": choice.value,
+        "metrics": metrics,
+    }
+    if structure is not None:
+        done_payload["structure"] = structure
+    yield sse_encode("done", done_payload)
+
+
+def structure_meta_dict(meta: Any) -> dict[str, Any]:
+    return {
+        "promptTokens": meta.prompt_tokens,
+        "contextBudget": meta.context_budget,
+        "truncated": meta.truncated,
+        "turnsDropped": meta.turns_dropped,
+        "tokenizeMethod": meta.method,
+    }

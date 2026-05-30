@@ -177,15 +177,14 @@ Set on each LLM service:
 | `AI_CHAT_HISTORY_MAX_TURNS` | `6` | Only last N turns sent to the LLM |
 | `AI_REPEAT_PENALTY` | `1.15` | Reduces repetitive outputs |
 
-**Fast chat (Java / mobile):** `POST /api/v1/internal/ai/chat/fast` — minimal wrapper, no tool templates. Same key header as other internal routes.
+**Direct proxy (default):** `POST /api/v1/ai/proxy/chat` or `/stream` — gateway **tokenizes** via llama `/tokenize`, builds system + `## Question` blocks, trims history to `LLAMA_CTX`. Set `AI_STRUCTURE_INPUT=false` to pass messages through unchanged. Preview: `POST /api/v1/ai/structure`.
 
 **Streaming (SSE):** append `/stream` for token-by-token UX (`text/event-stream`):
 
 | Endpoint | Events |
 |----------|--------|
-| `POST /api/v1/internal/ai/chat/fast/stream` | `start` → `token` `{t}` → `done` `{reply, metrics}` |
-| `POST /api/v1/internal/ai/message/stream` | same (workflow chat) |
-| `POST /api/v1/ai/proxy/chat/stream` | same (test UI / raw messages) |
+| `POST /api/v1/ai/proxy/chat/stream` | `start` → `token` → `done` `{reply, metrics, structure}` |
+| `POST /api/v1/internal/ai/message/stream` | same (workflow tutor mode) |
 
 Example client: `fetch` + `ReadableStream`, parse `event:` / `data:` lines (see test UI at `/`).
 

@@ -249,9 +249,8 @@
           <label>
             Mode
             <select id="mode">
-              <option value="fast" selected>Fast (lite chat API)</option>
-              <option value="direct">Direct (raw llama-server)</option>
-              <option value="gateway">Full (workflow tutor)</option>
+              <option value="direct" selected>Direct (structured → llama)</option>
+              <option value="gateway">Workflow tutor</option>
             </select>
           </label>
           <button type="button" id="benchBtn">Benchmark LLMs</button>
@@ -488,10 +487,6 @@
       return String(detail);
     }
 
-    function chatPayload(text, extra) {
-      return { message: text, query: text, ...extra };
-    }
-
     function sanitizeHistory(h) {
       return (h || []).filter(
         (t) =>
@@ -551,6 +546,9 @@
             doneData = data;
             full = data.reply || full;
             body.textContent = full;
+            if (data.structure && data.structure.promptTokens != null) {
+              document.getElementById("ctxUsed").textContent = String(data.structure.promptTokens);
+            }
           } else if (event === "error") {
             throw new Error(data.detail || "Stream error");
           }
@@ -562,6 +560,7 @@
       return {
         reply: full,
         metrics: doneData?.metrics,
+        structure: doneData?.structure,
         llm: doneData?.llm,
         latencyMs,
         ttft,
@@ -581,9 +580,12 @@
       lastSpeed = m.tokens_per_second ?? (
         lastOutTok && m.latency_ms ? +(lastOutTok / (m.latency_ms / 1000)).toFixed(2) : null
       );
+      const st = result.structure || {};
       const meta =
         (result.ttft != null ? "TTFT " + result.ttft + " ms · " : "") +
         (m.latency_ms != null ? m.latency_ms + " ms" : result.latencyMs + " ms") +
+        (st.promptTokens != null ? " · prompt " + st.promptTokens + " tok" : "") +
+        (st.truncated ? " · trimmed" : "") +
         (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
         " · " + (m.rating || "—") +
         " · " + modeLabel;
@@ -624,31 +626,23 @@
       const prior = sanitizeHistory(history);
 
       try {
-        if (mode === "fast") {
-          const result = await postSSE(
-            "/api/v1/internal/ai/chat/fast/stream",
-            chatPayload(text, {
-              llm,
-              ...(prior.length ? { chatHistory: prior } : {}),
-            }),
-            headers
-          );
-          finishStreamTurn(text, result, "fast");
-        } else if (mode === "direct") {
+        if (mode === "direct") {
           const messages = prior.concat([{ role: "user", content: text }]);
           const result = await postSSE(
             "/api/v1/ai/proxy/chat/stream",
-            { messages, llm },
+            { messages, llm, structure: true },
             headers
           );
           finishStreamTurn(text, result, "direct");
         } else if (mode === "gateway") {
           const result = await postSSE(
             "/api/v1/internal/ai/message/stream",
-            chatPayload(text, {
+            {
+              message: text,
+              query: text,
               llm,
               ...(prior.length ? { context: { chatHistory: prior } } : {}),
-            }),
+            },
             headers
           );
           finishStreamTurn(text, result, "gateway");
@@ -681,6 +675,7 @@
               messages: [{ role: "user", content: "Say hi in one word." }],
               llm,
               max_tokens: 16,
+              structure: true,
             }),
           });
           const body = await r.json();

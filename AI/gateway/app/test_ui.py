@@ -1,4 +1,4 @@
-"""Browser test UI (llama.cpp-style) + ui-config + direct LLM proxy for metrics."""
+"""Browser test UI + direct LLM proxy with input structuring."""
 import os
 from pathlib import Path
 from typing import Any
@@ -8,8 +8,11 @@ from fastapi import Header, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from app.input_structurer import structure_messages
 from app.llm_client import LlmChoice, chat_completions, resolve_llm
+from app.llm_stream import structure_meta_dict
 from app.metrics_util import build_metrics
+from app.proxy_models import ProxyChatRequest
 
 _STATIC = Path(__file__).resolve().parent.parent / "static"
 _INDEX = _STATIC / "index.html"
@@ -29,10 +32,9 @@ def _require_internal_key(x_internal_api_key: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid internal API key")
 
 
-class ProxyChatRequest(BaseModel):
+class StructurePreviewRequest(BaseModel):
     messages: list[dict[str, str]] = Field(min_length=1)
     llm: LlmChoice | None = None
-    max_tokens: int | None = None
 
 
 def register_test_ui(app) -> None:
@@ -45,13 +47,12 @@ def register_test_ui(app) -> None:
 
     @app.get("/api/v1/ai/ui-config", include_in_schema=False)
     async def ui_config() -> dict[str, Any]:
-        """Defaults for the test UI (API key, model labels, context window)."""
         return {
             "defaultApiKey": _internal_key() or _DEFAULT_KEY,
             "defaultLlm": os.getenv("AI_DEFAULT_LLM", "smol"),
-            "defaultMode": "fast",
-            "chatMode": os.getenv("AI_CHAT_MODE", "fast"),
-            "contextSize": int(os.getenv("LLAMA_CTX", "2048") or "2048"),
+            "defaultMode": "direct",
+            "contextSize": int(os.getenv("LLAMA_CTX", "1024") or "1024"),
+            "structureInput": os.getenv("AI_STRUCTURE_INPUT", "true"),
             "models": {
                 "smol": {
                     "id": "smol",
@@ -70,18 +71,46 @@ def register_test_ui(app) -> None:
             },
         }
 
+    @app.post("/api/v1/ai/structure", include_in_schema=False)
+    async def preview_structure(
+        body: StructurePreviewRequest,
+        x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
+    ) -> dict[str, Any]:
+        """Preview tokenized / structured messages (no LLM call)."""
+        _require_internal_key(x_internal_api_key)
+        choice = resolve_llm(body.llm)
+        prepared = await structure_messages(choice, body.messages)
+        return {
+            "messages": prepared.messages,
+            "structure": structure_meta_dict(prepared.meta),
+        }
+
     @app.post("/api/v1/ai/proxy/chat", include_in_schema=False)
     async def proxy_chat(
         body: ProxyChatRequest,
         x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
     ) -> dict[str, Any]:
-        """Direct llama-server chat — returns OpenAI usage + latency for the test UI."""
+        """Direct llama-server chat with optional input structuring."""
         _require_internal_key(x_internal_api_key)
         choice = resolve_llm(body.llm)
+        struct_out: dict[str, Any] | None = None
+        if body.use_structure():
+            prepared = await structure_messages(
+                choice,
+                body.messages,
+                personality=body.personality,
+                document_tokens=body.document_tokens,
+                system_override=body.system,
+            )
+            messages = prepared.messages
+            struct_out = structure_meta_dict(prepared.meta)
+        else:
+            messages = body.messages
+
         try:
             raw = await chat_completions(
                 choice,
-                body.messages,
+                messages,
                 max_tokens=body.max_tokens,
                 fast=True,
             )
@@ -98,7 +127,7 @@ def register_test_ui(app) -> None:
         if choices:
             content = (choices[0].get("message", {}) or {}).get("content") or ""
 
-        return {
+        out: dict[str, Any] = {
             "content": content.strip(),
             "llm": choice.value,
             "usage": usage,
@@ -108,3 +137,6 @@ def register_test_ui(app) -> None:
                 completion_tokens=ct,
             ),
         }
+        if struct_out:
+            out["structure"] = struct_out
+        return out
