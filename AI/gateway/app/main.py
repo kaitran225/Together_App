@@ -13,7 +13,15 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
-from app.llm_client import LlmChoice, QWEN_URL, SMOL_URL, resolve_llm
+from app.llm_client import (
+    LlmChoice,
+    get_qwen_url,
+    get_smol_url,
+    llm_env_configured,
+    log_llm_url_config,
+    resolve_llm,
+    using_compose_default_urls,
+)
 from app.openapi_config import attach_openapi, create_app
 from app.template_loader import load_by_tool_name, load_index
 from app.tool_applier import apply_tool
@@ -25,6 +33,11 @@ from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
 app = create_app()
 attach_openapi(app)
 register_test_ui(app)
+
+
+@app.on_event("startup")
+def _log_startup_config() -> None:
+    log_llm_url_config()
 
 INTERNAL_KEY = os.getenv("AI_SERVICE_INTERNAL_API_KEY", "")
 
@@ -259,8 +272,10 @@ async def health() -> dict[str, Any]:
     smol_ok = qwen_ok = False
     smol_err: str | None = None
     qwen_err: str | None = None
+    smol_url = get_smol_url()
+    qwen_url = get_qwen_url()
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-        for url, name in ((SMOL_URL, "smol"), (QWEN_URL, "qwen")):
+        for url, name in ((smol_url, "smol"), (qwen_url, "qwen")):
             try:
                 r = await client.get(f"{url}/health")
                 if r.is_success:
@@ -280,15 +295,24 @@ async def health() -> dict[str, Any]:
                     smol_err = msg
                 else:
                     qwen_err = msg
+    hint: str | None = None
+    if using_compose_default_urls() or not llm_env_configured():
+        hint = (
+            "LLM_SMOL_URL and LLM_QWEN_URL are not set on this gateway service. "
+            "Render Environment Groups must be linked to dev-together-ai-gateway; "
+            "then Manual Deploy. Example: https://dev-together-ai-smol.onrender.com"
+        )
     return {
         "status": "UP",
         "service": "ai-service",
         "llm_smol": smol_ok,
         "llm_qwen": qwen_ok,
-        "llm_smol_url": SMOL_URL,
-        "llm_qwen_url": QWEN_URL,
+        "llm_smol_url": smol_url,
+        "llm_qwen_url": qwen_url,
         "llm_smol_error": smol_err,
         "llm_qwen_error": qwen_err,
+        "llm_env_configured": llm_env_configured(),
+        "hint": hint,
     }
 
 

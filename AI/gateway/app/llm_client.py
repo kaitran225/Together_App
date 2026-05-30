@@ -1,7 +1,13 @@
+import logging
 import os
 from enum import Enum
 
 import httpx
+
+logger = logging.getLogger(__name__)
+
+_COMPOSE_SMOL = "http://llm-smol:8080"
+_COMPOSE_QWEN = "http://llm-qwen:8080"
 
 
 class LlmChoice(str, Enum):
@@ -9,32 +15,60 @@ class LlmChoice(str, Enum):
     qwen = "qwen"
 
 
-SMOL_URL = os.getenv("LLM_SMOL_URL", "http://llm-smol:8080").rstrip("/")
-QWEN_URL = os.getenv("LLM_QWEN_URL", "http://llm-qwen:8080").rstrip("/")
-DEFAULT_LLM = os.getenv("AI_DEFAULT_LLM", "smol").lower()
+def get_smol_url() -> str:
+    return os.getenv("LLM_SMOL_URL", _COMPOSE_SMOL).rstrip("/")
 
-MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "512"))
-TEMPERATURE = float(os.getenv("AI_TEMPERATURE", "0.7"))
-TOP_P = float(os.getenv("AI_TOP_P", "0.9"))
-TOP_K = int(os.getenv("AI_TOP_K", "40"))
-REPEAT_PENALTY = float(os.getenv("AI_REPEAT_PENALTY", "1.15"))
-FREQUENCY_PENALTY = float(os.getenv("AI_FREQUENCY_PENALTY", "0.1"))
 
-# Plain chat only — stops JSON loops on small instruct models
-CHAT_STOP = ["", "<|endoftext|>", "\n\nUser:", "\n\nHuman:"]
+def get_qwen_url() -> str:
+    return os.getenv("LLM_QWEN_URL", _COMPOSE_QWEN).rstrip("/")
+
+
+def llm_env_configured() -> bool:
+    return bool(os.getenv("LLM_SMOL_URL", "").strip() and os.getenv("LLM_QWEN_URL", "").strip())
+
+
+def using_compose_default_urls() -> bool:
+    return get_smol_url() == _COMPOSE_SMOL and get_qwen_url() == _COMPOSE_QWEN
+
+
+def log_llm_url_config() -> None:
+    if llm_env_configured():
+        logger.info("LLM backends: smol=%s qwen=%s", get_smol_url(), get_qwen_url())
+    else:
+        logger.warning(
+            "LLM_SMOL_URL / LLM_QWEN_URL not set — using Docker Compose defaults (%s, %s). "
+            "On Render, set both on the GATEWAY service and redeploy.",
+            _COMPOSE_SMOL,
+            _COMPOSE_QWEN,
+        )
 
 
 def resolve_llm(choice: LlmChoice | None) -> LlmChoice:
     if choice is not None:
         return choice
+    default = os.getenv("AI_DEFAULT_LLM", "smol").lower()
     try:
-        return LlmChoice(DEFAULT_LLM)
+        return LlmChoice(default)
     except ValueError:
         return LlmChoice.smol
 
 
 def llm_base(choice: LlmChoice) -> str:
-    return SMOL_URL if choice == LlmChoice.smol else QWEN_URL
+    return get_smol_url() if choice == LlmChoice.smol else get_qwen_url()
+
+
+def _int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    return int(raw)
+
+
+def _float_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    return float(raw)
 
 
 def _build_payload(
@@ -45,19 +79,23 @@ def _build_payload(
 ) -> dict:
     payload: dict = {
         "messages": messages,
-        "temperature": TEMPERATURE,
-        "top_p": TOP_P,
-        "top_k": TOP_K,
-        "repeat_penalty": REPEAT_PENALTY,
-        "frequency_penalty": FREQUENCY_PENALTY,
+        "temperature": _float_env("AI_TEMPERATURE", 0.7),
+        "top_p": _float_env("AI_TOP_P", 0.9),
+        "top_k": _int_env("AI_TOP_K", 40),
+        "repeat_penalty": _float_env("AI_REPEAT_PENALTY", 1.15),
+        "frequency_penalty": _float_env("AI_FREQUENCY_PENALTY", 0.1),
         "stream": False,
     }
-    cap = max_tokens if max_tokens is not None else MAX_TOKENS
+    cap = max_tokens if max_tokens is not None else _int_env("AI_MAX_TOKENS", 512)
     if cap > 0:
         payload["max_tokens"] = cap
     if stop:
         payload["stop"] = stop
     return payload
+
+
+# Plain chat only — stops JSON loops on small instruct models
+CHAT_STOP = ["", "<|endoftext|>", "\n\nUser:", "\n\nHuman:"]
 
 
 async def complete(

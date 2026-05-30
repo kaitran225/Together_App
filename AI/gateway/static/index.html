@@ -199,11 +199,15 @@
         const d = await r.json();
         const smol = d.llm_smol ? "ok" : "bad";
         const qwen = d.llm_qwen ? "ok" : "bad";
-        healthEl.innerHTML =
+        let html =
           `<span><span class="dot ${smol}"></span>llm_smol: ${d.llm_smol}</span>` +
           `<span><span class="dot ${qwen}"></span>llm_qwen: ${d.llm_qwen}</span>` +
           `<span class="muted">smol → ${d.llm_smol_url || "—"}</span>` +
           `<span class="muted">qwen → ${d.llm_qwen_url || "—"}</span>`;
+        if (d.hint) {
+          html += `<span style="color:#f07178;width:100%">${d.hint}</span>`;
+        }
+        healthEl.innerHTML = html;
       } catch (e) {
         healthEl.textContent = "Health check failed: " + e.message;
       }
