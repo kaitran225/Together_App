@@ -9,8 +9,8 @@ class LlmChoice(str, Enum):
     qwen = "qwen"
 
 
-SMOL_URL = os.getenv("LLM_SMOL_URL", "http://llm-smol:8080").rstrip("/")
-QWEN_URL = os.getenv("LLM_QWEN_URL", "http://llm-qwen:8080").rstrip("/")
+SMOL_URL = os.getenv("LLM_SMOL_URL").rstrip("/")
+QWEN_URL = os.getenv("LLM_QWEN_URL").rstrip("/")
 DEFAULT_LLM = os.getenv("AI_DEFAULT_LLM", "smol").lower()
 # 0 = omit max_tokens (model default). Otherwise caps reply length per turn.
 MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "0"))
