@@ -75,8 +75,8 @@ Runs **real small models** in Docker via [llama.cpp](https://github.com/ggml-org
 
 | Container | Model | GGUF size | Typical idle RSS* |
 |-----------|--------|-----------|-------------------|
-| `llm-smol` | SmolLM-135M-**Instruct** Q8_0 | ~145MB | ~180–260MB |
-| `llm-qwen` | Qwen2.5-0.5B-**Instruct** Q4_K_S | ~368MB | ~280–400MB |
+| `llm-smol` | **google/gemma-3-270m-it** (Unsloth Q4_K_S) | ~250MB | ~280–380MB |
+| `llm-qwen` | **Lamapi/next-270m** (Next-270M Q3_K_M) | ~242MB | ~270–360MB |
 | `ai-gateway` | (router only, Python) | — | ~50–80MB |
 
 \*Idle = model **mmap**’d + `llama-server` with `-c 4096 -t 2 -np 1`. Lower `LLAMA_CTX` on Render if OOM.
@@ -109,8 +109,8 @@ docker compose -f AI/docker-compose.yml up --build
 
 First start downloads GGUF into the image at build time; cold start may take 1–2 minutes.
 
-- SmolLM: http://localhost:8896/health  
-- Qwen: http://localhost:8897/health  
+- Gemma 3 270M (smol): http://localhost:8896/health  
+- Next-270M (qwen): http://localhost:8897/health  
 - Gateway: http://localhost:8898/health  
 - **Test UI:** http://localhost:8898/ (chat + health; set `X-Internal-Api-Key`)  
 - **Swagger UI:** http://localhost:8898/docs (or `/swagger-ui/index.html`)  
@@ -141,7 +141,30 @@ If you load `model.gguf` directly (not via gateway), use the **Instruct** files 
 
 - Temperature **0.7**, Top P **0.9**, Repeat penalty **1.15**
 - Max tokens **256–512** (avoid unlimited — causes long JSON spam on weak models)
-- Do **not** use base `Qwen2.5-0.2B` / `DogeAI2.5-0.2B` for chat
+- Use **instruct** GGUF builds (`gemma-3-270m-it`, `next-270m`), not base pretrained weights
+
+## Gateway input preprocessing (fewer LLM tokens)
+
+When `AI_STRUCTURE_INPUT=true` (default), the gateway **compresses and trims** prompts before llama-server:
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `AI_PREPROCESS_INPUT` | `true` | Collapse whitespace, cap per-turn chars, merge duplicate roles |
+| `AI_SYSTEM_PROMPT_LEVEL` | `micro` | Short system prompt (`micro` / `lite` / `full`) |
+| `AI_CHAT_HISTORY_MAX_TURNS` | `4` | Max prior user+assistant pairs |
+| `AI_MAX_USER_CHARS` / `AI_MAX_ASSISTANT_CHARS` | `800` / `400` | Hard cap per message body |
+| `AI_DOC_EXCERPT_MAX` / `AI_DOC_EXCERPT_CHARS` | `3` / `200` | Limit document context injected into system |
+| `AI_USER_TURN_PREFIX` | `false` | Skip extra `User:` prefix (Gemma/Next chat templates) |
+
+Preview without calling the LLM: `POST /api/v1/ai/structure` (test UI uses this for prompt token count).
+
+### Dynamic context summary
+
+When history is too long for `LLAMA_CTX`, the gateway can **summarize older turns** instead of only deleting them (`AI_CONTEXT_SUMMARIZE=true`):
+
+- Keeps the last `AI_CONTEXT_SUMMARIZE_KEEP_MSGS` messages (default 4).
+- Older turns → short paragraph appended to the system prompt (`Earlier conversation (summary): …`).
+- Uses a small LLM call by default; set `AI_CONTEXT_SUMMARIZE_EXTRACTIVE_ONLY=true` for a zero-extra-call snippet fallback.
 
 ## LLM Docker speed (what actually helps)
 
@@ -149,11 +172,11 @@ On Render **free tier**, slowness is mostly **CPU inference + cold start**, not 
 
 | Lever | What we did |
 |-------|-------------|
-| **Smaller GGUF** | smol **Q4_K_S** (~102MB), qwen **Q3_K_S** (~322MB) — rebuild both LLM images |
+| **Smaller GGUF** | smol **Q4_K_S** (~250MB), qwen **Q3_K_M** (~242MB) — rebuild both LLM images |
 | **`LLAMA_CTX=1024`** | Half the KV RAM vs 2048 → faster tokens, less OOM |
 | **`LLAMA_CACHE_TYPE_K/V=q8_0`** | Quantized KV cache (set in `start-llama.sh`) |
 | **`LLAMA_BATCH=512`** (smol) | Faster prompt processing on CPU |
-| **Use smol only** | qwen is ~3× heavier; set `AI_DEFAULT_LLM=smol` and skip the qwen service if RAM is tight |
+| **Use smol only** | Both ~270M; set `AI_DEFAULT_LLM=smol` and skip the qwen service if RAM is tight |
 | **Keep warm** | Render sleeps after ~15min idle — first chat after sleep is 30–60s; use UptimeRobot/cron on `/health` |
 
 You will **not** match Gemini/OpenAI on 512MB CPU. For production chat speed, use a hosted API (`AI_PROVIDER=gemini` on Java Auth) and keep on-device LLMs for offline/dev only.

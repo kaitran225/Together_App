@@ -59,7 +59,7 @@ def cap_chat_history(
 ) -> list[dict[str, str]] | None:
     if not history:
         return history
-    limit = max_turns if max_turns is not None else _int_env("AI_CHAT_HISTORY_MAX_TURNS", 6)
+    limit = max_turns if max_turns is not None else _int_env("AI_CHAT_HISTORY_MAX_TURNS", 4)
     if limit <= 0:
         return history
     return history[-limit:]

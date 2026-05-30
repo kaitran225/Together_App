@@ -70,6 +70,12 @@ class ChatTurn(BaseModel):
     content: str = Field(min_length=1)
 
 
+class LegacyQueryPayload(BaseModel):
+    """Some deployed gateways expect { query: { body: \"...\" } }."""
+
+    body: str = Field(min_length=1)
+
+
 class AiContext(BaseModel):
     """Matches Java `AiContextDto` (camelCase JSON from FE / Feign)."""
 
@@ -89,9 +95,10 @@ class AiContext(BaseModel):
 
 
 class MessageRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     message: str = Field(min_length=1)
+    query: LegacyQueryPayload | None = None
     context: AiContext | None = None
     llm: LlmChoice | None = None
 
@@ -104,9 +111,10 @@ class MessageRequest(BaseModel):
 class FastChatRequest(BaseModel):
     """Minimal chat — no tool agent; use for lowest latency from Java / mobile."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     message: str = Field(min_length=1)
+    query: LegacyQueryPayload | None = None
     llm: LlmChoice | None = None
     chat_history: list[ChatTurn] | None = Field(default=None, alias="chatHistory")
     max_tokens: int | None = Field(default=None, ge=16, le=2048)

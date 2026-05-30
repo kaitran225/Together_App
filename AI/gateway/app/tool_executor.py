@@ -14,10 +14,12 @@ from app.llm_client import (
     complete_messages,
     complete_messages_fast,
 )
+from app.context_summarizer import apply_dynamic_context_to_messages
+from app.input_preprocess import limit_document_tokens, preprocess_messages, preprocess_user_message
 from app.prompt_builder import (
     build_agent_system,
     build_chat_system,
-    build_chat_system_lite,
+    build_chat_system_for_mode,
     build_context_block,
 )
 from app.tool_applier import AppliedArtifact, apply_tool
@@ -37,18 +39,17 @@ def messages_for_fast_chat(
     chat_history: list[dict[str, str]] | None = None,
     system_override: str | None = None,
 ) -> list[dict[str, str]]:
-    history = cap_chat_history(chat_history)
-    ctx = ""
-    if document_tokens:
-        ctx = build_context_block(document_tokens, None, None)
-    system = system_override or build_chat_system_lite(personality, ctx)
+    history = preprocess_messages(cap_chat_history(chat_history) or [])
+    docs = limit_document_tokens(document_tokens)
+    ctx = build_context_block(docs, None, None) if docs else ""
+    system = system_override or build_chat_system_for_mode(personality, ctx)
     messages: list[dict[str, str]] = []
     if system.strip():
         messages.append({"role": "system", "content": system.strip()})
     if history:
         messages.extend(history)
-    messages.append({"role": "user", "content": message})
-    return messages
+    messages.append({"role": "user", "content": preprocess_user_message(message)})
+    return preprocess_messages(messages)
 
 
 def messages_for_workflow_chat(
@@ -72,10 +73,11 @@ def messages_for_workflow_chat(
             document_tokens=tokens or None,
             chat_history=chat_history,
         )
-    history = cap_chat_history(chat_history)
+    history = preprocess_messages(cap_chat_history(chat_history) or [])
+    tokens = limit_document_tokens(tokens) or []
     ctx = build_context_block(tokens, calendar_json, user_behavior)
     if chat_mode() == "fast":
-        system = build_chat_system_lite(personality, ctx)
+        system = build_chat_system_for_mode(personality, ctx)
     else:
         system = build_chat_system(personality, ctx)
     messages: list[dict[str, str]] = []
@@ -83,8 +85,8 @@ def messages_for_workflow_chat(
         messages.append({"role": "system", "content": system.strip()})
     if history:
         messages.extend(history)
-    messages.append({"role": "user", "content": message})
-    return messages
+    messages.append({"role": "user", "content": preprocess_user_message(message)})
+    return preprocess_messages(messages)
 
 
 async def run_chat_fast(
@@ -105,6 +107,7 @@ async def run_chat_fast(
         chat_history=chat_history,
         system_override=system_override,
     )
+    messages, _ = await apply_dynamic_context_to_messages(llm, messages)
     reply = await complete_messages_fast(llm, messages, max_tokens=max_tokens)
     if not reply.strip():
         return {
@@ -144,6 +147,7 @@ async def run_chat(
         chat_history=chat_history,
         attachment_excerpts=attachment_excerpts,
     )
+    messages, _ = await apply_dynamic_context_to_messages(llm, messages)
     if chat_mode() == "fast":
         reply = await complete_messages_fast(llm, messages)
     else:

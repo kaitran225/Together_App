@@ -1,9 +1,23 @@
 """Prompt Builder — loads JSON templates from AI/templates/."""
 import json
+import os
 from typing import Any
 
 from app.template_loader import load_by_tool, load_by_tool_name
 from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
+
+
+def system_prompt_level() -> str:
+    """micro | lite | full — smaller = fewer prompt tokens on small LLMs."""
+    return os.getenv("AI_SYSTEM_PROMPT_LEVEL", "micro").strip().lower()
+
+
+def build_chat_system_micro(personality: str | None, context_block: str) -> str:
+    tone = personality.strip() if personality and personality.strip() else "tutor"
+    base = f"You are a {tone}. Reply briefly to the user's last message. Stay on topic."
+    if context_block:
+        return f"{base}\n{context_block}"
+    return base
 
 
 def build_chat_system_lite(personality: str | None, context_block: str) -> str:
@@ -19,6 +33,15 @@ def build_chat_system_lite(personality: str | None, context_block: str) -> str:
     if context_block:
         return f"{base}\n\n{context_block}"
     return base
+
+
+def build_chat_system_for_mode(personality: str | None, context_block: str) -> str:
+    level = system_prompt_level()
+    if level == "full":
+        return build_chat_system(personality, context_block)
+    if level == "lite":
+        return build_chat_system_lite(personality, context_block)
+    return build_chat_system_micro(personality, context_block)
 
 
 def build_chat_system(personality: str | None, context_block: str) -> str:
@@ -81,10 +104,13 @@ def build_context_block(
     calendar_json: Any | None,
     user_behavior: Any | None,
 ) -> str:
+    from app.input_preprocess import limit_document_tokens
+
     parts: list[str] = []
-    if document_tokens:
-        joined = "\n".join(f"- {t}" for t in document_tokens)
-        parts.append(f"User document excerpts:\n{joined}")
+    docs = limit_document_tokens(document_tokens)
+    if docs:
+        joined = "\n".join(f"- {t}" for t in docs)
+        parts.append(f"Docs:\n{joined}")
     if calendar_json is not None:
         parts.append(f"User calendar context:\n{json.dumps(calendar_json, ensure_ascii=False)}")
     if user_behavior is not None:

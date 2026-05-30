@@ -119,10 +119,18 @@ async def stream_llm_sse(
 
 
 def structure_meta_dict(meta: Any) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "promptTokens": meta.prompt_tokens,
         "contextBudget": meta.context_budget,
         "truncated": meta.truncated,
         "turnsDropped": meta.turns_dropped,
         "tokenizeMethod": meta.method,
     }
+    if getattr(meta, "chars_before", 0) or getattr(meta, "chars_after", 0):
+        out["charsBefore"] = meta.chars_before
+        out["charsAfter"] = meta.chars_after
+    if getattr(meta, "summarized", False):
+        out["summarized"] = True
+        out["summaryMethod"] = meta.summary_method
+        out["turnsSummarized"] = meta.turns_summarized
+    return out

@@ -58,14 +58,14 @@ def register_test_ui(app) -> None:
                     "id": "smol",
                     "label": os.getenv(
                         "LLM_SMOL_MODEL_LABEL",
-                        "SmolLM-135M-Instruct-Q4_K_S.gguf",
+                        "google/gemma-3-270m-it (Q4_K_S)",
                     ),
                 },
                 "qwen": {
                     "id": "qwen",
                     "label": os.getenv(
                         "LLM_QWEN_MODEL_LABEL",
-                        "Qwen2.5-0.5B-Instruct-Q3_K_S.gguf",
+                        "Lamapi/next-270m (Q3_K_M)",
                     ),
                 },
             },

@@ -11,7 +11,7 @@ from app.llm_client import CHAT_STOP, LlmChoice, chat_mode, resolve_llm
 from app.llm_stream import stream_llm_sse, structure_meta_dict
 from app.proxy_models import ProxyChatRequest
 from app.sse_util import SSE_HEADERS, sse_encode
-from app.tool_executor import messages_for_workflow_chat
+from app.tool_executor import messages_for_fast_chat, messages_for_workflow_chat
 
 
 def _streaming_response(gen) -> StreamingResponse:
@@ -23,7 +23,45 @@ def _streaming_response(gen) -> StreamingResponse:
 
 
 def register_stream_routes(app, *, require_internal_key, ctx_from_message) -> None:
-    from app.main import MessageRequest
+    from app.main import FastChatRequest, MessageRequest
+
+    @app.post("/api/v1/internal/ai/chat/fast/stream", tags=["Chat"])
+    async def chat_fast_stream(
+        body: FastChatRequest,
+        x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
+    ):
+        """Stream lite workflow chat (SSE)."""
+        require_internal_key(x_internal_api_key)
+        choice = resolve_llm(body.llm)
+        history = (
+            [{"role": t.role, "content": t.content} for t in body.chat_history]
+            if body.chat_history
+            else None
+        )
+        if history and history[-1].get("role") == "user" and history[-1].get("content") == body.message:
+            history = history[:-1] or None
+        raw = messages_for_fast_chat(
+            body.message,
+            chat_history=history,
+            system_override=body.system,
+        )
+        prepared = await structure_messages(choice, raw, system_override=body.system)
+        struct = structure_meta_dict(prepared.meta)
+
+        async def gen():
+            try:
+                async for chunk in stream_llm_sse(
+                    choice,
+                    prepared.messages,
+                    max_tokens=body.max_tokens,
+                    fast=True,
+                    structure=struct,
+                ):
+                    yield chunk
+            except httpx.HTTPError as e:
+                yield sse_encode("error", {"detail": str(e)})
+
+        return _streaming_response(gen())
 
     @app.post("/api/v1/internal/ai/message/stream", tags=["Chat"])
     async def message_stream(

@@ -9,9 +9,17 @@ from typing import Any
 import httpx
 
 from app.chat_history_util import sanitize_openai_messages
+from app.input_preprocess import (
+    format_user_turn,
+    join_messages_for_token_count,
+    limit_document_tokens,
+    messages_char_weight,
+    preprocess_messages,
+)
 from app.llm_client import LlmChoice, cap_chat_history, llm_base
 from app.llm_http import get_http_client
-from app.prompt_builder import build_chat_system_lite, build_context_block
+from app.context_summarizer import compress_history_with_summary
+from app.prompt_builder import build_chat_system_for_mode, build_context_block
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +32,11 @@ class StructureMeta:
     turns_dropped: int = 0
     system_chars: int = 0
     method: str = "estimate"
+    chars_before: int = 0
+    chars_after: int = 0
+    summarized: bool = False
+    summary_method: str | None = None
+    turns_summarized: int = 0
 
 
 @dataclass
@@ -72,17 +85,11 @@ async def count_tokens(choice: LlmChoice, text: str) -> tuple[int, str]:
         return estimate_tokens(text), "estimate"
 
 
-async def _count_messages_tokens(
+async def count_messages_tokens(
     choice: LlmChoice, messages: list[dict[str, str]]
 ) -> tuple[int, str]:
-    total = 0
-    method = "llama"
-    for msg in messages:
-        n, m = await count_tokens(choice, msg.get("content", ""))
-        total += n
-        if m == "estimate":
-            method = "estimate"
-    return total, method
+    """One /tokenize call for the full prompt (cheaper than per-turn)."""
+    return await count_tokens(choice, join_messages_for_token_count(messages))
 
 
 def _split_system_and_history(
@@ -110,8 +117,9 @@ def _build_system_block(
         return system_override.strip()
     if existing_system and existing_system.strip():
         return existing_system.strip()
-    ctx = build_context_block(document_tokens, None, None)
-    return build_chat_system_lite(personality, ctx)
+    docs = limit_document_tokens(document_tokens)
+    ctx = build_context_block(docs, None, None)
+    return build_chat_system_for_mode(personality, ctx)
 
 
 async def structure_messages(
@@ -123,15 +131,19 @@ async def structure_messages(
     system_override: str | None = None,
 ) -> PreparedInput:
     """
-    Sanitize, add system prompt, token-count, and trim history to fit LLAMA_CTX budget.
+    Sanitize, compress, add system prompt, token-count, and trim history to fit LLAMA_CTX budget.
     """
     cleaned = sanitize_openai_messages(raw_messages)
+    chars_before = messages_char_weight(cleaned)
+    cleaned = preprocess_messages(cleaned)
+
     existing_system, history = _split_system_and_history(cleaned)
 
     if history and history[-1]["role"] == "user":
         history = history[:-1]
 
     history = cap_chat_history(history) or []
+    history = preprocess_messages(history)
 
     system = _build_system_block(
         personality=personality,
@@ -146,7 +158,7 @@ async def structure_messages(
 
     user_msg = {
         "role": "user",
-        "content": _format_user_turn(last_user["content"]),
+        "content": format_user_turn(last_user["content"]),
     }
 
     prefix: list[dict[str, str]] = []
@@ -155,11 +167,36 @@ async def structure_messages(
 
     budget = _prompt_token_budget()
     turns_dropped = 0
+    summarized = False
+    summary_method: str | None = None
+    turns_summarized = 0
     method = "llama"
+    char_budget = budget * _int_env("AI_CHARS_PER_TOKEN_EST", 4)
 
+    prefix, history, sum_meta = await compress_history_with_summary(
+        choice,
+        prefix=prefix,
+        history=history,
+        user_msg=user_msg,
+        budget=budget,
+    )
+    if sum_meta.get("summarized"):
+        summarized = True
+        summary_method = sum_meta.get("summaryMethod")
+        turns_summarized = int(sum_meta.get("turnsSummarized") or 0)
+
+    while history and messages_char_weight(prefix + history + [user_msg]) > char_budget:
+        if len(history) >= 2:
+            history = history[2:]
+            turns_dropped += 1
+        else:
+            history = []
+            turns_dropped += 1
+
+    total = 0
     while True:
         trial = prefix + history + [user_msg]
-        total, m = await _count_messages_tokens(choice, trial)
+        total, m = await count_messages_tokens(choice, trial)
         method = m
         if total <= budget or not history:
             break
@@ -172,7 +209,10 @@ async def structure_messages(
 
     messages = prefix + history + [user_msg]
     prompt_tokens = total
-    truncated = turns_dropped > 0 or prompt_tokens > budget
+    truncated = (
+        turns_dropped > 0 or prompt_tokens > budget or summarized
+    )
+    chars_after = messages_char_weight(messages)
 
     return PreparedInput(
         messages=messages,
@@ -181,15 +221,12 @@ async def structure_messages(
             context_budget=budget,
             truncated=truncated,
             turns_dropped=turns_dropped,
-            system_chars=len(system),
+            system_chars=len(prefix[0]["content"]) if prefix else len(system),
             method=method,
+            chars_before=chars_before,
+            chars_after=chars_after,
+            summarized=summarized,
+            summary_method=summary_method,
+            turns_summarized=turns_summarized,
         ),
     )
-
-
-def _format_user_turn(text: str) -> str:
-    """Prefix the user turn only — never put 'Answer' in the user message (models continue it)."""
-    body = text.strip()
-    if body.startswith("## "):
-        return body
-    return f"User: {body}"

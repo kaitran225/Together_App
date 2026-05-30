@@ -251,6 +251,7 @@
             <select id="mode">
               <option value="direct" selected>Direct (structured → llama)</option>
               <option value="gateway">Workflow tutor</option>
+              <option value="fast">Fast (lite tutor)</option>
             </select>
           </label>
           <button type="button" id="benchBtn">Benchmark LLMs</button>
@@ -586,6 +587,7 @@
         (m.latency_ms != null ? m.latency_ms + " ms" : result.latencyMs + " ms") +
         (st.promptTokens != null ? " · prompt " + st.promptTokens + " tok" : "") +
         (st.truncated ? " · trimmed" : "") +
+        (st.summarized ? " · summarized (" + (st.summaryMethod || "?") + ")" : "") +
         (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
         " · " + (m.rating || "—") +
         " · " + modeLabel;
@@ -625,6 +627,30 @@
       const headers = { "X-Internal-Api-Key": key };
       const prior = sanitizeHistory(history);
 
+      function workflowPayload(text, prior) {
+        const payload = {
+          message: text,
+          query: { body: text },
+          llm,
+        };
+        if (prior.length) {
+          payload.context = { chatHistory: prior };
+        }
+        return payload;
+      }
+
+      function fastPayload(text, prior) {
+        const payload = {
+          message: text,
+          query: { body: text },
+          llm,
+        };
+        if (prior.length) {
+          payload.chatHistory = prior;
+        }
+        return payload;
+      }
+
       try {
         if (mode === "direct") {
           const messages = prior.concat([{ role: "user", content: text }]);
@@ -637,15 +663,17 @@
         } else if (mode === "gateway") {
           const result = await postSSE(
             "/api/v1/internal/ai/message/stream",
-            {
-              message: text,
-              query: text,
-              llm,
-              ...(prior.length ? { context: { chatHistory: prior } } : {}),
-            },
+            workflowPayload(text, prior),
             headers
           );
           finishStreamTurn(text, result, "gateway");
+        } else if (mode === "fast") {
+          const result = await postSSE(
+            "/api/v1/internal/ai/chat/fast/stream",
+            fastPayload(text, prior),
+            headers
+          );
+          finishStreamTurn(text, result, "fast");
         }
         updateStatusBar();
       } catch (e) {
