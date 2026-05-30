@@ -143,17 +143,41 @@ If you load `model.gguf` directly (not via gateway), use the **Instruct** files 
 - Max tokens **256–512** (avoid unlimited — causes long JSON spam on weak models)
 - Do **not** use base `Qwen2.5-0.2B` / `DogeAI2.5-0.2B` for chat
 
+## LLM Docker speed (what actually helps)
+
+On Render **free tier**, slowness is mostly **CPU inference + cold start**, not the gateway wrapper.
+
+| Lever | What we did |
+|-------|-------------|
+| **Smaller GGUF** | smol **Q4_K_S** (~102MB), qwen **Q3_K_S** (~322MB) — rebuild both LLM images |
+| **`LLAMA_CTX=1024`** | Half the KV RAM vs 2048 → faster tokens, less OOM |
+| **`LLAMA_CACHE_TYPE_K/V=q8_0`** | Quantized KV cache (set in `start-llama.sh`) |
+| **`LLAMA_BATCH=512`** (smol) | Faster prompt processing on CPU |
+| **Use smol only** | qwen is ~3× heavier; set `AI_DEFAULT_LLM=smol` and skip the qwen service if RAM is tight |
+| **Keep warm** | Render sleeps after ~15min idle — first chat after sleep is 30–60s; use UptimeRobot/cron on `/health` |
+
+You will **not** match Gemini/OpenAI on 512MB CPU. For production chat speed, use a hosted API (`AI_PROVIDER=gemini` on Java Auth) and keep on-device LLMs for offline/dev only.
+
+After changing Dockerfiles, **redeploy `dev-together-ai-smol` and `dev-together-ai-qwen`** (full rebuild — new model download).
+
 ## Memory tuning (Render 512MB)
 
 Set on each LLM service:
 
 | Variable | Default | Notes |
 |----------|---------|--------|
-| `LLAMA_CTX` | `2048` | KV cache size; lower if OOM on Render |
-| `LLAMA_THREADS` | `2` | Match Render CPU |
-| `LLAMA_BATCH` | `128` | Lower if OOM during inference |
-| `AI_MAX_TOKENS` | `512` | Cap reply length; stops runaway JSON/text |
+| `LLAMA_CTX` | `1024` | KV cache size; try `512` if OOM |
+| `LLAMA_THREADS` | `2` | Match Render CPU (try `1` if contended) |
+| `LLAMA_BATCH` | `512` (smol) / `256` (qwen) | Prompt batch; lower if OOM |
+| `LLAMA_CACHE_TYPE_K` / `V` | `q8_0` | Quantized KV cache |
+| `LLAMA_MLOCK` | `1` on smol | Keep small model in RAM; **off** for qwen on 512MB |
+| `AI_MAX_TOKENS` | `512` | Cap reply length (full / tool agent mode) |
+| `AI_CHAT_MODE` | `fast` | `fast` = lite tutor prompt + 128 tok; `full` = longer prompts |
+| `AI_FAST_MAX_TOKENS` | `128` | Shorter replies = faster on CPU llama-server |
+| `AI_CHAT_HISTORY_MAX_TURNS` | `6` | Only last N turns sent to the LLM |
 | `AI_REPEAT_PENALTY` | `1.15` | Reduces repetitive outputs |
+
+**Fast chat (Java / mobile):** `POST /api/v1/internal/ai/chat/fast` — minimal wrapper, no tool templates. Same key header as other internal routes.
 
 Pass prior turns in `context.chatHistory` (`user` / `assistant`). Document/calendar/behavior context is not truncated.
 

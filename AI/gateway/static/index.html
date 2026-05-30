@@ -246,8 +246,9 @@
           <label>
             Mode
             <select id="mode">
-              <option value="gateway">Gateway (workflow chat)</option>
-              <option value="direct">Direct (llama-server)</option>
+              <option value="fast" selected>Fast (lite chat API)</option>
+              <option value="direct">Direct (raw llama-server)</option>
+              <option value="gateway">Full (workflow tutor)</option>
             </select>
           </label>
           <button type="button" id="benchBtn">Benchmark LLMs</button>
@@ -427,6 +428,7 @@
         const stored = localStorage.getItem(STORAGE_KEY);
         apiKeyEl.value = stored || d.defaultApiKey || "";
         if (d.defaultLlm) llmEl.value = d.defaultLlm;
+        if (d.defaultMode) modeEl.value = d.defaultMode;
         syncModelBtn();
       } catch (e) {
         apiKeyEl.value = localStorage.getItem(STORAGE_KEY) || "dev-internal-ai-key";
@@ -471,7 +473,55 @@
       const t0 = performance.now();
 
       try {
-        if (mode === "direct") {
+        if (mode === "fast") {
+          const payload = {
+            message: text,
+            llm,
+            chatHistory: history.length ? history : undefined,
+          };
+          const r = await fetch("/api/v1/internal/ai/chat/fast", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Internal-Api-Key": key,
+            },
+            body: JSON.stringify(payload),
+          });
+          const body = await r.json().catch(() => ({}));
+          const latencyMs = Math.round(performance.now() - t0);
+          if (!r.ok) {
+            addMessage("error", "HTTP " + r.status + ": " + (body.detail || JSON.stringify(body)));
+            recordMetric({ time: new Date().toLocaleTimeString(), mode: "fast", llm, ms: latencyMs, rating: "very_slow" });
+            return;
+          }
+          const reply = (body.reply && body.reply.trim()) || null;
+          if (!reply) {
+            addMessage("error", "Empty reply from fast chat.");
+            return;
+          }
+          history.push({ role: "user", content: text });
+          history.push({ role: "assistant", content: reply });
+          const m = body.metrics || {};
+          lastOutTok = m.completion_tokens ?? estTokens(reply);
+          lastSpeed = m.tokens_per_second ?? (
+            lastOutTok && m.latency_ms ? +(lastOutTok / (m.latency_ms / 1000)).toFixed(2) : null
+          );
+          const meta =
+            (m.latency_ms != null ? m.latency_ms + " ms" : latencyMs + " ms") +
+            (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
+            " · " + (m.rating || "—") + " · fast";
+          addMessage("assistant", reply, meta);
+          updateStatusBar({ ...m, completion_tokens: lastOutTok, tokens_per_second: lastSpeed });
+          recordMetric({
+            time: new Date().toLocaleTimeString(),
+            mode: "fast",
+            llm: body.llm || llm,
+            ms: Math.round(m.latency_ms ?? latencyMs),
+            outTok: lastOutTok,
+            tps: lastSpeed,
+            rating: m.rating || "ok",
+          });
+        } else if (mode === "direct") {
           const messages = history.concat([{ role: "user", content: text }]);
           const r = await fetch("/api/v1/ai/proxy/chat", {
             method: "POST",
@@ -515,7 +565,7 @@
             tps: lastSpeed,
             rating: m.rating || "ok",
           });
-        } else {
+        } else if (mode === "gateway") {
           const payload = {
             message: text,
             llm,

@@ -3,11 +3,70 @@ from typing import Any
 
 import httpx
 
-from app.llm_client import LlmChoice, complete, complete_chat
-from app.prompt_builder import build_agent_system, build_chat_system, build_context_block
+import os
+
+from app.llm_client import (
+    LlmChoice,
+    cap_chat_history,
+    chat_mode,
+    complete,
+    complete_chat,
+    complete_fast,
+)
+from app.prompt_builder import (
+    build_agent_system,
+    build_chat_system,
+    build_chat_system_lite,
+    build_context_block,
+)
 from app.tool_applier import AppliedArtifact, apply_tool
 from app.tool_validator import MAX_RETRIES, parse_and_validate
 from app.workflow_schemas import ActionType, ToolType
+
+
+def _fast_minimal_context() -> bool:
+    return os.getenv("AI_FAST_MINIMAL_CONTEXT", "true").strip().lower() in ("1", "true", "yes")
+
+
+async def run_chat_fast(
+    message: str,
+    *,
+    llm: LlmChoice,
+    personality: str | None = None,
+    document_tokens: list[str] | None = None,
+    chat_history: list[dict[str, str]] | None = None,
+    max_tokens: int | None = None,
+    system_override: str | None = None,
+) -> dict[str, Any]:
+    """Thin LLM path — no tool templates, lite system prompt, capped history."""
+    history = cap_chat_history(chat_history)
+    ctx = ""
+    if document_tokens:
+        ctx = build_context_block(document_tokens, None, None)
+    system = system_override or build_chat_system_lite(personality, ctx)
+    reply = await complete_fast(
+        llm,
+        message,
+        system,
+        chat_history=history,
+        max_tokens=max_tokens,
+    )
+    if not reply.strip():
+        return {
+            "actionType": ActionType.CHAT.value,
+            "valid": False,
+            "chatReply": None,
+            "toolJson": None,
+            "retryCount": 0,
+            "errors": ["LLM returned an empty reply."],
+        }
+    return {
+        "actionType": ActionType.CHAT.value,
+        "valid": True,
+        "chatReply": reply,
+        "toolJson": None,
+        "retryCount": 0,
+    }
 
 
 async def run_chat(
@@ -21,12 +80,45 @@ async def run_chat(
     chat_history: list[dict[str, str]] | None = None,
     attachment_excerpts: list[str] | None = None,
 ) -> dict[str, Any]:
+    history = cap_chat_history(chat_history)
+    if chat_mode() == "fast":
+        tokens = list(document_tokens or [])
+        if attachment_excerpts:
+            tokens.extend(attachment_excerpts)
+        if _fast_minimal_context():
+            return await run_chat_fast(
+                message,
+                llm=llm,
+                personality=personality,
+                document_tokens=tokens or None,
+                chat_history=history,
+            )
+        ctx = build_context_block(tokens, calendar_json, user_behavior)
+        system = build_chat_system_lite(personality, ctx)
+        reply = await complete_fast(llm, message, system, chat_history=history)
+        if not reply.strip():
+            return {
+                "actionType": ActionType.CHAT.value,
+                "valid": False,
+                "chatReply": None,
+                "toolJson": None,
+                "retryCount": 0,
+                "errors": ["LLM returned an empty reply."],
+            }
+        return {
+            "actionType": ActionType.CHAT.value,
+            "valid": True,
+            "chatReply": reply,
+            "toolJson": None,
+            "retryCount": 0,
+        }
+
     tokens = list(document_tokens or [])
     if attachment_excerpts:
         tokens.extend(attachment_excerpts)
     ctx = build_context_block(tokens, calendar_json, user_behavior)
     system = build_chat_system(personality, ctx)
-    reply = await complete_chat(llm, message, system, chat_history=chat_history)
+    reply = await complete_chat(llm, message, system, chat_history=history)
     if not reply.strip():
         return {
             "actionType": ActionType.CHAT.value,

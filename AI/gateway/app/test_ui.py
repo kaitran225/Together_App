@@ -49,20 +49,22 @@ def register_test_ui(app) -> None:
         return {
             "defaultApiKey": _internal_key() or _DEFAULT_KEY,
             "defaultLlm": os.getenv("AI_DEFAULT_LLM", "smol"),
+            "defaultMode": "fast",
+            "chatMode": os.getenv("AI_CHAT_MODE", "fast"),
             "contextSize": int(os.getenv("LLAMA_CTX", "2048") or "2048"),
             "models": {
                 "smol": {
                     "id": "smol",
                     "label": os.getenv(
                         "LLM_SMOL_MODEL_LABEL",
-                        "smollm-135m-instruct-add-basics-q8_0.gguf",
+                        "SmolLM-135M-Instruct-Q4_K_S.gguf",
                     ),
                 },
                 "qwen": {
                     "id": "qwen",
                     "label": os.getenv(
                         "LLM_QWEN_MODEL_LABEL",
-                        "Qwen2.5-0.5B-Instruct-Q4_K_S.gguf",
+                        "Qwen2.5-0.5B-Instruct-Q3_K_S.gguf",
                     ),
                 },
             },
@@ -77,7 +79,12 @@ def register_test_ui(app) -> None:
         _require_internal_key(x_internal_api_key)
         choice = resolve_llm(body.llm)
         try:
-            raw = await chat_completions(choice, body.messages, max_tokens=body.max_tokens)
+            raw = await chat_completions(
+                choice,
+                body.messages,
+                max_tokens=body.max_tokens,
+                fast=True,
+            )
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=str(e)) from e
 

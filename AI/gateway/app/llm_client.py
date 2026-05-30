@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx
 
+from app.llm_http import get_http_client
+
 logger = logging.getLogger(__name__)
 
 _COMPOSE_SMOL = "http://llm-smol:8080"
@@ -43,6 +45,24 @@ def log_llm_url_config() -> None:
             _COMPOSE_SMOL,
             _COMPOSE_QWEN,
         )
+
+
+def chat_mode() -> str:
+    """`fast` = lite prompt, no stop tokens, lower max_tokens (default). `full` = workflow tutor."""
+    return os.getenv("AI_CHAT_MODE", "fast").strip().lower()
+
+
+def cap_chat_history(
+    history: list[dict[str, str]] | None,
+    *,
+    max_turns: int | None = None,
+) -> list[dict[str, str]] | None:
+    if not history:
+        return history
+    limit = max_turns if max_turns is not None else _int_env("AI_CHAT_HISTORY_MAX_TURNS", 6)
+    if limit <= 0:
+        return history
+    return history[-limit:]
 
 
 def resolve_llm(choice: LlmChoice | None) -> LlmChoice:
@@ -120,13 +140,13 @@ async def complete(
 
     payload = _build_payload(messages, max_tokens=max_tokens, stop=stop)
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        res = await client.post(
-            f"{llm_base(choice)}/v1/chat/completions",
-            json=payload,
-        )
-        res.raise_for_status()
-        data = res.json()
+    client = get_http_client()
+    res = await client.post(
+        f"{llm_base(choice)}/v1/chat/completions",
+        json=payload,
+    )
+    res.raise_for_status()
+    data = res.json()
 
     choices = data.get("choices") or []
     if not choices:
@@ -138,13 +158,12 @@ async def complete(
             stop,
         )
         payload_retry = _build_payload(messages, max_tokens=max_tokens, stop=None)
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            res = await client.post(
-                f"{llm_base(choice)}/v1/chat/completions",
-                json=payload_retry,
-            )
-            res.raise_for_status()
-            data = res.json()
+        res = await client.post(
+            f"{llm_base(choice)}/v1/chat/completions",
+            json=payload_retry,
+        )
+        res.raise_for_status()
+        data = res.json()
         choices = data.get("choices") or []
         if choices:
             content = _extract_assistant_text(choices[0])
@@ -184,22 +203,47 @@ async def complete_chat(
     )
 
 
+async def complete_fast(
+    choice: LlmChoice,
+    user_message: str,
+    system_prompt: str | None,
+    *,
+    chat_history: list[dict[str, str]] | None = None,
+    max_tokens: int | None = None,
+) -> str:
+    """Minimal wrapper: no stop sequences, lower token cap — best latency on llama-server."""
+    cap = max_tokens if max_tokens is not None else _int_env("AI_FAST_MAX_TOKENS", 128)
+    return await complete(
+        choice,
+        user_message,
+        system_prompt,
+        chat_history=chat_history,
+        max_tokens=cap,
+        stop=None,
+    )
+
+
 async def chat_completions(
     choice: LlmChoice,
     messages: list[dict[str, str]],
     *,
     max_tokens: int | None = None,
     stop: list[str] | None = CHAT_STOP,
+    fast: bool = False,
 ) -> dict[str, Any]:
     """Raw OpenAI-compatible response from llama-server plus request timing."""
+    if fast:
+        stop = None
+        if max_tokens is None:
+            max_tokens = _int_env("AI_FAST_MAX_TOKENS", 128)
     payload = _build_payload(messages, max_tokens=max_tokens, stop=stop)
     t0 = time.perf_counter()
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        res = await client.post(
-            f"{llm_base(choice)}/v1/chat/completions",
-            json=payload,
-        )
-        res.raise_for_status()
-        data = res.json()
+    client = get_http_client()
+    res = await client.post(
+        f"{llm_base(choice)}/v1/chat/completions",
+        json=payload,
+    )
+    res.raise_for_status()
+    data = res.json()
     latency_ms = (time.perf_counter() - t0) * 1000.0
     return {"data": data, "latency_ms": latency_ms}

@@ -4,10 +4,13 @@ Together AI Service — matches .guide/Together_Workflow.pdf
 FE: LLM Chatbox + LLM Tool Agent (JSON templates → validate → apply)
 BE: getMessage, getMessage+attachments, actionList, getEventList; Tool Executioner + Prompt Builder
 """
+import logging
 import os
 import time
 from enum import Enum
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
@@ -16,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.llm_client import (
     LlmChoice,
+    chat_mode,
     get_qwen_url,
     get_smol_url,
     llm_env_configured,
@@ -23,11 +27,12 @@ from app.llm_client import (
     resolve_llm,
     using_compose_default_urls,
 )
+from app.llm_http import close_http_client
 from app.openapi_config import attach_openapi, create_app
 from app.template_loader import load_by_tool_name, load_index
 from app.tool_applier import apply_tool
 from app.metrics_util import build_metrics
-from app.tool_executor import run_agent, run_chat, suggest_events_from_calendar
+from app.tool_executor import run_agent, run_chat, run_chat_fast, suggest_events_from_calendar
 from app.workflow_apply_client import is_configured, persist_applied
 from app.test_ui import register_test_ui
 from app.workflow_schemas import ACTION_TOOL_MAP, ActionType, ToolType
@@ -40,6 +45,12 @@ register_test_ui(app)
 @app.on_event("startup")
 def _log_startup_config() -> None:
     log_llm_url_config()
+    logger.info("AI_CHAT_MODE=%s (fast = lite prompt, 128 tok cap)", chat_mode())
+
+
+@app.on_event("shutdown")
+async def _shutdown_http() -> None:
+    await close_http_client()
 
 INTERNAL_KEY = os.getenv("AI_SERVICE_INTERNAL_API_KEY", "")
 
@@ -74,6 +85,18 @@ class MessageRequest(BaseModel):
     message: str = Field(min_length=1)
     context: AiContext | None = None
     llm: LlmChoice | None = None
+
+
+class FastChatRequest(BaseModel):
+    """Minimal chat — no tool agent; use for lowest latency from Java / mobile."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str = Field(min_length=1)
+    llm: LlmChoice | None = None
+    chat_history: list[ChatTurn] | None = Field(default=None, alias="chatHistory")
+    max_tokens: int | None = Field(default=None, ge=16, le=2048)
+    system: str | None = None
 
 
 class MessageWithAttachmentsRequest(BaseModel):
@@ -127,6 +150,12 @@ class RequestMetrics(BaseModel):
     total_tokens: int | None = None
     tokens_per_second: float | None = None
     rating: str
+
+
+class FastChatResponse(BaseModel):
+    reply: str
+    llm: str
+    metrics: RequestMetrics | None = None
 
 
 class AiMessageResponse(BaseModel):
@@ -440,6 +469,45 @@ async def get_message(
         raise HTTPException(status_code=502, detail=str(e)) from e
     latency_ms = (time.perf_counter() - t0) * 1000.0
     return _to_message_response(result, choice.value, latency_ms=latency_ms)
+
+
+@app.post("/api/v1/internal/ai/chat/fast", response_model=FastChatResponse, tags=["Chat"])
+async def chat_fast(
+    body: FastChatRequest,
+    x_internal_api_key: str | None = Header(default=None, alias="X-Internal-Api-Key"),
+) -> FastChatResponse:
+    """Thin LLM wrapper (lite prompt, capped history). Prefer over `/message` for chat speed."""
+    _require_internal_key(x_internal_api_key)
+    choice = resolve_llm(body.llm)
+    history = (
+        [{"role": t.role, "content": t.content} for t in body.chat_history]
+        if body.chat_history
+        else None
+    )
+    t0 = time.perf_counter()
+    try:
+        result = await run_chat_fast(
+            body.message,
+            llm=choice,
+            personality=None,
+            document_tokens=None,
+            chat_history=history,
+            max_tokens=body.max_tokens,
+            system_override=body.system,
+        )
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+    reply = result.get("chatReply") or ""
+    if not reply.strip():
+        errs = result.get("errors") or ["Empty LLM reply"]
+        raise HTTPException(status_code=502, detail="; ".join(errs))
+    raw = build_metrics(latency_ms)
+    return FastChatResponse(
+        reply=reply,
+        llm=choice.value,
+        metrics=RequestMetrics(**raw),
+    )
 
 
 @app.post(
