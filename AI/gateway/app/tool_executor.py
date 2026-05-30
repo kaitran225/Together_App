@@ -6,12 +6,13 @@ import httpx
 import os
 
 from app.llm_client import (
+    CHAT_STOP,
     LlmChoice,
     cap_chat_history,
     chat_mode,
     complete,
-    complete_chat,
-    complete_fast,
+    complete_messages,
+    complete_messages_fast,
 )
 from app.prompt_builder import (
     build_agent_system,
@@ -28,6 +29,64 @@ def _fast_minimal_context() -> bool:
     return os.getenv("AI_FAST_MINIMAL_CONTEXT", "true").strip().lower() in ("1", "true", "yes")
 
 
+def messages_for_fast_chat(
+    message: str,
+    *,
+    personality: str | None = None,
+    document_tokens: list[str] | None = None,
+    chat_history: list[dict[str, str]] | None = None,
+    system_override: str | None = None,
+) -> list[dict[str, str]]:
+    history = cap_chat_history(chat_history)
+    ctx = ""
+    if document_tokens:
+        ctx = build_context_block(document_tokens, None, None)
+    system = system_override or build_chat_system_lite(personality, ctx)
+    messages: list[dict[str, str]] = []
+    if system.strip():
+        messages.append({"role": "system", "content": system.strip()})
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": message})
+    return messages
+
+
+def messages_for_workflow_chat(
+    message: str,
+    *,
+    personality: str | None,
+    document_tokens: list[str] | None,
+    calendar_json: Any | None,
+    user_behavior: Any | None,
+    chat_history: list[dict[str, str]] | None = None,
+    attachment_excerpts: list[str] | None = None,
+) -> list[dict[str, str]]:
+    """OpenAI messages for CHAT — respects AI_CHAT_MODE."""
+    tokens = list(document_tokens or [])
+    if attachment_excerpts:
+        tokens.extend(attachment_excerpts)
+    if chat_mode() == "fast" and _fast_minimal_context():
+        return messages_for_fast_chat(
+            message,
+            personality=personality,
+            document_tokens=tokens or None,
+            chat_history=chat_history,
+        )
+    history = cap_chat_history(chat_history)
+    ctx = build_context_block(tokens, calendar_json, user_behavior)
+    if chat_mode() == "fast":
+        system = build_chat_system_lite(personality, ctx)
+    else:
+        system = build_chat_system(personality, ctx)
+    messages: list[dict[str, str]] = []
+    if system.strip():
+        messages.append({"role": "system", "content": system.strip()})
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": message})
+    return messages
+
+
 async def run_chat_fast(
     message: str,
     *,
@@ -39,18 +98,14 @@ async def run_chat_fast(
     system_override: str | None = None,
 ) -> dict[str, Any]:
     """Thin LLM path — no tool templates, lite system prompt, capped history."""
-    history = cap_chat_history(chat_history)
-    ctx = ""
-    if document_tokens:
-        ctx = build_context_block(document_tokens, None, None)
-    system = system_override or build_chat_system_lite(personality, ctx)
-    reply = await complete_fast(
-        llm,
+    messages = messages_for_fast_chat(
         message,
-        system,
-        chat_history=history,
-        max_tokens=max_tokens,
+        personality=personality,
+        document_tokens=document_tokens,
+        chat_history=chat_history,
+        system_override=system_override,
     )
+    reply = await complete_messages_fast(llm, messages, max_tokens=max_tokens)
     if not reply.strip():
         return {
             "actionType": ActionType.CHAT.value,
@@ -80,45 +135,19 @@ async def run_chat(
     chat_history: list[dict[str, str]] | None = None,
     attachment_excerpts: list[str] | None = None,
 ) -> dict[str, Any]:
-    history = cap_chat_history(chat_history)
+    messages = messages_for_workflow_chat(
+        message,
+        personality=personality,
+        document_tokens=document_tokens,
+        calendar_json=calendar_json,
+        user_behavior=user_behavior,
+        chat_history=chat_history,
+        attachment_excerpts=attachment_excerpts,
+    )
     if chat_mode() == "fast":
-        tokens = list(document_tokens or [])
-        if attachment_excerpts:
-            tokens.extend(attachment_excerpts)
-        if _fast_minimal_context():
-            return await run_chat_fast(
-                message,
-                llm=llm,
-                personality=personality,
-                document_tokens=tokens or None,
-                chat_history=history,
-            )
-        ctx = build_context_block(tokens, calendar_json, user_behavior)
-        system = build_chat_system_lite(personality, ctx)
-        reply = await complete_fast(llm, message, system, chat_history=history)
-        if not reply.strip():
-            return {
-                "actionType": ActionType.CHAT.value,
-                "valid": False,
-                "chatReply": None,
-                "toolJson": None,
-                "retryCount": 0,
-                "errors": ["LLM returned an empty reply."],
-            }
-        return {
-            "actionType": ActionType.CHAT.value,
-            "valid": True,
-            "chatReply": reply,
-            "toolJson": None,
-            "retryCount": 0,
-        }
-
-    tokens = list(document_tokens or [])
-    if attachment_excerpts:
-        tokens.extend(attachment_excerpts)
-    ctx = build_context_block(tokens, calendar_json, user_behavior)
-    system = build_chat_system(personality, ctx)
-    reply = await complete_chat(llm, message, system, chat_history=history)
+        reply = await complete_messages_fast(llm, messages)
+    else:
+        reply = await complete_messages(llm, messages, stop=CHAT_STOP)
     if not reply.strip():
         return {
             "actionType": ActionType.CHAT.value,

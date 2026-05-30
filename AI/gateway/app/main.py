@@ -700,3 +700,12 @@ async def quiz_generate_legacy(
             QuizQuestion(id=1, question=f"Stub about {body.topic}?", options=["True", "False"], correctIndex=0)
         ]
     return QuizGenerateResponse(questions=questions, llm=choice.value, stub=not res.valid)
+
+
+from app.stream_routes import register_stream_routes
+
+register_stream_routes(
+    app,
+    require_internal_key=_require_internal_key,
+    ctx_from_message=_ctx,
+)

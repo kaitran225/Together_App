@@ -179,6 +179,16 @@ Set on each LLM service:
 
 **Fast chat (Java / mobile):** `POST /api/v1/internal/ai/chat/fast` — minimal wrapper, no tool templates. Same key header as other internal routes.
 
+**Streaming (SSE):** append `/stream` for token-by-token UX (`text/event-stream`):
+
+| Endpoint | Events |
+|----------|--------|
+| `POST /api/v1/internal/ai/chat/fast/stream` | `start` → `token` `{t}` → `done` `{reply, metrics}` |
+| `POST /api/v1/internal/ai/message/stream` | same (workflow chat) |
+| `POST /api/v1/ai/proxy/chat/stream` | same (test UI / raw messages) |
+
+Example client: `fetch` + `ReadableStream`, parse `event:` / `data:` lines (see test UI at `/`).
+
 Pass prior turns in `context.chatHistory` (`user` / `assistant`). Document/calendar/behavior context is not truncated.
 
 If a service OOMs on free tier, lower `LLAMA_CTX` (e.g. `2048`) or deploy one LLM + gateway only.

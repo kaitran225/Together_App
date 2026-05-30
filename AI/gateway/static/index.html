@@ -70,6 +70,9 @@
     .msg.assistant { align-self: flex-start; background: var(--bot-bg); border: 1px solid var(--border); }
     .msg.error { align-self: stretch; border: 1px solid var(--very-slow); color: #ffc9c9; }
     .msg .meta { font-size: 0.65rem; color: var(--muted); margin-top: 0.35rem; }
+    .msg.streaming .meta { display: block !important; color: var(--accent); }
+    .msg.streaming div:first-child::after { content: "▋"; animation: blink 1s step-end infinite; color: var(--accent); }
+    @keyframes blink { 50% { opacity: 0; } }
     .bottom-bar {
       border-top: 1px solid var(--border);
       background: var(--surface);
@@ -456,6 +459,125 @@
       }
     }
 
+    function createStreamingBubble() {
+      const div = document.createElement("div");
+      div.className = "msg assistant streaming";
+      const body = document.createElement("div");
+      div.appendChild(body);
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = "streaming…";
+      div.appendChild(meta);
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return { div, body, meta };
+    }
+
+    /** POST + read SSE (event: token | done | error). */
+    async function postSSE(url, payload, headers) {
+      const t0 = performance.now();
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        const detail = err.detail || (typeof err === "string" ? err : JSON.stringify(err));
+        throw new Error("HTTP " + r.status + ": " + detail);
+      }
+      const { div, body, meta } = createStreamingBubble();
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let full = "";
+      let doneData = null;
+      let firstTokenAt = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() || "";
+        for (const block of blocks) {
+          if (!block.trim()) continue;
+          let event = "message";
+          let dataLine = "";
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataLine = line.slice(5).trim();
+          }
+          if (!dataLine) continue;
+          let data;
+          try {
+            data = JSON.parse(dataLine);
+          } catch {
+            continue;
+          }
+          if (event === "token" && data.t) {
+            if (firstTokenAt === null) firstTokenAt = performance.now();
+            full += data.t;
+            body.textContent = full;
+            chatEl.scrollTop = chatEl.scrollHeight;
+          } else if (event === "done") {
+            doneData = data;
+            full = data.reply || full;
+            body.textContent = full;
+          } else if (event === "error") {
+            throw new Error(data.detail || "Stream error");
+          }
+        }
+      }
+      div.classList.remove("streaming");
+      const latencyMs = Math.round(performance.now() - t0);
+      const ttft = firstTokenAt != null ? Math.round(firstTokenAt - t0) : null;
+      return {
+        reply: full,
+        metrics: doneData?.metrics,
+        llm: doneData?.llm,
+        latencyMs,
+        ttft,
+      };
+    }
+
+    function finishStreamTurn(text, result, modeLabel) {
+      const reply = (result.reply && result.reply.trim()) || null;
+      if (!reply) {
+        addMessage("error", "Empty reply from " + modeLabel + ".");
+        return false;
+      }
+      history.push({ role: "user", content: text });
+      history.push({ role: "assistant", content: reply });
+      const m = result.metrics || {};
+      lastOutTok = m.completion_tokens ?? estTokens(reply);
+      lastSpeed = m.tokens_per_second ?? (
+        lastOutTok && m.latency_ms ? +(lastOutTok / (m.latency_ms / 1000)).toFixed(2) : null
+      );
+      const meta =
+        (result.ttft != null ? "TTFT " + result.ttft + " ms · " : "") +
+        (m.latency_ms != null ? m.latency_ms + " ms" : result.latencyMs + " ms") +
+        (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
+        " · " + (m.rating || "—") +
+        " · " + modeLabel;
+      const bubbles = chatEl.querySelectorAll(".msg.assistant");
+      const last = bubbles[bubbles.length - 1];
+      if (last) {
+        const metaEl = last.querySelector(".meta");
+        if (metaEl) metaEl.textContent = meta;
+      }
+      updateStatusBar({ ...m, completion_tokens: lastOutTok, tokens_per_second: lastSpeed });
+      recordMetric({
+        time: new Date().toLocaleTimeString(),
+        mode: modeLabel,
+        llm: result.llm || llmEl.value,
+        ms: Math.round(m.latency_ms ?? result.latencyMs),
+        outTok: lastOutTok,
+        tps: lastSpeed,
+        rating: m.rating || "ok",
+      });
+      return true;
+    }
+
     async function send() {
       const text = inputEl.value.trim();
       const key = apiKeyEl.value.trim();
@@ -470,173 +592,35 @@
       sendBtn.disabled = true;
       const mode = modeEl.value;
       const llm = llmEl.value;
-      const t0 = performance.now();
+      const headers = { "X-Internal-Api-Key": key };
 
       try {
         if (mode === "fast") {
-          const payload = {
-            message: text,
-            llm,
-            chatHistory: history.length ? history : undefined,
-          };
-          const r = await fetch("/api/v1/internal/ai/chat/fast", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Internal-Api-Key": key,
-            },
-            body: JSON.stringify(payload),
-          });
-          const body = await r.json().catch(() => ({}));
-          const latencyMs = Math.round(performance.now() - t0);
-          if (!r.ok) {
-            addMessage("error", "HTTP " + r.status + ": " + (body.detail || JSON.stringify(body)));
-            recordMetric({ time: new Date().toLocaleTimeString(), mode: "fast", llm, ms: latencyMs, rating: "very_slow" });
-            return;
-          }
-          const reply = (body.reply && body.reply.trim()) || null;
-          if (!reply) {
-            addMessage("error", "Empty reply from fast chat.");
-            return;
-          }
-          history.push({ role: "user", content: text });
-          history.push({ role: "assistant", content: reply });
-          const m = body.metrics || {};
-          lastOutTok = m.completion_tokens ?? estTokens(reply);
-          lastSpeed = m.tokens_per_second ?? (
-            lastOutTok && m.latency_ms ? +(lastOutTok / (m.latency_ms / 1000)).toFixed(2) : null
+          const result = await postSSE(
+            "/api/v1/internal/ai/chat/fast/stream",
+            { message: text, llm, chatHistory: history.length ? history : undefined },
+            headers
           );
-          const meta =
-            (m.latency_ms != null ? m.latency_ms + " ms" : latencyMs + " ms") +
-            (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
-            " · " + (m.rating || "—") + " · fast";
-          addMessage("assistant", reply, meta);
-          updateStatusBar({ ...m, completion_tokens: lastOutTok, tokens_per_second: lastSpeed });
-          recordMetric({
-            time: new Date().toLocaleTimeString(),
-            mode: "fast",
-            llm: body.llm || llm,
-            ms: Math.round(m.latency_ms ?? latencyMs),
-            outTok: lastOutTok,
-            tps: lastSpeed,
-            rating: m.rating || "ok",
-          });
+          finishStreamTurn(text, result, "fast");
         } else if (mode === "direct") {
           const messages = history.concat([{ role: "user", content: text }]);
-          const r = await fetch("/api/v1/ai/proxy/chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Internal-Api-Key": key,
-            },
-            body: JSON.stringify({ messages, llm }),
-          });
-          const body = await r.json().catch(() => ({}));
-          const latencyMs = Math.round(performance.now() - t0);
-          if (!r.ok) {
-            addMessage("error", "HTTP " + r.status + ": " + (body.detail || JSON.stringify(body)));
-            recordMetric({
-              time: new Date().toLocaleTimeString(),
-              mode: "direct",
-              llm,
-              ms: latencyMs,
-              rating: "very_slow",
-            });
-            return;
-          }
-          const m = body.metrics || {};
-          const reply = body.content || "(empty)";
-          history.push({ role: "user", content: text });
-          history.push({ role: "assistant", content: reply });
-          lastOutTok = m.completion_tokens ?? estTokens(reply);
-          lastSpeed = m.tokens_per_second ?? null;
-          const meta =
-            (m.latency_ms != null ? m.latency_ms + " ms" : latencyMs + " ms") +
-            (m.tokens_per_second != null ? " · " + m.tokens_per_second + " t/s" : "") +
-            " · " + (m.rating || "—");
-          addMessage("assistant", reply, meta);
-          updateStatusBar(m);
-          recordMetric({
-            time: new Date().toLocaleTimeString(),
-            mode: "direct",
-            llm,
-            ms: Math.round(m.latency_ms ?? latencyMs),
-            outTok: lastOutTok,
-            tps: lastSpeed,
-            rating: m.rating || "ok",
-          });
-        } else if (mode === "gateway") {
-          const payload = {
-            message: text,
-            llm,
-            context: history.length ? { chatHistory: history } : undefined,
-          };
-          const r = await fetch("/api/v1/internal/ai/message", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Internal-Api-Key": key,
-            },
-            body: JSON.stringify(payload),
-          });
-          const body = await r.json().catch(() => ({}));
-          const latencyMs = Math.round(performance.now() - t0);
-          if (!r.ok) {
-            addMessage("error", "HTTP " + r.status + ": " + (body.detail || JSON.stringify(body)));
-            recordMetric({
-              time: new Date().toLocaleTimeString(),
-              mode: "gateway",
-              llm,
-              ms: latencyMs,
-              rating: "very_slow",
-            });
-            return;
-          }
-          if (body.errors?.length) {
-            addMessage("error", body.errors.join("; "));
-          }
-          const reply = (body.chatReply && body.chatReply.trim()) || null;
-          if (!reply) {
-            addMessage(
-              "error",
-              "Empty reply from gateway. Check Direct mode or redeploy gateway after the stop-token fix."
-            );
-            recordMetric({
-              time: new Date().toLocaleTimeString(),
-              mode: "gateway",
-              llm: body.llm || llm,
-              ms: Math.round(body.metrics?.latency_ms ?? latencyMs),
-              rating: "very_slow",
-            });
-            return;
-          }
-          history.push({ role: "user", content: text });
-          history.push({ role: "assistant", content: reply });
-          const m = body.metrics || {};
-          lastOutTok = m.completion_tokens ?? estTokens(reply);
-          lastSpeed = m.tokens_per_second ?? (
-            lastOutTok && m.latency_ms ? +(lastOutTok / (m.latency_ms / 1000)).toFixed(2) : null
+          const result = await postSSE(
+            "/api/v1/ai/proxy/chat/stream",
+            { messages, llm },
+            headers
           );
-          const meta =
-            (m.latency_ms != null ? m.latency_ms + " ms" : latencyMs + " ms") +
-            (lastSpeed != null ? " · ~" + lastSpeed + " t/s" : "") +
-            " · " + (m.rating || "—") +
-            " · gateway";
-          addMessage("assistant", reply, meta);
-          updateStatusBar({
-            ...m,
-            completion_tokens: lastOutTok,
-            tokens_per_second: lastSpeed,
-          });
-          recordMetric({
-            time: new Date().toLocaleTimeString(),
-            mode: "gateway",
-            llm: body.llm || llm,
-            ms: Math.round(m.latency_ms ?? latencyMs),
-            outTok: lastOutTok,
-            tps: lastSpeed,
-            rating: m.rating || "ok",
-          });
+          finishStreamTurn(text, result, "direct");
+        } else if (mode === "gateway") {
+          const result = await postSSE(
+            "/api/v1/internal/ai/message/stream",
+            {
+              message: text,
+              llm,
+              context: history.length ? { chatHistory: history } : undefined,
+            },
+            headers
+          );
+          finishStreamTurn(text, result, "gateway");
         }
         updateStatusBar();
       } catch (e) {

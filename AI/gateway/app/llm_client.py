@@ -98,6 +98,7 @@ def _build_payload(
     *,
     max_tokens: int | None,
     stop: list[str] | None,
+    stream: bool = False,
 ) -> dict:
     payload: dict = {
         "messages": messages,
@@ -106,7 +107,7 @@ def _build_payload(
         "top_k": _int_env("AI_TOP_K", 40),
         "repeat_penalty": _float_env("AI_REPEAT_PENALTY", 1.15),
         "frequency_penalty": _float_env("AI_FREQUENCY_PENALTY", 0.1),
-        "stream": False,
+        "stream": stream,
     }
     cap = max_tokens if max_tokens is not None else _int_env("AI_MAX_TOKENS", 512)
     if cap > 0:
@@ -122,22 +123,13 @@ def _build_payload(
 CHAT_STOP = ["<|endoftext|>", "<|end|>", "\n\nUser:", "\n\nHuman:"]
 
 
-async def complete(
+async def complete_messages(
     choice: LlmChoice,
-    user_message: str,
-    system_prompt: str | None,
+    messages: list[dict[str, str]],
     *,
-    chat_history: list[dict[str, str]] | None = None,
     max_tokens: int | None = None,
     stop: list[str] | None = None,
 ) -> str:
-    messages: list[dict[str, str]] = []
-    if system_prompt and system_prompt.strip():
-        messages.append({"role": "system", "content": system_prompt.strip()})
-    if chat_history:
-        messages.extend(chat_history)
-    messages.append({"role": "user", "content": user_message})
-
     payload = _build_payload(messages, max_tokens=max_tokens, stop=stop)
 
     client = get_http_client()
@@ -171,6 +163,26 @@ async def complete(
         finish = (choices[0] if choices else {}).get("finish_reason")
         raise httpx.HTTPError(f"LLM returned empty content (finish_reason={finish!r})")
     return content.strip()
+
+
+async def complete(
+    choice: LlmChoice,
+    user_message: str,
+    system_prompt: str | None,
+    *,
+    chat_history: list[dict[str, str]] | None = None,
+    max_tokens: int | None = None,
+    stop: list[str] | None = None,
+) -> str:
+    messages: list[dict[str, str]] = []
+    if system_prompt and system_prompt.strip():
+        messages.append({"role": "system", "content": system_prompt.strip()})
+    if chat_history:
+        messages.extend(chat_history)
+    messages.append({"role": "user", "content": user_message})
+    return await complete_messages(
+        choice, messages, max_tokens=max_tokens, stop=stop
+    )
 
 
 def _extract_assistant_text(choice: dict[str, Any]) -> str:
@@ -221,6 +233,16 @@ async def complete_fast(
         max_tokens=cap,
         stop=None,
     )
+
+
+async def complete_messages_fast(
+    choice: LlmChoice,
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int | None = None,
+) -> str:
+    cap = max_tokens if max_tokens is not None else _int_env("AI_FAST_MAX_TOKENS", 128)
+    return await complete_messages(choice, messages, max_tokens=cap, stop=None)
 
 
 async def chat_completions(
