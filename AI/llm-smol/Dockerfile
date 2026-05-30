@@ -1,5 +1,4 @@
-# Render: Root Directory = AI | Dockerfile Path = render/Dockerfile.llm-smol
-# VLM: HuggingFaceTB/SmolVLM-256M-Instruct via ggml-org GGUF (~175MB + ~99MB mmproj)
+# LLM #1 — SmolVLM-256M-Instruct (vision+text). ggml-org GGUF for llama.cpp.
 FROM alpine:3.20 AS model
 RUN apk add --no-cache curl
 RUN mkdir -p /models \
@@ -16,6 +15,8 @@ RUN chmod +x /start-llama.sh
 WORKDIR /app
 ENV LLAMA_MODEL_PATH=/models/model.gguf
 ENV LLAMA_MMPROJ_PATH=/models/mmproj.gguf
-ENV LLAMA_CTX=256000 LLAMA_THREADS=4 LLAMA_BATCH=128000
-EXPOSE 10000
+ENV LLAMA_CTX=256
+ENV LLAMA_THREADS=2
+ENV LLAMA_BATCH=128
+EXPOSE 8080
 ENTRYPOINT ["/start-llama.sh"]
