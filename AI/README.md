@@ -75,11 +75,11 @@ Runs **real small models** in Docker via [llama.cpp](https://github.com/ggml-org
 
 | Container | Model | GGUF size | Typical idle RSS* |
 |-----------|--------|-----------|-------------------|
-| `llm-smol` | SmolVLM-256M-Instruct Q8_0 (+ mmproj) | ~279MB | ~250–350MB |
-| `llm-qwen` | Qwen2.5-0.2B Q8_0 | ~246MB | ~220–300MB |
+| `llm-smol` | DogeAI2.5-0.2B Q4_K_S | ~238MB | ~220–300MB |
+| `llm-qwen` | Qwen2.5-0.2B Q4_K_S | ~199MB | ~200–280MB |
 | `ai-gateway` | (router only, Python) | — | ~50–80MB |
 
-\*Idle = model **mmap**’d + `llama-server` with `-c 256 -t 2 -np 1`. Spikes during generation; keep `AI_MAX_TOKENS` low on Render.
+\*Idle = model **mmap**’d + `llama-server` with `-c 4096 -t 2 -np 1`. Lower `LLAMA_CTX` on Render if OOM.
 
 ## Local
 
@@ -140,12 +140,14 @@ Set on each LLM service:
 
 | Variable | Default | Notes |
 |----------|---------|--------|
-| `LLAMA_CTX` | `256` | Lower = less KV cache RAM |
+| `LLAMA_CTX` | `4096` | KV cache size; lower if OOM on Render |
 | `LLAMA_THREADS` | `2` | Match Render CPU |
 | `LLAMA_BATCH` | `128` | Lower if OOM during inference |
-| `AI_MAX_TOKENS` | `256` | Gateway cap on reply length |
+| `AI_MAX_TOKENS` | `0` | `0` = no reply cap; set e.g. `512` to limit output length |
 
-If `llm-qwen` OOMs on free tier, deploy only `llm-smol` + gateway, or set `LLAMA_CTX=192`.
+Pass prior turns in `context.chatHistory` (`user` / `assistant`). Document/calendar/behavior context is not truncated.
+
+If a service OOMs on free tier, lower `LLAMA_CTX` (e.g. `2048`) or deploy one LLM + gateway only.
 
 ## Render.com (free tier)
 

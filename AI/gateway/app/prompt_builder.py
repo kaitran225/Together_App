@@ -64,10 +64,10 @@ def build_context_block(
 ) -> str:
     parts: list[str] = []
     if document_tokens:
-        joined = "\n".join(f"- {t[:2000]}" for t in document_tokens[:20])
+        joined = "\n".join(f"- {t}" for t in document_tokens)
         parts.append(f"User document excerpts:\n{joined}")
     if calendar_json is not None:
-        parts.append(f"User calendar context:\n{json.dumps(calendar_json, ensure_ascii=False)[:4000]}")
+        parts.append(f"User calendar context:\n{json.dumps(calendar_json, ensure_ascii=False)}")
     if user_behavior is not None:
-        parts.append(f"User behavior:\n{json.dumps(user_behavior, ensure_ascii=False)[:2000]}")
+        parts.append(f"User behavior:\n{json.dumps(user_behavior, ensure_ascii=False)}")
     return "\n\n".join(parts) if parts else ""

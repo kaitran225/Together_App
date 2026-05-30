@@ -3,7 +3,7 @@
 set -eu
 
 PORT="${PORT:-8080}"
-CTX="${LLAMA_CTX:-256}"
+CTX="${LLAMA_CTX:-4096}"
 THREADS="${LLAMA_THREADS:-2}"
 BATCH="${LLAMA_BATCH:-128}"
 MODEL="${LLAMA_MODEL_PATH:-/models/model.gguf}"

@@ -18,6 +18,7 @@ async def run_chat(
     document_tokens: list[str] | None,
     calendar_json: Any | None,
     user_behavior: Any | None,
+    chat_history: list[dict[str, str]] | None = None,
     attachment_excerpts: list[str] | None = None,
 ) -> dict[str, Any]:
     tokens = list(document_tokens or [])
@@ -25,7 +26,7 @@ async def run_chat(
         tokens.extend(attachment_excerpts)
     ctx = build_context_block(tokens, calendar_json, user_behavior)
     system = build_chat_system(personality, ctx)
-    reply = await complete(llm, message, system)
+    reply = await complete(llm, message, system, chat_history=chat_history)
     return {
         "actionType": ActionType.CHAT.value,
         "valid": True,
@@ -45,6 +46,7 @@ async def run_agent(
     document_tokens: list[str] | None,
     calendar_json: Any | None,
     user_behavior: Any | None,
+    chat_history: list[dict[str, str]] | None = None,
     user_sso: str | None = None,
     document_id: int | None = None,
     do_apply: bool = False,
@@ -57,6 +59,7 @@ async def run_agent(
             document_tokens=document_tokens,
             calendar_json=calendar_json,
             user_behavior=user_behavior,
+            chat_history=chat_history,
         )
 
     ctx = build_context_block(document_tokens, calendar_json, user_behavior)

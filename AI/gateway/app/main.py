@@ -36,11 +36,17 @@ class AttachmentRef(BaseModel):
     text_excerpt: str = Field(min_length=1)
 
 
+class ChatTurn(BaseModel):
+    role: str = Field(pattern=r"^(system|user|assistant)$")
+    content: str = Field(min_length=1)
+
+
 class AiContext(BaseModel):
     personality: str | None = None
     document_tokens: list[str] | None = None
     calendar: Any | None = None
     user_behavior: Any | None = None
+    chat_history: list[ChatTurn] | None = None
 
 
 class MessageRequest(BaseModel):
@@ -168,10 +174,17 @@ def _require_internal_key(x_internal_api_key: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid internal API key")
 
 
-def _ctx(ctx: AiContext | None) -> tuple[str | None, list[str] | None, Any | None, Any | None]:
+def _ctx(
+    ctx: AiContext | None,
+) -> tuple[str | None, list[str] | None, Any | None, Any | None, list[dict[str, str]] | None]:
     if not ctx:
-        return None, None, None, None
-    return ctx.personality, ctx.document_tokens, ctx.calendar, ctx.user_behavior
+        return None, None, None, None, None
+    history = (
+        [{"role": t.role, "content": t.content} for t in ctx.chat_history]
+        if ctx.chat_history
+        else None
+    )
+    return ctx.personality, ctx.document_tokens, ctx.calendar, ctx.user_behavior, history
 
 
 def _applied_from_result(result: dict[str, Any]) -> AppliedArtifactResponse | None:
@@ -343,7 +356,7 @@ async def get_message(
     """getMessage(String msg) — CHAT / LLM Chatbox."""
     _require_internal_key(x_internal_api_key)
     choice = resolve_llm(body.llm)
-    personality, docs, cal, behavior = _ctx(body.context)
+    personality, docs, cal, behavior, history = _ctx(body.context)
     try:
         result = await run_chat(
             body.message,
@@ -352,6 +365,7 @@ async def get_message(
             document_tokens=docs,
             calendar_json=cal,
             user_behavior=behavior,
+            chat_history=history,
         )
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
@@ -370,7 +384,7 @@ async def get_message_with_attachments(
     """getMessage(String msg, List<Attachment> att)."""
     _require_internal_key(x_internal_api_key)
     choice = resolve_llm(body.llm)
-    personality, docs, cal, behavior = _ctx(body.context)
+    personality, docs, cal, behavior, history = _ctx(body.context)
     excerpts = [f"[{a.name}] {a.text_excerpt}" for a in body.attachments]
     try:
         result = await run_chat(
@@ -380,6 +394,7 @@ async def get_message_with_attachments(
             document_tokens=docs,
             calendar_json=cal,
             user_behavior=behavior,
+            chat_history=history,
             attachment_excerpts=excerpts,
         )
     except httpx.HTTPError as e:
@@ -395,7 +410,7 @@ async def tool_agent(
     """LLM Tool Agent — JSON template, validate, retry, Apply-ready toolJson."""
     _require_internal_key(x_internal_api_key)
     choice = resolve_llm(body.llm)
-    personality, docs, cal, behavior = _ctx(body.context)
+    personality, docs, cal, behavior, history = _ctx(body.context)
     try:
         result = await run_agent(
             body.message,
@@ -406,6 +421,7 @@ async def tool_agent(
             document_tokens=docs,
             calendar_json=cal,
             user_behavior=behavior,
+            chat_history=history,
             user_sso=body.user_sso,
             document_id=body.document_id,
             do_apply=body.apply,
@@ -497,7 +513,7 @@ async def chat_legacy(
 ) -> ChatResponse:
     _require_internal_key(x_internal_api_key)
     choice = resolve_llm(body.llm)
-    personality, docs, cal, behavior = _ctx(body.context)
+    personality, docs, cal, behavior, history = _ctx(body.context)
     if body.system_prompt:
         docs = (docs or []) + [body.system_prompt]
     result = await run_chat(
@@ -507,6 +523,7 @@ async def chat_legacy(
         document_tokens=docs,
         calendar_json=cal,
         user_behavior=behavior,
+        chat_history=history,
     )
     return ChatResponse(reply=result.get("chatReply") or "", llm=choice.value)
 

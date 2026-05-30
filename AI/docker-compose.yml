@@ -10,7 +10,7 @@ services:
       - "8896:8080"
     environment:
       PORT: "8080"
-      LLAMA_CTX: "256"
+      LLAMA_CTX: "4096"
       LLAMA_THREADS: "2"
     deploy:
       resources:
@@ -25,7 +25,7 @@ services:
       - "8897:8080"
     environment:
       PORT: "8080"
-      LLAMA_CTX: "256"
+      LLAMA_CTX: "4096"
       LLAMA_THREADS: "2"
     deploy:
       resources:
@@ -47,7 +47,7 @@ services:
       LLM_SMOL_URL: http://llm-smol:8080
       LLM_QWEN_URL: http://llm-qwen:8080
       AI_DEFAULT_LLM: ${AI_DEFAULT_LLM:-smol}
-      AI_MAX_TOKENS: "256"
+      AI_MAX_TOKENS: "0"
     deploy:
       resources:
         limits:
