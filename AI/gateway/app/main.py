@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.llm_client import (
     LlmChoice,
@@ -27,7 +27,7 @@ from app.llm_client import (
     resolve_llm,
     using_compose_default_urls,
 )
-from app.chat_history_util import sanitize_history_turns
+from app.chat_history_util import coerce_message_field, sanitize_history_turns
 from app.llm_http import close_http_client
 from app.openapi_config import attach_openapi, create_app
 from app.template_loader import load_by_tool_name, load_index
@@ -89,9 +89,16 @@ class AiContext(BaseModel):
 
 
 class MessageRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     message: str = Field(min_length=1)
     context: AiContext | None = None
     llm: LlmChoice | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _message_or_query(cls, data: Any) -> Any:
+        return coerce_message_field(data)
 
 
 class FastChatRequest(BaseModel):
@@ -105,24 +112,29 @@ class FastChatRequest(BaseModel):
     max_tokens: int | None = Field(default=None, ge=16, le=2048)
     system: str | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _message_or_query(cls, data: Any) -> Any:
+        return coerce_message_field(data)
+
     @field_validator("chat_history", mode="before")
     @classmethod
     def _clean_chat_history(cls, v: Any) -> Any:
         return sanitize_history_turns(v)
 
-    @field_validator("message", mode="before")
-    @classmethod
-    def _strip_message(cls, v: Any) -> Any:
-        if isinstance(v, str):
-            return v.strip()
-        return v
-
 
 class MessageWithAttachmentsRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     message: str = Field(min_length=1)
     attachments: list[AttachmentRef] = Field(min_length=1)
     context: AiContext | None = None
     llm: LlmChoice | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _message_or_query(cls, data: Any) -> Any:
+        return coerce_message_field(data)
 
 
 class AgentRequest(BaseModel):

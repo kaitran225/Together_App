@@ -4,6 +4,22 @@ from __future__ import annotations
 from typing import Any
 
 
+def coerce_message_field(data: Any) -> Any:
+    """Accept `message` or legacy `query` as the user prompt (Render / older clients)."""
+    if not isinstance(data, dict):
+        return data
+    d = dict(data)
+    msg = str(d.get("message") or "").strip()
+    q = str(d.get("query") or "").strip()
+    if msg:
+        d["message"] = msg
+    elif q:
+        d["message"] = q
+    else:
+        return d
+    return d
+
+
 def sanitize_history_turns(raw: Any) -> list[dict[str, str]] | None:
     if not raw:
         return None

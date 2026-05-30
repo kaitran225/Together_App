@@ -479,13 +479,17 @@
       if (Array.isArray(detail)) {
         return detail
           .map((d) => {
-            const loc = (d.loc || []).filter((x) => x !== "body").join(".");
+            const loc = (d.loc || []).join(".");
             return (loc ? loc + ": " : "") + (d.msg || JSON.stringify(d));
           })
           .join("; ");
       }
       if (typeof detail === "object") return JSON.stringify(detail);
       return String(detail);
+    }
+
+    function chatPayload(text, extra) {
+      return { message: text, query: text, ...extra };
     }
 
     function sanitizeHistory(h) {
@@ -623,11 +627,10 @@
         if (mode === "fast") {
           const result = await postSSE(
             "/api/v1/internal/ai/chat/fast/stream",
-            {
-              message: text,
+            chatPayload(text, {
               llm,
               ...(prior.length ? { chatHistory: prior } : {}),
-            },
+            }),
             headers
           );
           finishStreamTurn(text, result, "fast");
@@ -642,11 +645,10 @@
         } else if (mode === "gateway") {
           const result = await postSSE(
             "/api/v1/internal/ai/message/stream",
-            {
-              message: text,
+            chatPayload(text, {
               llm,
               ...(prior.length ? { context: { chatHistory: prior } } : {}),
-            },
+            }),
             headers
           );
           finishStreamTurn(text, result, "gateway");
