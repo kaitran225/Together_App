@@ -97,8 +97,13 @@ public final class MessageConstants {
     public static final String MESSAGE_ROOM_MEMBER_INVALID = "ROOM_MEMBER_INVALID";
     public static final String MESSAGE_ROOM_MEMBER_ALREADY_ACTIVE = "ROOM_MEMBER_ALREADY_ACTIVE";
     public static final String MESSAGE_ROOM_MEMBER_CANNOT_LEAVE = "ROOM_MEMBER_CANNOT_LEAVE";
+    public static final String MESSAGE_ROOM_MEMBER_CANNOT_JOIN = "ROOM_MEMBER_CANNOT_JOIN";
+    public static final String MESSAGE_ROOM_MEMBER_LEFT = "ROOM_MEMBER_LEFT";
+    public static final String MESSAGE_ROOM_CLOSED = "ROOM_CLOSED";
+    public static final String MESSAGE_ROOM_OPENED = "ROOM_OPENED";
     public static final String MESSAGE_ROOM_MEMBER_CANNOT_KICK_SELF = "ROOM_MEMBER_CANNOT_KICK_SELF";
     public static final String MESSAGE_ROOM_HOST_TRANSFER_REQUIRED = "ROOM_HOST_TRANSFER_REQUIRED";
+    public static final String MESSAGE_ROOM_HOST_TRANSFERRED = "ROOM_HOST_TRANSFERRED";
     public static final String MESSAGE_ROOM_SIGNAL_MESSAGE_REQUIRED = "ROOM_SIGNAL_MESSAGE_REQUIRED";
     public static final String MESSAGE_ROOM_SIGNAL_ROOM_ID_REQUIRED = "ROOM_SIGNAL_ROOM_ID_REQUIRED";
     public static final String MESSAGE_ROOM_SIGNAL_TYPE_REQUIRED = "ROOM_SIGNAL_TYPE_REQUIRED";

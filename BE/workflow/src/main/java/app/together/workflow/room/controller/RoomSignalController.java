@@ -1,5 +1,6 @@
 package app.together.workflow.room.controller;
 
+import app.together.workflow.room.dto.RoomDtos.ChatMessage;
 import app.together.workflow.room.dto.RoomDtos.SignalMessage;
 import app.together.workflow.room.service.RoomRealtimeService;
 import lombok.RequiredArgsConstructor;
@@ -16,5 +17,10 @@ public class RoomSignalController {
     @MessageMapping("/room.signal")
     public void signal(@Payload SignalMessage message) {
         roomRealtimeService.signal(message);
+    }
+
+    @MessageMapping("/room.chat")
+    public void chat(@Payload ChatMessage message) {
+        roomRealtimeService.broadcastChat(message);
     }
 }

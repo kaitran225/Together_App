@@ -35,6 +35,12 @@ public class RoomWebRtcConfigService {
     @Value("${app.webrtc.turn-credential:}")
     private String turnCredential;
 
+    @Value("${app.webrtc.turn-secret:}") // Shared secret đồng bộ với CoTURN
+    private String turnSecret;
+
+    @Value("${app.webrtc.turn-ttl-seconds:86400}") // Thời gian sống của credential (mặc định 24h)
+    private long turnTtlSeconds;
+
     public RoomWebRtcConfigResponse getConfig(Long roomId) {
         if (roomId == null) {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_INVALID);
@@ -65,7 +71,8 @@ public class RoomWebRtcConfigService {
         if (stunUrls != null && !stunUrls.isBlank()) {
             servers.add(new IceServerResponse(parseUrls(stunUrls), null, null));
         }
-        if (turnUrls != null && !turnUrls.isBlank()) {
+        if (turnUrls != null && !turnUrls.isBlank() && !turnSecret.isBlank()) {
+            // long expiryTime = (System.currentTime)
             servers.add(new IceServerResponse(parseUrls(turnUrls), turnUsername, turnCredential));
         }
         return servers;

@@ -7,8 +7,11 @@ import app.together.common.shared.exception.ResourceNotFoundException;
 import app.together.common.shared.security.Permission;
 import app.together.common.shared.security.PermissionCheckService;
 import app.together.common.workflow.entity.Room;
+import app.together.common.workflow.entity.RoomActivity;
 import app.together.common.workflow.entity.RoomMember;
 import app.together.common.workflow.entity.RoomMemberId;
+import app.together.common.workflow.enums.RoomStatus;
+import app.together.common.workflow.repository.RoomActivityRepository;
 import app.together.common.workflow.repository.RoomMemberRepository;
 import app.together.common.workflow.repository.RoomRepository;
 import app.together.workflow.manager.room.RoomDomainManager;
@@ -18,6 +21,8 @@ import app.together.workflow.room.dto.RoomDtos.JoinRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomResponse;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,10 +46,14 @@ public class RoomService {
     private final RoomEventHandler roomEventHandler;
     private final RoomJoinPolicyService roomJoinPolicyService;
     private final RoomDomainManagerRegistry roomDomainManagerRegistry;
+    private final RoomActivityRepository roomActivityRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public RoomResponse createRoom(String userSso, CreateRoomRequest request) {
         permissionCheckService.requireSystemPermission(Permission.ROOM_CREATE);
         roomValidator.validateCreateRoomRequest(userSso, request);
+
+        roomValidator.validateAndReserveSlot(userSso);
 
         Instant now = Instant.now();
         boolean isPublic = Boolean.TRUE.equals(request.isPublic());
@@ -68,7 +77,7 @@ public class RoomService {
 
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
-        roomEventHandler.record(roomId, "ROOM_MEMBER_JOINED", userSso, room.getStatus());
+        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_CANNOT_JOIN, userSso, room.getStatus());
         return toRoomResponse(room);
     }
 
@@ -85,10 +94,30 @@ public class RoomService {
         }
 
         Instant now = Instant.now();
+        long durationMinutes = 0;
+        if (member.getJoinedAt() != null) {
+            durationMinutes = java.time.Duration.between(member.getJoinedAt(), now).toMinutes();
+        }
+
         roomStateService.deactivateMember(member, now);
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
-        roomEventHandler.record(roomId, "ROOM_MEMBER_LEFT", userSso, member.getUserSso());
+        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_LEFT, userSso, member.getUserSso());
+        // Nếu thời gian học trên 0 phút, lưu hoạt động học tập và kích hoạt Event
+        // Gamification
+        if (durationMinutes > 0) {
+            roomActivityRepository.save(app.together.common.workflow.entity.RoomActivity.builder()
+                    .roomId(roomId)
+                    .userMasterDataId(1L) // Giá trị dummy, hoặc đổi kiểu sso nếu thích ứng nhất quán
+                    .activityType(app.together.common.workflow.enums.RoomActivity.STUDY.toString())
+                    .durationMinutes((int) durationMinutes)
+                    .build());
+
+            // Bắn sự kiện bất đồng bộ nội bộ để service Gamification/Auth bắt được để cộng
+            // Exp/Streak
+            eventPublisher.publishEvent(new app.together.workflow.room.event.StudySessionCompletedEvent(userSso,
+                    (int) durationMinutes, now));
+        }
         return toRoomResponse(room);
     }
 
@@ -106,7 +135,9 @@ public class RoomService {
         List<RoomMember> members = roomMemberRepository.findByRoomId(roomId);
         roomDomainManager(room).deactivateActiveMembers(members, now);
         roomMemberRepository.saveAll(members);
-        roomEventHandler.record(roomId, "ROOM_CLOSED", userSso, room.getStatus());
+        roomEventHandler.record(roomId,MessageConstants.MESSAGE_ROOM_CLOSED, userSso, room.getStatus());
+
+        roomValidator.releaseSlot(room.getClosedBy()); // thu hồi slot tạo phòng cho user
         return toRoomResponse(room);
     }
 
@@ -120,7 +151,7 @@ public class RoomService {
 
         roomGuardService.requireRoomClosedOrDraft(room);
         roomStateService.openRoom(room);
-        roomEventHandler.record(roomId, "ROOM_OPENED", userSso, room.getStatus());
+        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_OPENED, userSso, room.getStatus());
         return toRoomResponse(room);
     }
 
@@ -167,7 +198,7 @@ public class RoomService {
         roomMemberRepository.save(targetMember);
         roomMemberRepository.save(currentHost);
 
-        roomEventHandler.record(roomId, "ROOM_OWNER_TRANSFERRED", userSso, targetUserSso);
+        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_HOST_TRANSFERRED, userSso, targetUserSso);
         return toRoomResponse(room);
     }
 

@@ -3,6 +3,7 @@ package app.together.workflow.room.service;
 import app.together.common.shared.constant.MessageConstants;
 import app.together.common.shared.exception.BadRequestException;
 import app.together.common.shared.util.SecurityUtils;
+import app.together.workflow.room.dto.RoomDtos.ChatMessage;
 import app.together.workflow.room.dto.RoomDtos.RoomEvent;
 import app.together.workflow.room.dto.RoomDtos.SignalMessage;
 import lombok.RequiredArgsConstructor;
@@ -72,5 +73,14 @@ public class RoomRealtimeService {
         } catch (NumberFormatException ex) {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_SIGNAL_ROOM_ID_INVALID);
         }
+    }
+
+    public void broadcastChat(ChatMessage message) {
+        if (message == null || !StringUtils.hasText(message.roomId())) {
+            throw new BadRequestException(MessageConstants.MESSAGE_ROOM_SIGNAL_ROOM_ID_REQUIRED);
+        }
+        Long roomId = parseRoomId(message.roomId());
+        // Tạo payload sự kiện Chat và broadcast đến toàn bộ thành viên trong phòng
+        messagingTemplate.convertAndSend(ROOM_SIGNAL_TOPIC_PREFIX + roomId + "/chat", message);
     }
 }

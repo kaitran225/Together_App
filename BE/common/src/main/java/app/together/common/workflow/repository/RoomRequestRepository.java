@@ -8,4 +8,5 @@ import java.util.List;
 public interface RoomRequestRepository extends JpaRepository<RoomRequest, Long> {
 
     List<RoomRequest> findByUserSso(String userSso);
+    List<RoomRequest> findByStatusAndExpiresAtAfter(String status, java.time.Instant now);
 }
