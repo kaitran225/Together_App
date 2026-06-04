@@ -10,6 +10,7 @@ import app.together.common.shared.exception.UnauthorizedException;
 import app.together.common.workflow.entity.Room;
 import app.together.common.workflow.entity.RoomMember;
 import app.together.common.workflow.entity.RoomMemberId;
+import app.together.common.workflow.enums.RoomRequestStatus;
 import app.together.common.workflow.enums.RoomStatus;
 import app.together.common.workflow.repository.RoomMemberRepository;
 import app.together.common.workflow.repository.RoomRepository;
@@ -126,7 +127,7 @@ public class RoomGuardService {
         if (room == null) {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_INVALID);
         }
-        if (!Objects.equals(room.getStatus(), RoomStatus.CLOSED.name()) && !Objects.equals(room.getStatus(), RoomStatus.DRAFT.name())) {
+        if (!Objects.equals(room.getStatus(), RoomRequestStatus.EXPIRED.name()) && !Objects.equals(room.getStatus(), RoomStatus.DRAFT.name())) {
             throw new ConflictException(MessageConstants.MESSAGE_ROOM_INVALID);
         }
     }

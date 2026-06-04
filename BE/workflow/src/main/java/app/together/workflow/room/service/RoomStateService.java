@@ -3,6 +3,7 @@ package app.together.workflow.room.service;
 import app.together.common.auth.enums.RoomRole;
 import app.together.common.workflow.entity.Room;
 import app.together.common.workflow.entity.RoomMember;
+import app.together.common.workflow.enums.RoomRequestStatus;
 import app.together.common.workflow.enums.RoomStatus;
 import app.together.common.workflow.enums.RoomType;
 import app.together.common.workflow.repository.RoomMemberRepository;
@@ -86,7 +87,7 @@ public class RoomStateService {
     }
 
     public void closeRoom(Room room, String userSso, Instant now) {
-        room.setStatus(RoomStatus.CLOSED.name());
+        room.setStatus(RoomRequestStatus.EXPIRED.name());
         room.setClosedAt(now);
         room.setClosedBy(userSso);
         roomRepository.save(room);

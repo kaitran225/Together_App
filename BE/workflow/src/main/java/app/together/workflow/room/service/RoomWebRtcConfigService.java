@@ -3,6 +3,7 @@ package app.together.workflow.room.service;
 import app.together.common.shared.constant.MessageConstants;
 import app.together.common.shared.exception.BadRequestException;
 import app.together.common.workflow.entity.Room;
+import app.together.common.workflow.enums.RoomRequestStatus;
 import app.together.common.workflow.enums.RoomStatus;
 import app.together.common.workflow.repository.RoomRepository;
 import app.together.workflow.room.config.RoomMediaProperties;
@@ -49,7 +50,7 @@ public class RoomWebRtcConfigService {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_ROOM_INVALID));
 
-        if (room.getDeletedAt() != null || RoomStatus.CLOSED.name().equals(room.getStatus())) {
+        if (room.getDeletedAt() != null || RoomRequestStatus.EXPIRED.name().equals(room.getStatus())) {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_INVALID);
         }
 

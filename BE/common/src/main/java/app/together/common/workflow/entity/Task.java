@@ -74,4 +74,10 @@ public class Task extends BaseAuditEntity {
 
     @Column(name = "deleted_at")
     Instant deletedAt;
+
+    @Column(name = "column_id")
+    Long columnId;
+
+    @Column(name = "sprint_id")
+    Long sprintId;
 }
