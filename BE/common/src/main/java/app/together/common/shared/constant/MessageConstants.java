@@ -169,6 +169,8 @@ public final class MessageConstants {
     public static final String MESSAGE_TASK_NOT_FOUND = "TASK_NOT_FOUND";
     public static final String MESSAGE_TASK_INVALID = "TASK_INVALID";
     public static final String MESSAGE_TASK_TITLE_REQUIRED = "TASK_TITLE_REQUIRED";
+    public static final String MESSAGE_TASK_CANNOT_DEPEND_ON_ITSELF = "TASK_CANNOT_DEPEND_ON_ITSELF";
+    public static final String MESSAGE_TASK_MUST_BE_PROJECT = "TASK_MUST_BE_PROJECT";
     public static final String MESSAGE_TASK_ASSIGNMENT_NOT_FOUND = "TASK_ASSIGNMENT_NOT_FOUND";
     public static final String MESSAGE_TASK_ASSIGNMENT_INVALID = "TASK_ASSIGNMENT_INVALID";
     public static final String MESSAGE_TASK_DEPENDENCY_NOT_FOUND = "TASK_DEPENDENCY_NOT_FOUND";
@@ -182,6 +184,7 @@ public final class MessageConstants {
     public static final String MESSAGE_TASK_ATTACHMENT_INVALID = "TASK_ATTACHMENT_INVALID";
     public static final String MESSAGE_TASK_ATTACHMENT_TITLE_REQUIRED = "TASK_ATTACHMENT_TITLE_REQUIRED";
     public static final String MESSAGE_TASK_ATTACHMENT_URL_REQUIRED = "TASK_ATTACHMENT_URL_REQUIRED";
+    public static final String MESSAGE_TASK_ALREADY_ASSIGNED = "MESSAGE_TASK_ALREADY_ASSIGNED";
     public static final String MESSAGE_BOARD_COLUMN_NOT_FOUND = "BOARD_COLUMN_NOT_FOUND";
     public static final String MESSAGE_BOARD_COLUMN_INVALID = "BOARD_COLUMN_INVALID";
     public static final String MESSAGE_BOARD_COLUMN_NAME_REQUIRED = "BOARD_COLUMN_NAME_REQUIRED";

@@ -28,7 +28,7 @@ import static app.together.common.shared.dto.ApiResponse.ok;
 @Tag(name = "Auth", description = "Auth API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final AuthService authService;

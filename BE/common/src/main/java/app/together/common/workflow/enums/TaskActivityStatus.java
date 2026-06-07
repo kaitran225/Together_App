@@ -1,5 +1,5 @@
 package app.together.common.workflow.enums;
 
 public enum TaskActivityStatus {
-    MOVE_TASK,
+    MOVE_TASK, CREAATE_TASK, ASSTIGN_TASK, COMPLETE_TASK, REOPEN_TASK, COMMENT_TASK
 }
