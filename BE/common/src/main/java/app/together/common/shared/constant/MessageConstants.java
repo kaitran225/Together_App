@@ -192,6 +192,8 @@ public final class MessageConstants {
     public static final String MESSAGE_BOARD_COLUMN_COLOR_CODE_REQUIRED = "BOARD_COLUMN_COLOR_CODE_REQUIRED";
     public static final String MESSAGE_BOARD_COLUMN_PROJECT_ID_REQUIRED = "BOARD_COLUMN_PROJECT_ID_REQUIRED";
     public static final String MESSAGE_BOARD_COLUMN_PROJECT_ID_INVALID = "BOARD_COLUMN_PROJECT_ID_INVALID";
+    public static final String MESSAGE_TASK_SUBMISSION_CONTENT_REQUIRED = "TASK_SUBMISSION_CONTENT_REQUIRED";
+    public static final String MESSAGE_TASK_SUBMISSION_GRADE_INVALID = "TASK_SUBMISSION_GRADE_INVALID";
 
     // Meetings
     public static final String MESSAGE_MEETING_NOT_FOUND = "MEETING_NOT_FOUND";
@@ -215,4 +217,13 @@ public final class MessageConstants {
     public static final String MESSAGE_APP_CONFIG_NOT_FOUND = "APP_CONFIG_NOT_FOUND";
     public static final String MESSAGE_APP_CONFIG_INVALID = "APP_CONFIG_INVALID";
     public static final String MESSAGE_APP_CONFIG_KEY_REQUIRED = "APP_CONFIG_KEY_REQUIRED";
+
+    // Personal / Space Repetition
+    public static final String MESSAGE_FLASHCARD_QUALITY_INVALID = "FLASHCARD_QUALITY_INVALID";
+
+    // AI
+    public static final String MESSAGE_AI_NOT_FOUND = "AI_NOT_FOUND";
+    public static final String MESSAGE_FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA = "FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA";
+    public static final String MESSAGE_DELETE_DOCUMENT_NOT_ALLOWED = "DELETE_DOCUMENT_NOT_ALLOWED";
+    public static final String MESSAGE_SAVE_MINDMAP_NOT_ALLOWED = "SAVE_MINDMAP_NOT_ALLOWED";
 }
