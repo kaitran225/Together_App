@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-
 import java.util.Locale;
 
 @Component
@@ -23,6 +22,9 @@ public class RoomValidator {
 
     @Value("${app.room.media.social.default-members:10}")
     private int minimumSlots;
+
+    @Value("${app.room.media.social.user-limit}")
+    private Integer userSlotsLimit;
 
     public void validateCreateRoomRequest(String userSso, CreateRoomRequest request) {
         if (userSso == null || userSso.isBlank()) {
@@ -68,12 +70,12 @@ public class RoomValidator {
         app.together.common.workflow.entity.UserRoomSlot slot = userRoomSlotRepository.findById(userSso)
                 .orElseGet(() -> userRoomSlotRepository.save(app.together.common.workflow.entity.UserRoomSlot.builder()
                         .userSso(userSso)
-                        .totalSlots(3) // Mặc định gói FREE được tạo tối đa 3 phòng
-                        .usedSlots(minimumSlots)
+                        .totalSlots(userSlotsLimit)
+                        .usedSlots(0)
                         .build()));
 
         if (slot.getUsedSlots() >= slot.getTotalSlots()) {
-            throw new BadRequestException("Bạn đã dùng hết giới hạn số lượng phòng có thể tạo cùng lúc.");
+            throw new BadRequestException(MessageConstants.MESSAGE_USER_ROOM_SLOT_INVALID);
         }
 
         slot.setUsedSlots(slot.getUsedSlots() + 1);
@@ -88,14 +90,4 @@ public class RoomValidator {
             }
         });
     }
-
-    // public void ValidateUserSlot(String userSso) {
-    //     UserRoomSlot slot = userRoomSlotRepository.findById(userSso)
-    //             .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_USER_ROOM_SLOT_NOT_FOUND));
-    //     if(slot.getUsedSlots() >= slot.getTotalSlots()){
-    //         throw new BadRequestException(MessageConstants.MESSAGE_USER_ROOM_SLOT_INVALID);
-    //     }
-
-    // }
-
 }

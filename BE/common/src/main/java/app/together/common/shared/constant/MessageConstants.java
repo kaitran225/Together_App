@@ -99,6 +99,7 @@ public final class MessageConstants {
     public static final String MESSAGE_ROOM_MEMBER_CANNOT_LEAVE = "ROOM_MEMBER_CANNOT_LEAVE";
     public static final String MESSAGE_ROOM_MEMBER_CANNOT_JOIN = "ROOM_MEMBER_CANNOT_JOIN";
     public static final String MESSAGE_ROOM_MEMBER_LEFT = "ROOM_MEMBER_LEFT";
+    public static final String MESSAGE_ROOM_MEMBER_JOINED = "ROOM_MEMBER_JOINED";
     public static final String MESSAGE_ROOM_CLOSED = "ROOM_CLOSED";
     public static final String MESSAGE_ROOM_OPENED = "ROOM_OPENED";
     public static final String MESSAGE_ROOM_MEMBER_CANNOT_KICK_SELF = "ROOM_MEMBER_CANNOT_KICK_SELF";
@@ -226,4 +227,11 @@ public final class MessageConstants {
     public static final String MESSAGE_FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA = "FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA";
     public static final String MESSAGE_DELETE_DOCUMENT_NOT_ALLOWED = "DELETE_DOCUMENT_NOT_ALLOWED";
     public static final String MESSAGE_SAVE_MINDMAP_NOT_ALLOWED = "SAVE_MINDMAP_NOT_ALLOWED";
+
+    // Payment/ PayOs
+    public static final String MESSAGE_SIGNATURE_INVALID = "SIGNATURE_INVALID";
+    public static final String MESSAGE_PACKAGE_NOT_FOUND = "PACKAGE_NOT_FOUND";
+    public static final String MESSAGE_PACKAGE_INVALID = "PACKAGE_INVALID";
+    public static final String MESSAGE_DURATION_INVALID = "DURATION_INVALID";
+    public static final String MESSAGE_NOT_ENOUGH_COINS = "NOT_ENOUGH_COINS";
 }

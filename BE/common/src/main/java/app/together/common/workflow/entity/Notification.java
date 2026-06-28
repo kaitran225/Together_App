@@ -50,7 +50,7 @@ public class Notification extends BaseAuditEntity {
     @Column(name = "read_at")
     Instant readAt;
 
-    @Column(name = "sent_via", columnDefinition = "varchar[]")
+    @Column(name = "sent_via", columnDefinition = "jsonb")
     String sentVia;
 
     @Column(name = "expires_at")

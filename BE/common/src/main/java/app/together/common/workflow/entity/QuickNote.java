@@ -34,7 +34,7 @@ public class QuickNote extends BaseAuditEntity {
     @Column(name = "is_pinned")
     Boolean isPinned;
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @Column(name = "tags", columnDefinition = "jsonb")
     String tags;
 
     @Column(name = "linked_to_type")

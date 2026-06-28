@@ -7,6 +7,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.Instant;
+import java.util.List;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "meeting_summaries")
@@ -32,16 +36,20 @@ public class MeetingSummary extends BaseAuditEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     String content;
 
-    @Column(name = "key_points", columnDefinition = "text[]")
+    @Column(name = "key_points", columnDefinition = "jsonb")
     String keyPoints;
 
     @Column(name = "action_items", columnDefinition = "jsonb")
     String actionItems;
 
-    @Column(name = "decisions_made", columnDefinition = "text[]")
-    String decisionsMade;
+    // @Column(name = "decisions_made", columnDefinition = "jsonb")
+    // String decisionsMade;
 
-    @Column(name = "next_steps", columnDefinition = "text[]")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "decisions_made", columnDefinition = "jsonb")
+    private List<String> decisionsMade;
+
+    @Column(name = "next_steps", columnDefinition = "jsonb")
     String nextSteps;
 
     @Column(name = "model_used")

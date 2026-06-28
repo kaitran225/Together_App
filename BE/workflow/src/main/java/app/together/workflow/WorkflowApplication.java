@@ -7,15 +7,18 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * Workflow service baseline: room management + WebSocket signaling.
  */
-@SpringBootApplication(scanBasePackages = { "app.together.workflow", "app.together.common.shared", "app.together.common.workflow" })
+@SpringBootApplication(scanBasePackages = { "app.together.workflow", "app.together.common.shared",
+        "app.together.common.workflow" })
 @EnableJpaRepositories(basePackages = { "app.together" })
 @EntityScan(basePackages = { "app.together" })
 @ConfigurationPropertiesScan(basePackageClasses = RoomMediaProperties.class)
 @EnableFeignClients(basePackages = { "app.together.workflow" })
+@EnableAsync
 public class WorkflowApplication {
 
     public static void main(String[] args) {

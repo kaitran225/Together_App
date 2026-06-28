@@ -69,8 +69,8 @@ public class Schedule extends BaseAuditEntity {
     @EqualsAndHashCode.Include
     String externalId;
 
-    @Column(name = "reminder_minutes", columnDefinition = "integer[]")
-    String reminderMinutes;
+    @Column(name = "reminder_minutes")
+    Integer reminderMinutes;
 
     @Column(name = "status")
     String status;

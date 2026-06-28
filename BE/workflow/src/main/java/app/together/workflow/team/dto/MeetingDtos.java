@@ -76,7 +76,7 @@ public final class MeetingDtos {
             String content,
             String keyPoints,
             String actionItems,
-            String decisionsMade,
+            List<String> decisionsMade,
             String nextSteps,
             String modelUsed,
             Instant generatedAt) {

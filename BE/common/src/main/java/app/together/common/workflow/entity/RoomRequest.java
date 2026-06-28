@@ -42,7 +42,7 @@ public class RoomRequest extends BaseAuditEntity {
     @Column(name = "preferred_size")
     Integer preferredSize;
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @Column(name = "tags", columnDefinition = "jsonb")
     String tags;
 
     @Column(name = "status")

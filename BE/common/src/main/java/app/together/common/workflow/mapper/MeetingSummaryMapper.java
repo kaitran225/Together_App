@@ -18,7 +18,4 @@ public interface MeetingSummaryMapper {
     @Mapping(target = "summaryId", ignore = true)
     void updateEntity(@MappingTarget MeetingSummary entity, MeetingSummaryDto dto);
 
-    MeetingSummary copy(MeetingSummary entity);
-
-    MeetingSummary deepCopy(MeetingSummary entity);
 }

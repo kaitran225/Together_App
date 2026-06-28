@@ -9,18 +9,12 @@ import app.together.common.shared.security.PermissionCheckService;
 import app.together.common.workflow.entity.*;
 import app.together.common.workflow.enums.MeetingParticipantStatus;
 import app.together.common.workflow.enums.MeetingStatus;
-import app.together.common.workflow.enums.TaskPriority;
-import app.together.common.workflow.enums.TaskStatus;
 import app.together.common.workflow.repository.*;
 import app.together.workflow.team.dto.MeetingDtos.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,17 +32,13 @@ public class MeetingService {
     private final MeetingSummaryRepository meetingSummaryRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ProjectRepository projectRepository;
-    private final TaskRepository taskRepository;
     private final PermissionCheckService permissionCheckService;
-    private final ObjectMapper objectMapper;
-
-    @Value("${app.ai-server.url}")
-    private String aiServerUrl;
+    private final GenerateAiSummary generateAiSummary;
 
     /*
      * Lên lịch hộp cho nhóm
      * Quyền: TEAM_MEETING_CREATE (OWNER)
-     * */
+     */
     public MeetingResponse createMeeting(Long teamId, String userSso, CreateMeetingRequest request) {
         TeamMember teamMember = getActiveTeamMember(teamId, userSso);
         permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_CREATE, teamMember.getRole());
@@ -86,17 +76,19 @@ public class MeetingService {
 
     /*
      * Thêm thành viên vào cuộc họp
-     * Quyền: TEAM_MEETING_JOIN (MEMBER, OWNER)*/
+     * Quyền: TEAM_MEETING_JOIN (MEMBER, OWNER)
+     */
     public MeetingResponse joinMeeting(Long meetingId, String userSso) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_MEETING_NOT_FOUND));
 
-        TeamMember teamMember = getActiveTeamMember(meetingId, userSso);
-        permissionCheckService.requireTeamRole(Permission.TEAM_DELETE, teamMember.getRole());
+        TeamMember teamMember = getActiveTeamMember(meeting.getTeamId(), userSso);
+        permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_JOIN, teamMember.getRole());
 
         Instant now = Instant.now();
 
-        // nếu cuộc họp chưa bắt đầu thực tế, Host hoặc người đầu vào sẽ kích hoạt cuộc họp
+        // nếu cuộc họp chưa bắt đầu thực tế, Host hoặc người đầu vào sẽ
+        // kích hoạt cuộc họp
         if (MeetingStatus.SCHEDULED.name().equals(meeting.getStatus())) {
             meeting.setStatus(MeetingStatus.IN_PROGRESS.name());
             meeting.setActualStart(now);
@@ -104,7 +96,8 @@ public class MeetingService {
         }
 
         // cập nhật trạng thái điểm danh tham gia hộp
-        MeetingParticipant participant = meetingParticipantRepository.findById(new MeetingParticipantId(meetingId, userSso))
+        MeetingParticipant participant = meetingParticipantRepository
+                .findById(new MeetingParticipantId(meetingId, userSso))
                 .orElse(MeetingParticipant.builder()
                         .meetingId(meetingId)
                         .userSso(userSso)
@@ -126,7 +119,7 @@ public class MeetingService {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_MEETING_NOT_FOUND));
 
-        TeamMember teamMember = getActiveTeamMember(meetingId, userSso);
+        TeamMember teamMember = getActiveTeamMember(meeting.getTeamId(), userSso);
         permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_JOIN, teamMember.getRole());
 
         MeetingNote note = MeetingNote.builder()
@@ -136,16 +129,18 @@ public class MeetingService {
                 .isShared(request.isShared() != null ? request.isShared() : Boolean.FALSE)
                 .build();
         MeetingNote saved = meetingNoteRepository.save(note);
-        return new MeetingNoteResponse(saved.getNoteId(), saved.getMeetingId(), saved.getUserSso(), saved.getContent(), saved.getIsShared());
+        return new MeetingNoteResponse(saved.getNoteId(), saved.getMeetingId(), saved.getUserSso(), saved.getContent(),
+                saved.getIsShared());
     }
 
     /*
-     * Kết thúc họp & kích hoạt phân tích AI bất đồng bộ*/
+     * Kết thúc họp & kích hoạt phân tích AI bất đồng bộ
+     */
     public MeetingResponse endMeeting(Long meetingId, String userSso) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_MEETING_NOT_FOUND));
 
-        TeamMember teamMember = getActiveTeamMember(meetingId, userSso);
+        TeamMember teamMember = getActiveTeamMember(meeting.getTeamId(), userSso);
         permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_CREATE, teamMember.getRole());
 
         Instant now = Instant.now();
@@ -161,72 +156,26 @@ public class MeetingService {
                 meetingParticipantRepository.save(p);
             }
         }
-        generateAndProcessAiSummary(saved);
+        generateAiSummary.generateAndProcessAiSummary(saved);
 
         return toMeetingResponse(saved);
     }
 
     /*
      * Gọi custom AI server để phân tích nội dung cuộc họp
-     * */
-    @Async
-    public void generateAndProcessAiSummary(Meeting meeting) {
-        log.info("Start generating AI summary for meeting {}", meeting.getMeetingId());
-        try {
-            // dùng để gọi sang AI LLM
-            RestClient restClient = RestClient.create();
-            AiSummaryPayload aiResult = restClient.post()
-                    .uri(aiServerUrl + "api/v1/ai/summarize-meeting")
-                    .body(meeting)
-                    .retrieve()
-                    .body(AiSummaryPayload.class);
-
-            if (aiResult == null) {
-                log.warn("AI summary result is null for meeting {}", meeting.getMeetingId());
-                return;
-            }
-
-            MeetingSummary summary = MeetingSummary.builder()
-                    .meetingId(meeting.getMeetingId())
-                    .content(aiResult.content())
-                    .keyPoints(objectMapper.writeValueAsString(aiResult.keyPoints()))
-                    .decisionsMade(objectMapper.writeValueAsString(aiResult.decisionsMade()))
-                    .nextSteps(objectMapper.writeValueAsString(aiResult.nextSteps()))
-                    .actionItems(objectMapper.writeValueAsString(aiResult.actionItems()))
-                    .modelUsed(aiResult.modelUsed() != null ? aiResult.modelUsed() : "Custom-LLM-v2")
-                    .generatedAt(Instant.now())
-                    .build();
-            meetingSummaryRepository.save(summary);
-
-            if (meeting.getProjectId() != null && aiResult.actionItems() != null) {
-                for (AiProposedTask proposedTask : aiResult.actionItems()) {
-                    Task draftTask = Task.builder()
-                            .projectId(meeting.getProjectId())
-                            .teamId(meeting.getTeamId())
-                            .title("[AI đề xuất]" + proposedTask.title())
-                            .description(proposedTask.description() + "\n*(Được gợi ý từ Trợ lý AI sau cuộc họp: \"" + meeting.getTitle() + "\")*")
-                            .priority(proposedTask.priority() != null ? proposedTask.priority() : TaskPriority.MEDIUM.name())
-                            .status(TaskStatus.DRAFT.name()) // chờ trưởng nhóm duyệt
-                            .build();
-                    taskRepository.save(draftTask);
-                }
-                log.info("Created {} proposed tasks for meeting {}", aiResult.actionItems().size(), meeting.getMeetingId());
-            }
-        } catch (Exception ex) {
-            log.error(ex.getMessage(), ex);
-        }
-    }
+     */
 
     @Transactional(readOnly = true)
     public MeetingSummaryResponse getMeetingSummary(Long meetingId, String userSso) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_MEETING_NOT_FOUND));
 
-        TeamMember teamMember = getActiveTeamMember(meetingId, userSso);
+        TeamMember teamMember = getActiveTeamMember(meeting.getTeamId(), userSso);
         permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_JOIN, teamMember.getRole());
 
         MeetingSummary summary = meetingSummaryRepository.findByMeetingId(meetingId)
-                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_MEETING_SUMMARY_NOT_FOUND, meetingId));
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_MEETING_SUMMARY_NOT_FOUND,
+                        meetingId));
 
         return new MeetingSummaryResponse(
                 summary.getSummaryId(),
@@ -237,8 +186,7 @@ public class MeetingService {
                 summary.getDecisionsMade(),
                 summary.getNextSteps(),
                 summary.getModelUsed(),
-                summary.getGeneratedAt()
-        );
+                summary.getGeneratedAt());
     }
 
     private TeamMember getActiveTeamMember(Long teamId, String userSso) {
@@ -266,7 +214,6 @@ public class MeetingService {
                 m.getActualStart(),
                 m.getActualEnd(),
                 m.getRecordingUrl(),
-                m.getTranscriptUrl()
-        );
+                m.getTranscriptUrl());
     }
 }

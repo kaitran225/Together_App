@@ -72,11 +72,31 @@ public class RoomWebRtcConfigService {
         if (stunUrls != null && !stunUrls.isBlank()) {
             servers.add(new IceServerResponse(parseUrls(stunUrls), null, null));
         }
-        if (turnUrls != null && !turnUrls.isBlank() && !turnSecret.isBlank()) {
-            // long expiryTime = (System.currentTime)
-            servers.add(new IceServerResponse(parseUrls(turnUrls), turnUsername, turnCredential));
+        if (turnUrls != null && !turnUrls.isBlank()) {
+            List<String> parsedTurnUrls = parseUrls(turnUrls);
+            if (turnSecret != null && !turnSecret.isBlank()) {
+                servers.add(generateTurnServerCredentials(parsedTurnUrls));
+            } else if (turnUsername != null && !turnUsername.isBlank()) {
+                servers.add(new IceServerResponse(parsedTurnUrls, turnUsername.trim(), turnCredential));
+            }
         }
         return servers;
+    }
+
+    private IceServerResponse generateTurnServerCredentials(List<String> urls) {
+        long unixTime = System.currentTimeMillis() / 1000L;
+        long expiryTime = unixTime + turnTtlSeconds;
+        String username = expiryTime + ":" + (turnUsername != null && !turnUsername.isBlank() ? turnUsername.trim() : "together");
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA1");
+            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(turnSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA1");
+            mac.init(secretKey);
+            byte[] rawHmac = mac.doFinal(username.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            String credential = java.util.Base64.getEncoder().encodeToString(rawHmac);
+            return new IceServerResponse(urls, username, credential);
+        } catch (Exception e) {
+            return new IceServerResponse(urls, turnUsername, turnCredential);
+        }
     }
 
     private List<String> parseUrls(String raw) {

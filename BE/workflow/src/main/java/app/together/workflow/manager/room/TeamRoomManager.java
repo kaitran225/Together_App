@@ -1,9 +1,7 @@
 package app.together.workflow.manager.room;
 
-import app.together.common.shared.util.SecurityUtils;
 import app.together.common.workflow.entity.Room;
 import app.together.common.workflow.enums.RoomType;
-import app.together.common.workflow.repository.TeamMemberRepository;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
@@ -18,7 +16,7 @@ public class TeamRoomManager implements RoomDomainManager {
     }
 
     @Override
-    public void validateJoinPolicy(Room room){
+    public void validateJoinPolicy(Room room) {
 
     }
 }

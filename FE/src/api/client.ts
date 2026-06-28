@@ -26,6 +26,69 @@ export const authApi = {
     })
     return r.json()
   },
+
+  async login(email: string, password: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
+    if (useMock) {
+      return Promise.resolve({ success: true, data: { accessToken: 'mock-token', refreshToken: 'mock-refresh-token' } })
+    }
+    const r = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    return r.json()
+  },
+
+  async register(email: string, password: string, fullName: string): Promise<ApiResponse<any>> {
+    if (useMock) {
+      return Promise.resolve({ success: true })
+    }
+    const r = await fetch('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, fullName }),
+    })
+    return r.json()
+  },
+
+  async logout(refreshToken: string): Promise<ApiResponse<void>> {
+    if (useMock) {
+      return Promise.resolve({ success: true })
+    }
+    const r = await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+    return r.json()
+  },
+
+  async changePassword(token: string, oldPassword: string, newPassword: string): Promise<ApiResponse<string>> {
+    if (useMock) {
+      return Promise.resolve({ success: true, data: 'Password changed successfully' })
+    }
+    const r = await fetch('/api/v1/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    })
+    return r.json()
+  },
+
+  async googleLogin(idToken: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
+    if (useMock) {
+      return Promise.resolve({ success: true, data: { accessToken: 'mock-token', refreshToken: 'mock-refresh-token' } })
+    }
+    const r = await fetch('/api/v1/auth/google-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    })
+    return r.json()
+  },
 }
 
 export const readApi = {

@@ -41,7 +41,7 @@ public class QuizAnalytics extends BaseAuditEntity {
     @Column(name = "recommendations", columnDefinition = "TEXT")
     String recommendations;
 
-    @Column(name = "improvement_areas", columnDefinition = "text[]")
+    @Column(name = "improvement_areas", columnDefinition = "jsonb")
     String improvementAreas;
 
     @Column(name = "generated_at")

@@ -5,27 +5,74 @@ import { useAuth } from '../../../contexts/AuthContext'
 
 export default function Welcome() {
   const navigate = useNavigate()
-  const { login, user, isAuthenticated } = useAuth()
+  const { login, loginWithGoogle, user, isAuthenticated } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = login({ identifier, password })
-    if (!result.ok) {
-      setError(result.error ?? 'Login failed.')
-      return
-    }
     setError('')
-    const role = result.user?.role
-    navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+    try {
+      const result = await login({ identifier, password })
+      if (!result.ok) {
+        setError(result.error ?? 'Login failed.')
+        return
+      }
+      const role = result.user?.role
+      navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.')
+    }
   }
 
   useEffect(() => {
     if (!isAuthenticated) return
     navigate(user?.role === 'ADMIN' ? '/admin' : '/dashboard')
   }, [isAuthenticated, navigate, user?.role])
+
+  useEffect(() => {
+    const handleGoogleCredential = async (response: any) => {
+      try {
+        const result = await loginWithGoogle(response.credential)
+        if (!result.ok) {
+          setError(result.error ?? 'Google Login failed.')
+          return
+        }
+        setError('')
+        const role = result.user?.role
+        navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+      } catch (err: any) {
+        setError(err.message || 'An unexpected error occurred during Google Login.')
+      }
+    }
+
+    const initializeGoogle = () => {
+      const { google } = window as any
+      if (google && google.accounts) {
+        google.accounts.id.initialize({
+          client_id: '86569125365-696pntgpnum4je6iontfukfq4p8hhh57.apps.googleusercontent.com',
+          callback: handleGoogleCredential,
+        })
+        google.accounts.id.renderButton(
+          document.getElementById('google-btn'),
+          { theme: 'outline', size: 'large', width: 364 }
+        )
+      }
+    }
+
+    initializeGoogle()
+
+    const interval = setInterval(() => {
+      const { google } = window as any
+      if (google && google.accounts) {
+        initializeGoogle()
+        clearInterval(interval)
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [loginWithGoogle, navigate])
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full w-full max-w-[440px] mx-auto">
@@ -38,10 +85,7 @@ export default function Welcome() {
           <p className="text-neutral-600 text-sm">Log in to continue your study plans, tasks, and focus sessions.</p>
         </div>
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
-            <span className="text-[#4285F4] font-bold">G</span>
-            <span>Continue with Google</span>
-          </Button>
+          <div id="google-btn" className="w-full flex justify-center min-h-[44px]"></div>
           <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
             <span className="text-[#1877F2] font-bold">f</span>
             <span>Continue with Facebook</span>

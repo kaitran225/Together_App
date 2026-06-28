@@ -48,6 +48,15 @@ import java.util.UUID;
 @EnableWebSecurity
 public class AuthSecurityConfig {
 
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
+
+    @Value("${app.oauth2.client-secret:{noop}secret}")
+    private String clientSecret;
+
+    @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5173}")
+    private String redirectUris;
+
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
@@ -78,17 +87,17 @@ public class AuthSecurityConfig {
                 "/v3/api-docs/**",
                 "/v3/api-docs",
                 "/webjars/**",
-                "/api/auth/logout",
-                "/api/auth/verify-email",
+                "/api/v1/auth/logout",
+                "/api/v1/auth/verify-email",
                 "/api/auth/health/check"
         };
         String[] PUBLIC_AUTH = {
-                "/api/auth/login",
-                "/api/auth/register",
-                "/api/auth/refresh",
-                "/api/auth/google-login",
-                "/api/auth/reset-password",
-                "/api/auth/reset-password/confirm"
+                "/api/v1/auth/login",
+                "/api/v1/auth/register",
+                "/api/v1/auth/refresh",
+                "/api/v1/auth/google-login",
+                "/api/v1/auth/reset-password",
+                "/api/v1/auth/reset-password/confirm"
         };
         http
                 .cors(Customizer.withDefaults())
@@ -108,7 +117,7 @@ public class AuthSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
@@ -119,14 +128,13 @@ public class AuthSecurityConfig {
 
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
-        RegisteredClient exe101Web = RegisteredClient.withId(UUID.randomUUID().toString())
+        String[] uris = redirectUris.split(",");
+        var clientBuilder = RegisteredClient.withId(UUID.randomUUID().toString())
             .clientId("exe101-web")
-            .clientSecret("{noop}secret")
+            .clientSecret(clientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-            .redirectUri("http://localhost:5173/callback")
-            .redirectUri("http://localhost:5173")
             .scope(OidcScopes.OPENID)
             .scope("read")
             .scope("write")
@@ -134,9 +142,11 @@ public class AuthSecurityConfig {
             .tokenSettings(TokenSettings.builder()
                 .accessTokenTimeToLive(Duration.ofHours(1))
                 .refreshTokenTimeToLive(Duration.ofDays(7))
-                .build())
-            .build();
-        return new InMemoryRegisteredClientRepository(exe101Web);
+                .build());
+        for (String uri : uris) {
+            clientBuilder.redirectUri(uri.trim());
+        }
+        return new InMemoryRegisteredClientRepository(clientBuilder.build());
     }
 
     //Giữ lại key trong quá trình server chạy

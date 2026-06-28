@@ -54,6 +54,11 @@ public class RoomStateService {
             return;
         }
 
+        // Chỉ đồng bộ sức chứa nếu phòng đang ở trạng thái hoạt động (OPEN hoặc FULL)
+        if (!RoomStatus.OPEN.name().equals(room.getStatus()) && !RoomStatus.FULL.name().equals(room.getStatus())) {
+            return;
+        }
+
         long activeMembers = roomMemberRepository.countByRoomIdAndIsActiveTrue(room.getRoomId());
         String nextStatus = activeMembers >= room.getMaxMembers() ? RoomStatus.FULL.name() : RoomStatus.OPEN.name();
         if (!Objects.equals(room.getStatus(), nextStatus)) {

@@ -9,9 +9,11 @@ import app.together.common.shared.security.PermissionCheckService;
 import app.together.common.workflow.entity.Room;
 import app.together.common.workflow.entity.RoomMember;
 import app.together.common.workflow.entity.RoomMemberId;
+import app.together.common.workflow.entity.UserMasterData;
 import app.together.common.workflow.repository.RoomActivityRepository;
 import app.together.common.workflow.repository.RoomMemberRepository;
 import app.together.common.workflow.repository.RoomRepository;
+import app.together.common.workflow.repository.UserMasterDataRepository;
 import app.together.workflow.manager.room.RoomDomainManager;
 import app.together.workflow.manager.room.RoomDomainManagerRegistry;
 import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
@@ -19,6 +21,7 @@ import app.together.workflow.room.dto.RoomDtos.JoinRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class RoomService {
 
     private static final String ROOM_RESOURCE = "Room";
@@ -45,6 +49,7 @@ public class RoomService {
     private final RoomJoinPolicyService roomJoinPolicyService;
     private final RoomDomainManagerRegistry roomDomainManagerRegistry;
     private final RoomActivityRepository roomActivityRepository;
+    private final UserMasterDataRepository userMasterDataRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public RoomResponse createRoom(String userSso, CreateRoomRequest request) {
@@ -75,7 +80,7 @@ public class RoomService {
 
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
-        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_CANNOT_JOIN, userSso, room.getStatus());
+        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_JOINED, userSso, room.getStatus());
         return toRoomResponse(room);
     }
 
@@ -101,15 +106,22 @@ public class RoomService {
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
         roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_LEFT, userSso, member.getUserSso());
-        // Nếu thời gian học trên 0 phút, lưu hoạt động học tập và kích hoạt Event
-        // Gamification
+        // Nếu thời gian học trên 0 phút, lưu hoạt động học tập và kích hoạt Event Gamification
         if (durationMinutes > 0) {
-            roomActivityRepository.save(app.together.common.workflow.entity.RoomActivity.builder()
-                    .roomId(roomId)
-                    .userMasterDataId(1L) // Giá trị dummy, hoặc đổi kiểu sso nếu thích ứng nhất quán
-                    .activityType(app.together.common.workflow.enums.RoomActivity.STUDY.toString())
-                    .durationMinutes((int) durationMinutes)
-                    .build());
+            Long masterDataId = userMasterDataRepository.findByUserSso(userSso)
+                    .map(UserMasterData::getMasterDataId)
+                    .orElse(null);
+
+            if (masterDataId != null) {
+                roomActivityRepository.save(app.together.common.workflow.entity.RoomActivity.builder()
+                        .roomId(roomId)
+                        .userMasterDataId(masterDataId)
+                        .activityType(app.together.common.workflow.enums.RoomActivity.STUDY.toString())
+                        .durationMinutes((int) durationMinutes)
+                        .build());
+            } else {
+                log.warn("UserMasterData not found for userSso {}, skipping RoomActivity record.", userSso);
+            }
 
             // Bắn sự kiện bất đồng bộ nội bộ để service Gamification/Auth bắt được để cộng
             // Exp/Streak
@@ -133,9 +145,9 @@ public class RoomService {
         List<RoomMember> members = roomMemberRepository.findByRoomId(roomId);
         roomDomainManager(room).deactivateActiveMembers(members, now);
         roomMemberRepository.saveAll(members);
-        roomEventHandler.record(roomId,MessageConstants.MESSAGE_ROOM_CLOSED, userSso, room.getStatus());
+        roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_CLOSED, userSso, room.getStatus());
 
-        roomValidator.releaseSlot(room.getClosedBy()); // thu hồi slot tạo phòng cho user
+        roomValidator.releaseSlot(userSso); // thu hồi slot tạo phòng cho user
         return toRoomResponse(room);
     }
 

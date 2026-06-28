@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   authenticate,
   changeUserPassword,
@@ -11,6 +11,25 @@ import {
   type UserPreferences,
   type UserRole,
 } from '../mocks/auth'
+import { authApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/client'
+
+const useMock = import.meta.env.VITE_USE_MOCK === 'true'
+
+const mapToPublicUser = (dto: any): PublicUser => {
+  return {
+    id: String(dto.userId || dto.userSso),
+    username: dto.userSso,
+    email: dto.email,
+    fullName: dto.fullName || dto.email.split('@')[0],
+    role: dto.systemRole === 'ADMIN' ? 'ADMIN' : 'USER',
+    active: dto.status !== 'DISABLED',
+    avatarUrl: dto.avatarUrl || '',
+    preferences: {
+      theme: 'system',
+      notifications: { email: true, push: true, inApp: true },
+    }
+  }
+}
 
 // Temporary debug switch: bypass login gates while UI debugging.
 const DEBUG_AUTH_BYPASS = false
@@ -24,14 +43,15 @@ type AuthContextValue = {
   users: PublicUser[]
   isAuthenticated: boolean
   isAdmin: boolean
-  login: (input: LoginInput) => { ok: boolean; error?: string; user?: PublicUser }
+  login: (input: LoginInput) => Promise<{ ok: boolean; error?: string; user?: PublicUser }>
+  loginWithGoogle: (idToken: string) => Promise<{ ok: boolean; error?: string; user?: PublicUser }>
   logout: () => void
   refreshUsers: () => void
   createMockUser: (input: CreateUserInput) => { ok: boolean; error?: string }
   updateMockUser: (id: string, updates: Partial<PublicUser>) => { ok: boolean; error?: string }
   toggleMockUserStatus: (id: string) => { ok: boolean; error?: string }
   updateOwnProfile: (input: ProfileInput) => { ok: boolean; error?: string }
-  changeOwnPassword: (currentPassword: string, newPassword: string, confirmPassword: string) => { ok: boolean; error?: string }
+  changeOwnPassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<{ ok: boolean; error?: string }>
   updateOwnPreferences: (preferences: UserPreferences) => { ok: boolean; error?: string }
 }
 
@@ -49,15 +69,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUsers = useCallback(() => setUsers(listUsers()), [])
 
-  const login = useCallback((input: LoginInput) => {
-    const result = authenticate(input)
-    if (!result.user) return { ok: false, error: result.error ?? 'Login failed.' }
-    setUser(result.user)
-    refreshUsers()
-    return { ok: true, user: result.user }
+  useEffect(() => {
+    if (useMock) return
+    const token = getStoredToken()
+    if (token) {
+      authApi.me(token)
+        .then((res) => {
+          if (res.success && res.data) {
+            setUser(mapToPublicUser(res.data))
+          } else {
+            clearStoredToken()
+            setUser(null)
+          }
+        })
+        .catch(() => {
+          clearStoredToken()
+          setUser(null)
+        })
+    }
+  }, [])
+
+  const login = useCallback(async (input: LoginInput) => {
+    if (useMock) {
+      const result = authenticate(input)
+      if (!result.user) return { ok: false, error: result.error ?? 'Login failed.' }
+      setUser(result.user)
+      refreshUsers()
+      return { ok: true, user: result.user }
+    }
+
+    try {
+      const res = await authApi.login(input.identifier, input.password)
+      if (res.success && res.data?.accessToken) {
+        const { accessToken, refreshToken } = res.data
+        setStoredToken(accessToken)
+        localStorage.setItem('refresh_token', refreshToken)
+        const profileRes = await authApi.me(accessToken)
+        if (profileRes.success && profileRes.data) {
+          const publicUser = mapToPublicUser(profileRes.data)
+          setUser(publicUser)
+          return { ok: true, user: publicUser }
+        }
+      }
+      return { ok: false, error: res.message || 'Login failed.' }
+    } catch (err: any) {
+      return { ok: false, error: err.message || 'Network error during login.' }
+    }
   }, [refreshUsers])
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    if (useMock) {
+      const mockUser = listUsers().find((u) => u.role === 'USER') || listUsers()[0]
+      setUser(mockUser)
+      return { ok: true, user: mockUser }
+    }
+
+    try {
+      const res = await authApi.googleLogin(idToken)
+      if (res.success && res.data?.accessToken) {
+        const { accessToken, refreshToken } = res.data
+        setStoredToken(accessToken)
+        localStorage.setItem('refresh_token', refreshToken)
+        const profileRes = await authApi.me(accessToken)
+        if (profileRes.success && profileRes.data) {
+          const publicUser = mapToPublicUser(profileRes.data)
+          setUser(publicUser)
+          return { ok: true, user: publicUser }
+        }
+      }
+      return { ok: false, error: res.message || 'Google Login failed.' }
+    } catch (err: any) {
+      return { ok: false, error: err.message || 'Network error during Google Login.' }
+    }
+  }, [])
+
   const logout = useCallback(() => {
+    if (!useMock) {
+      const refreshToken = localStorage.getItem('refresh_token')
+      if (refreshToken) {
+        authApi.logout(refreshToken).catch((e) => console.error('Logout error:', e))
+      }
+      clearStoredToken()
+      localStorage.removeItem('refresh_token')
+    }
     setUser(null)
   }, [])
 
@@ -103,14 +197,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true }
   }, [refreshUsers, user])
 
-  const changeOwnPassword = useCallback((currentPassword: string, newPassword: string, confirmPassword: string) => {
+  const changeOwnPassword = useCallback(async (currentPassword: string, newPassword: string, confirmPassword: string) => {
     if (!user) return { ok: false, error: 'Not authenticated.' }
-    if (!verifyUserPassword(user.id, currentPassword)) return { ok: false, error: 'Current password is incorrect.' }
     if (newPassword.length < 6) return { ok: false, error: 'New password must be at least 6 characters.' }
     if (newPassword !== confirmPassword) return { ok: false, error: 'Password confirmation does not match.' }
-    const changed = changeUserPassword(user.id, newPassword)
-    if (!changed) return { ok: false, error: 'Unable to update password.' }
-    return { ok: true }
+
+    if (useMock) {
+      if (!verifyUserPassword(user.id, currentPassword)) return { ok: false, error: 'Current password is incorrect.' }
+      const changed = changeUserPassword(user.id, newPassword)
+      if (!changed) return { ok: false, error: 'Unable to update password.' }
+      return { ok: true }
+    }
+
+    try {
+      const token = getStoredToken()
+      if (!token) return { ok: false, error: 'No authorization token found.' }
+      const res = await authApi.changePassword(token, currentPassword, newPassword)
+      if (res.success) {
+        return { ok: true }
+      }
+      return { ok: false, error: res.message || 'Unable to update password.' }
+    } catch (err: any) {
+      return { ok: false, error: err.message || 'Network error during password update.' }
+    }
   }, [user])
 
   const updateOwnPreferences = useCallback((preferences: UserPreferences) => {
@@ -128,6 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: DEBUG_AUTH_BYPASS ? true : !!effectiveUser,
     isAdmin: effectiveUser?.role === 'ADMIN',
     login,
+    loginWithGoogle,
     logout,
     refreshUsers,
     createMockUser,
@@ -140,6 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     createMockUser,
     changeOwnPassword,
     login,
+    loginWithGoogle,
     logout,
     refreshUsers,
     toggleMockUserStatus,

@@ -65,7 +65,7 @@ public class ProjectsService {
                 .teamId(teamId)
                 .name(request.name().trim())
                 .description(request.description().trim())
-                .status(ProjectStatus.PLANNING.name() != null ? request.description().trim() : null)
+                .status(ProjectStatus.PLANNING.name() != null ? ProjectStatus.PLANNING.name() : null)
                 .startDate(request.startDate())
                 .dueDate(request.dueDate())
                 .build();

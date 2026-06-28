@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@FeignClient(name = "ai-service", url = "${app.ai.server-url}")
+@FeignClient(name = "ai-service", url = "${app.ai.service-url=https://dev-together-ai-gateway.onrender.com/}")
 public interface AiServiceClient {
 
     // 1. Hàm getMessage(String msg) trong sơ đồ

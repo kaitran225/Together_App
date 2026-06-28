@@ -27,11 +27,16 @@ export default function AdminAccountSettings() {
     setMessage(result.ok ? 'Profile updated.' : result.error ?? 'Failed to update profile.')
   }
 
-  const savePassword = (e: React.FormEvent) => {
+  const savePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = changeOwnPassword(passwordForm.current, passwordForm.next, passwordForm.confirm)
-    setMessage(result.ok ? 'Password updated.' : result.error ?? 'Failed to update password.')
-    if (result.ok) setPasswordForm({ current: '', next: '', confirm: '' })
+    setMessage('')
+    try {
+      const result = await changeOwnPassword(passwordForm.current, passwordForm.next, passwordForm.confirm)
+      setMessage(result.ok ? 'Password updated.' : result.error ?? 'Failed to update password.')
+      if (result.ok) setPasswordForm({ current: '', next: '', confirm: '' })
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to update password.')
+    }
   }
 
   const savePreferences = (e: React.FormEvent) => {
