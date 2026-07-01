@@ -38,6 +38,7 @@ public class RoomPost extends BaseAuditEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     String content;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "attachments", columnDefinition = "jsonb")
     String attachments;
 

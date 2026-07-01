@@ -35,6 +35,7 @@ public class QuizAttemptService {
 
     private static final String STATUS_IN_PROGRESS = "IN_PROGRESS";
     private static final String STATUS_COMPLETED = "COMPLETED";
+    private static final String VISIBILITY_PUBLIC = "PUBLIC";
 
     private final QuizRepository quizRepository;
     private final QuizQuestionRepository quizQuestionRepository;
@@ -55,7 +56,7 @@ public class QuizAttemptService {
         }
 
         // Chỉ cho phép người sở hữu quiz hoặc quiz public mới được làm
-        if (!quiz.getUserSso().equals(userSso)) {
+        if (!canAccessQuiz(quiz, userSso)) {
             throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
         }
 
@@ -193,6 +194,9 @@ public class QuizAttemptService {
     public List<QuizAttemptHistoryResponse> getAttemptHistory(Long quizId, String userSso) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_QUIZ_NOT_FOUND, quizId));
+        if (!canAccessQuiz(quiz, userSso)) {
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
+        }
 
         List<QuizAttempt> attempts = quizAttemptRepository.findByQuizIdAndUserSso(quizId, userSso);
 
@@ -225,6 +229,11 @@ public class QuizAttemptService {
         }
 
         return toAttemptResponse(attempt);
+    }
+
+    private boolean canAccessQuiz(Quiz quiz, String userSso) {
+        return quiz.getDeletedAt() == null
+                && (quiz.getUserSso().equals(userSso) || VISIBILITY_PUBLIC.equalsIgnoreCase(quiz.getVisibility()));
     }
 
     private QuizAttemptResponse toAttemptResponse(QuizAttempt attempt) {

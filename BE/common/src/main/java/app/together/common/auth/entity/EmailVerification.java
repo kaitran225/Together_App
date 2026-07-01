@@ -9,7 +9,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.Instant;
 
 @Entity
-@Table(name = "email_verifications")
+@Table(name = "email_verifications", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

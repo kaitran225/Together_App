@@ -66,9 +66,11 @@ public class Task extends BaseAuditEntity {
     @Column(name = "completed_at")
     Instant completedAt;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "attachments", columnDefinition = "jsonb")
     String attachments;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 

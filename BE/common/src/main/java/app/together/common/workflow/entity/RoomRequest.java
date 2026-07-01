@@ -42,6 +42,7 @@ public class RoomRequest extends BaseAuditEntity {
     @Column(name = "preferred_size")
     Integer preferredSize;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "tags", columnDefinition = "jsonb")
     String tags;
 

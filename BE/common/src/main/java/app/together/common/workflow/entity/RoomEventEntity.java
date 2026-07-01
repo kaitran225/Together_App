@@ -31,6 +31,7 @@ public class RoomEventEntity extends BaseAuditEntity {
     @Column(name = "actor_sso")
     String actorSso;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "payload", columnDefinition = "jsonb")
     String payload;
 

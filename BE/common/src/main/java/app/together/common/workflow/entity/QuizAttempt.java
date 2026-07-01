@@ -36,6 +36,7 @@ public class QuizAttempt extends BaseAuditEntity {
     @Column(name = "score", precision = 5, scale = 2)
     BigDecimal score;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "user_answer", columnDefinition = "jsonb")
     String userAnswer;
 

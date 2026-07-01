@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Badge, Button, Card, IconButton, SegmentedControl, SettingsIcon } from '../../../components/common'
-import { NOTIFICATION_TABS, NOTIFICATIONS, type NotificationItem, type NotificationType } from '../../../mocks'
+import { workflowApi } from '../../../api/client'
+import { NOTIFICATION_TABS, type NotificationItem, type NotificationType } from '../../../mocks'
 
 const TABS = NOTIFICATION_TABS
 type TabId = (typeof TABS)[number]['id']
@@ -51,6 +52,22 @@ function getIcon(type: NotificationType) {
   }
 }
 
+function normalizeNotification(item: any): NotificationItem {
+  const type = (item.type || 'message').toLowerCase() as NotificationType
+  const createdAt = item.createdAt ? new Date(item.createdAt) : new Date()
+  const time = Number.isNaN(createdAt.getTime()) ? 'Recently' : createdAt.toLocaleDateString('vi-VN')
+
+  return {
+    id: String(item.notificationId ?? item.id ?? ''),
+    type: type === 'deadline' || type === 'team' || type === 'ai' || type === 'achievement' || type === 'message' ? type : 'message',
+    title: item.title || 'Notification',
+    description: item.message || 'You have a new update.',
+    time,
+    priority: type === 'deadline' || Boolean(item.linkType),
+    unread: item.isRead === false,
+  }
+}
+
 function filterByTab(items: NotificationItem[], tab: TabId): NotificationItem[] {
   if (tab === 'all') return items
   if (tab === 'upcoming') return items.filter((n) => n.type === 'deadline' || n.priority)
@@ -60,7 +77,29 @@ function filterByTab(items: NotificationItem[], tab: TabId): NotificationItem[] 
 
 export default function Notification() {
   const [tab, setTab] = useState<TabId>('all')
-  const filtered = filterByTab(NOTIFICATIONS, tab)
+  const [items, setItems] = useState<NotificationItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const loadNotifications = async () => {
+    setIsLoading(true)
+    try {
+      const res = await workflowApi.getNotifications()
+      if (res.success) {
+        const mapped = Array.isArray(res.data) ? res.data.map(normalizeNotification) : []
+        setItems(mapped)
+      }
+    } catch {
+      setItems([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadNotifications()
+  }, [])
+
+  const filtered = filterByTab(items, tab)
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
@@ -69,7 +108,21 @@ export default function Notification() {
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Notification Board</h1>
           <p className="text-neutral-600 mt-1">Don&apos;t miss out on study announcements and group activities.</p>
         </div>
-        <IconButton icon={<SettingsIcon className="w-5 h-5" />} label="Notification settings" />
+        <div className="flex items-center gap-2">
+          {items.some((n) => n.unread) && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                await workflowApi.markAllNotificationsAsRead()
+                setItems((prev) => prev.map((item) => ({ ...item, unread: false })))
+              }}
+            >
+              Mark all as read
+            </Button>
+          )}
+          <IconButton icon={<SettingsIcon className="w-5 h-5" />} label="Notification settings" />
+        </div>
       </div>
 
       <div className="border-b border-neutral-200 pb-2">
@@ -81,16 +134,36 @@ export default function Notification() {
       </div>
 
       <ul className="space-y-3">
-        {filtered.map((n) => (
+        {isLoading ? (
+          <li className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Loading notifications…</li>
+        ) : filtered.length === 0 ? (
+          <li className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">No notifications yet.</li>
+        ) : filtered.map((n) => (
           <li key={n.id}>
             <Card
-              className={`p-4 flex gap-4 items-start border-2 transition-colors ${
-                n.unread ? 'bg-neutral-50 border-neutral-200' : 'border-neutral-200'
+              onClick={async () => {
+                if (n.unread) {
+                  const numId = Number(n.id)
+                  if (!Number.isNaN(numId)) {
+                    await workflowApi.markNotificationAsRead(numId)
+                    setItems((prev) =>
+                      prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
+                    )
+                  }
+                }
+              }}
+              className={`p-4 flex gap-4 items-start border-2 transition-all duration-200 cursor-pointer ${
+                n.unread
+                  ? 'bg-neutral-50/70 border-primary/30 hover:border-primary/50 hover:bg-neutral-50'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
               }`}
             >
               {getIcon(n.type)}
               <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-neutral-900">{n.title}</h3>
+                <h3 className="font-bold text-neutral-900 flex items-center gap-2">
+                  {n.title}
+                  {n.unread && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                </h3>
                 <p className="text-sm text-neutral-600 mt-1">{n.description}</p>
                 {n.priority && (
                   <Badge variant="warning" className="mt-2">Priority</Badge>
@@ -106,7 +179,7 @@ export default function Notification() {
 
       {filtered.length > 0 && (
         <div className="flex justify-center pt-2">
-          <Button variant="primary" size="md">Show older notifications</Button>
+          <Button variant="primary" size="md" onClick={loadNotifications}>Refresh notifications</Button>
         </div>
       )}
     </div>

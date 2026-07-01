@@ -65,4 +65,16 @@ public class ProjectController {
         projectsService.deleteProject(projectId, currentUserSso);
         return ApiResponse.ok(null);
     }
+
+    @GetMapping("/projects/{projectId}/export")
+    public org.springframework.http.ResponseEntity<byte[]> exportProjectTasks(@PathVariable Long projectId) {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        byte[] csvData = projectsService.exportProjectTasksCsv(projectId, currentUserSso);
+
+        String filename = "project_" + projectId + "_tasks.csv";
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(csvData);
+    }
 }

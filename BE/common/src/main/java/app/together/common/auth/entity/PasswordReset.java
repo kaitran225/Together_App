@@ -9,7 +9,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.Instant;
 
 @Entity
-@Table(name = "password_resets")
+@Table(name = "password_resets", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

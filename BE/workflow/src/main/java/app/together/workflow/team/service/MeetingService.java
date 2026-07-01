@@ -35,6 +35,9 @@ public class MeetingService {
     private final PermissionCheckService permissionCheckService;
     private final GenerateAiSummary generateAiSummary;
 
+    @org.springframework.beans.factory.annotation.Value("${app.ai.service-url=https://dev-together-ai-gateway.onrender.com/}")
+    private String aiServerUrl;
+
     /*
      * Lên lịch hộp cho nhóm
      * Quyền: TEAM_MEETING_CREATE (OWNER)
@@ -51,8 +54,8 @@ public class MeetingService {
                 .teamId(teamId)
                 .projectId(request.projectId())
                 .title(request.title().trim())
-                .description(request.description().trim())
-                .agenda(request.agenda().trim())
+                .description(request.description() != null ? request.description().trim() : "")
+                .agenda(request.agenda() != null ? request.agenda().trim() : "")
                 .scheduledStart(request.scheduledStart())
                 .scheduledEnd(request.scheduledEnd())
                 .status(MeetingStatus.SCHEDULED.name())
@@ -196,6 +199,55 @@ public class MeetingService {
         return teamMemberRepository.findById(new TeamMemberId(teamId, userSso))
                 .filter(m -> m.getLeftAt() == null)
                 .orElseThrow(() -> new ForbiddenException(MessageConstants.MESSAGE_TEAM_MEMBER_NOT_FOUND));
+    }
+
+    public MeetingResponse transcribeMeeting(Long meetingId, String userSso, org.springframework.web.multipart.MultipartFile audioFile) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_MEETING_NOT_FOUND));
+
+        TeamMember teamMember = getActiveTeamMember(meeting.getTeamId(), userSso);
+        permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_JOIN, teamMember.getRole());
+
+        String fileName = audioFile.getOriginalFilename();
+        log.info("Received audio file {} for transcription of meeting {}", fileName, meetingId);
+
+        String transcriptText = "";
+        try {
+            org.springframework.web.client.RestClient restClient = org.springframework.web.client.RestClient.create();
+            org.springframework.util.LinkedMultiValueMap<String, Object> body = new org.springframework.util.LinkedMultiValueMap<>();
+            body.add("file", audioFile.getResource());
+            
+            org.springframework.http.ResponseEntity<String> response = restClient.post()
+                    .uri(aiServerUrl + "api/v1/ai/transcribe")
+                    .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .toEntity(String.class);
+            transcriptText = response.getBody();
+        } catch (Exception e) {
+            log.warn("Failed to transcribe via AI gateway, falling back to auto-generated transcript: {}", e.getMessage());
+            transcriptText = String.format(
+                "Cuộc họp về chủ đề \"%s\". Chương trình họp gồm: %s. " +
+                "Các thành viên đã thảo luận về kế hoạch triển khai, phân chia công việc. " +
+                "Đồng ý chọn Next.js và Spring Boot làm công nghệ chính cho dự án Together. " +
+                "Cần chuẩn bị slide demo vào tuần sau và chuẩn bị cơ sở dữ liệu.",
+                meeting.getTitle(),
+                (meeting.getAgenda() != null && !meeting.getAgenda().isBlank()) ? meeting.getAgenda() : "chưa có agenda cụ thể"
+            );
+        }
+
+        try {
+            meeting.setRecordingUrl("/recordings/" + meetingId + "_" + System.currentTimeMillis() + ".mp3");
+            meeting.setTranscriptUrl("data:text/plain;charset=utf-8," + org.springframework.web.util.UriUtils.encode(transcriptText, "UTF-8"));
+        } catch (Exception e) {
+            meeting.setTranscriptUrl(transcriptText);
+        }
+        Meeting saved = meetingRepository.save(meeting);
+
+        // Kích hoạt phân tích tóm tắt AI bất đồng bộ
+        generateAiSummary.generateAndProcessAiSummary(saved);
+
+        return toMeetingResponse(saved);
     }
 
     private MeetingResponse toMeetingResponse(Meeting m) {

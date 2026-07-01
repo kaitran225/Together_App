@@ -14,6 +14,7 @@ import app.together.common.workflow.repository.QuizQuestionRepository;
 import app.together.common.workflow.repository.QuizRepository;
 import app.together.workflow.personal.client.AiServiceClient;
 import app.together.workflow.personal.dto.ChatDtos.*;
+import app.together.workflow.personal.dto.QuizSetDtos.QuizSetResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class PersonalQuizService {
+
+    private static final String VISIBILITY_PRIVATE = "PRIVATE";
+    private static final String VISIBILITY_PUBLIC = "PUBLIC";
 
     private final DocumentRepository documentRepository;
     private final QuizRepository quizRepository;
@@ -78,6 +82,8 @@ public class PersonalQuizService {
                     .passingScore(80)
                     .isRandomized(false)
                     .showAnswers(true)
+                    .visibility(VISIBILITY_PRIVATE)
+                    .source("AI_GENERATED")
                     .build();
             Quiz savedQuiz = quizRepository.save(quiz);
 
@@ -109,5 +115,72 @@ public class PersonalQuizService {
             log.error("Failed to parse and save AI generated quiz metadata: {}", ex.getMessage());
             throw new BadRequestException(MessageConstants.MESSAGE_FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA);
         }
+    }
+
+    public List<QuizQuestion> getQuizQuestions(String userSso, Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_QUIZ_NOT_FOUND, quizId));
+        if (!canAccessQuiz(quiz, userSso)) {
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
+        }
+        return quizQuestionRepository.findByQuizId(quizId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<QuizSetResponse> getAvailableQuizSets(String userSso, String keyword, String difficulty) {
+        String normalizedKeyword = hasText(keyword) ? keyword.trim() : null;
+        String normalizedDifficulty = hasText(difficulty) ? difficulty.trim().toUpperCase() : null;
+
+        return quizRepository.findAvailableQuizSets(userSso, normalizedKeyword, normalizedDifficulty).stream()
+                .map(quiz -> toQuizSetResponse(quiz, userSso))
+                .toList();
+    }
+
+    public QuizSetResponse updateQuizSetSharing(String userSso, Long quizId, String visibility) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_QUIZ_NOT_FOUND, quizId));
+        if (!quiz.getUserSso().equals(userSso) || quiz.getDeletedAt() != null) {
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
+        }
+
+        String normalizedVisibility = hasText(visibility) ? visibility.trim().toUpperCase() : VISIBILITY_PRIVATE;
+        if (!VISIBILITY_PRIVATE.equals(normalizedVisibility) && !VISIBILITY_PUBLIC.equals(normalizedVisibility)) {
+            throw new BadRequestException(MessageConstants.MESSAGE_INVALID);
+        }
+
+        quiz.setVisibility(normalizedVisibility);
+        quiz.setSharedAt(VISIBILITY_PUBLIC.equals(normalizedVisibility) ? java.time.Instant.now() : null);
+        return toQuizSetResponse(quizRepository.save(quiz), userSso);
+    }
+
+    private QuizSetResponse toQuizSetResponse(Quiz quiz, String currentUserSso) {
+        String visibility = hasText(quiz.getVisibility()) ? quiz.getVisibility() : VISIBILITY_PRIVATE;
+        String source = hasText(quiz.getSource()) ? quiz.getSource() : "USER_GENERATED";
+        return new QuizSetResponse(
+                quiz.getQuizId(),
+                quiz.getDocumentId(),
+                quiz.getUserSso(),
+                quiz.getTitle(),
+                quiz.getDescription(),
+                quiz.getDifficulty(),
+                quiz.getTimeLimitMinutes(),
+                quiz.getPassingScore(),
+                quiz.getIsRandomized(),
+                quiz.getShowAnswers(),
+                visibility,
+                source,
+                quiz.getSharedAt(),
+                quizQuestionRepository.countByQuizId(quiz.getQuizId()),
+                quiz.getUserSso().equals(currentUserSso)
+        );
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private boolean canAccessQuiz(Quiz quiz, String userSso) {
+        return quiz.getDeletedAt() == null
+                && (quiz.getUserSso().equals(userSso) || VISIBILITY_PUBLIC.equalsIgnoreCase(quiz.getVisibility()));
     }
 }

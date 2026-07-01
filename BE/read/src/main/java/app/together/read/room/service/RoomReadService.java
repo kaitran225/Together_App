@@ -56,6 +56,98 @@ public class RoomReadService {
                 members);
     }
 
+    public List<RoomResponse> getActiveRooms() {
+        return roomRepository.findAll().stream()
+                .filter(room -> !"CLOSED".equalsIgnoreCase(room.getStatus()) && room.getDeletedAt() == null)
+                .map(room -> {
+                    List<RoomMemberResponse> members = roomMemberRepository.findByRoomId(room.getRoomId()).stream()
+                            .map(this::toMemberResponse)
+                            .toList();
+                    return new RoomResponse(
+                            room.getRoomId(),
+                            room.getTitle(),
+                            room.getDescription(),
+                            room.getInviteCode(),
+                            room.getStatus(),
+                            room.getIsPublic(),
+                            room.getMaxMembers(),
+                            room.getActivatedAt(),
+                            room.getExpiresAt(),
+                            room.getClosedAt(),
+                            members);
+                })
+                .toList();
+    }
+
+    public List<RoomResponse> getMyRooms(String userSso) {
+        List<RoomMember> memberships = roomMemberRepository.findByUserSso(userSso);
+        List<Long> roomIds = memberships.stream()
+                .map(RoomMember::getRoomId)
+                .toList();
+
+        return roomRepository.findAllById(roomIds).stream()
+                .filter(room -> !"CLOSED".equalsIgnoreCase(room.getStatus()) && room.getDeletedAt() == null)
+                .map(room -> {
+                    List<RoomMemberResponse> members = roomMemberRepository.findByRoomId(room.getRoomId()).stream()
+                            .map(this::toMemberResponse)
+                            .toList();
+                    return new RoomResponse(
+                            room.getRoomId(),
+                            room.getTitle(),
+                            room.getDescription(),
+                            room.getInviteCode(),
+                            room.getStatus(),
+                            room.getIsPublic(),
+                            room.getMaxMembers(),
+                            room.getActivatedAt(),
+                            room.getExpiresAt(),
+                            room.getClosedAt(),
+                            members);
+                })
+                .toList();
+    }
+
+    public List<RoomResponse> getSuggestedRooms() {
+        List<Room> activeRooms = roomRepository.findAll().stream()
+                .filter(room -> !"CLOSED".equalsIgnoreCase(room.getStatus()) && room.getDeletedAt() == null)
+                .toList();
+
+        // Sort rooms by active member count in descending order
+        activeRooms.sort((room1, room2) -> Long.compare(
+                roomMemberRepository.countByRoomIdAndIsActiveTrue(room2.getRoomId()),
+                roomMemberRepository.countByRoomIdAndIsActiveTrue(room1.getRoomId())
+        ));
+
+        // Take top 5 and map to response
+        return activeRooms.stream()
+                .limit(5)
+                .map(room -> {
+                    List<RoomMemberResponse> members = roomMemberRepository.findByRoomId(room.getRoomId()).stream()
+                            .map(this::toMemberResponse)
+                            .toList();
+                    return new RoomResponse(
+                            room.getRoomId(),
+                            room.getTitle(),
+                            room.getDescription(),
+                            room.getInviteCode(),
+                            room.getStatus(),
+                            room.getIsPublic(),
+                            room.getMaxMembers(),
+                            room.getActivatedAt(),
+                            room.getExpiresAt(),
+                            room.getClosedAt(),
+                            members);
+                })
+                .toList();
+    }
+
+    public List<RoomMemberResponse> getRoomParticipants(Long roomId) {
+        requireRoom(roomId); // First, ensure the room exists.
+        return roomMemberRepository.findByRoomId(roomId).stream()
+                .map(this::toMemberResponse)
+                .toList();
+    }
+
     public List<RoomEventEntity> getTimeline(Long roomId) {
         requireRoom(roomId);
         return roomEventRepository.findByRoomIdOrderByEventAtDesc(roomId);

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("api/v1/workflow/personal/chat")
+@RequestMapping("/api/v1/workflow/personal/chat")
 @RequiredArgsConstructor
 public class PersonalChatController {
 
@@ -20,6 +20,12 @@ public class PersonalChatController {
     public ApiResponse<ChatConversationResponse> createConversation(@RequestBody CreateConversationRequest request) {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(personalChatService.createConversation(currentUserSso, request));
+    }
+
+    @GetMapping("/conversations")
+    public ApiResponse<List<ChatConversationResponse>> getConversations() {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(personalChatService.getConversations(currentUserSso));
     }
 
     @PostMapping("/conversations/{conversationId}/messages")

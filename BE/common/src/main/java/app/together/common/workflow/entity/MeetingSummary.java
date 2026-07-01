@@ -36,9 +36,11 @@ public class MeetingSummary extends BaseAuditEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     String content;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "key_points", columnDefinition = "jsonb")
     String keyPoints;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "action_items", columnDefinition = "jsonb")
     String actionItems;
 
@@ -49,6 +51,7 @@ public class MeetingSummary extends BaseAuditEntity {
     @Column(name = "decisions_made", columnDefinition = "jsonb")
     private List<String> decisionsMade;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "next_steps", columnDefinition = "jsonb")
     String nextSteps;
 

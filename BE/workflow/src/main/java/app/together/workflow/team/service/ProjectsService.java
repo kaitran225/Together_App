@@ -19,6 +19,7 @@ import app.together.common.workflow.enums.ProjectStatus;
 import app.together.common.workflow.repository.ProjectRepository;
 import app.together.common.workflow.repository.TeamMemberRepository;
 import app.together.common.workflow.repository.TeamRepository;
+import app.together.common.workflow.repository.TaskRepository;
 import app.together.workflow.team.dto.ProjectDtos.CreateProjectRequest;
 import app.together.workflow.team.dto.ProjectDtos.ProjectResponse;
 import app.together.workflow.team.dto.ProjectDtos.UpdateProjectRequest;
@@ -32,6 +33,7 @@ public class ProjectsService {
     private final ProjectRepository projectRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
+    private final TaskRepository taskRepository;
     private final ScrumBoardService scrumBoardService;
     private final PermissionCheckService permissionCheckService;
 
@@ -196,5 +198,46 @@ public class ProjectsService {
                 project.getStartDate(),
                 project.getDueDate(),
                 project.getCompletedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportProjectTasksCsv(Long projectId, String userSso) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", projectId));
+
+        TeamMember member = getActiveTeamMember(project.getTeamId(), userSso);
+        permissionCheckService.requireTeamRole(Permission.WORKFLOW_READ, member.getRole());
+
+        List<app.together.common.workflow.entity.Task> tasks = taskRepository.findByProjectId(projectId);
+
+        StringBuilder csv = new StringBuilder();
+        // Add UTF-8 BOM
+        csv.append('\ufeff');
+        csv.append("Task ID,Title,Description,Status,Priority,Estimated Hours,Start Date,Due Date,Created By\n");
+
+        for (app.together.common.workflow.entity.Task task : tasks) {
+            csv.append(task.getTaskId()).append(",")
+               .append(escapeCsv(task.getTitle())).append(",")
+               .append(escapeCsv(task.getDescription())).append(",")
+               .append(escapeCsv(task.getStatus())).append(",")
+               .append(escapeCsv(task.getPriority())).append(",")
+               .append(task.getEstimatedHours() != null ? task.getEstimatedHours() : 0).append(",")
+               .append(task.getStartDate() != null ? task.getStartDate().toString() : "").append(",")
+               .append(task.getDueDate() != null ? task.getDueDate().toString() : "").append(",")
+               .append(escapeCsv(task.getCreatedBy())).append("\n");
+        }
+
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) {
+            return "";
+        }
+        String field = value.replace("\"", "\"\"");
+        if (field.contains(",") || field.contains("\n") || field.contains("\"")) {
+            return "\"" + field + "\"";
+        }
+        return field;
     }
 }

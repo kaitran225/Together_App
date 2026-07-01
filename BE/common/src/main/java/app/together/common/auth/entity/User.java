@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

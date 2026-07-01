@@ -39,6 +39,8 @@ public record UserDto(
         String status,
         Boolean emailVerified,
         SystemRole systemRole,
-        Boolean isAdmin
+        Boolean isAdmin,
+        java.util.List<String> skills,
+        java.util.List<String> learningGoals
 ) {
 }

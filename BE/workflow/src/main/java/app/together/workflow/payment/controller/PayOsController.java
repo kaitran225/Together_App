@@ -16,7 +16,7 @@ public class PayOsController {
 
     @PostMapping("/checkout")
     public ApiResponse<CheckoutResponse> checkout(@RequestParam("packageId") Long packageId) {
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(payOsService.createPaymentLink(currentUserSso, packageId));
     }
 

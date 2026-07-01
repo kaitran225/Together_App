@@ -19,7 +19,7 @@ public class SubscriptionController {
 
     @PostMapping("/upgrade")
     public ApiResponse<SubscriptionDtos.SubscriptionResponse> upgradeTier(@RequestBody SubscriptionDtos.UpgradeTierRequest request){
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(subscriptionService.upgradeUserTier(currentUserSso, request));
     }
 }

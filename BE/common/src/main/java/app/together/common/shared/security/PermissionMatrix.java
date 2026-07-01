@@ -119,6 +119,7 @@ public final class PermissionMatrix {
                                         TEAM_REPORT_VIEW,
                                         TASK_CREATE,
                                         TASK_UPDATE,
+                                        TEAM_MEETING_CREATE,
                                         WORKFLOW_READ ->
                                 PermissionRule.allOf(Patterns.teamMember());
 
@@ -127,7 +128,6 @@ public final class PermissionMatrix {
                                         TEAM_INVITE_MEMBER,
                                         TEAM_REMOVE_MEMBER,
                                         TEAM_DELETE,
-                                        TEAM_MEETING_CREATE,
                                         TASK_ASSIGN,
                                         TASK_DELETE,
                                         TASK_EVALUATE,

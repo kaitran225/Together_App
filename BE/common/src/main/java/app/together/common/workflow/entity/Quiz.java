@@ -52,6 +52,15 @@ public class Quiz extends BaseAuditEntity {
     @Column(name = "show_answers")
     Boolean showAnswers;
 
+    @Column(name = "visibility")
+    String visibility;
+
+    @Column(name = "source")
+    String source;
+
+    @Column(name = "shared_at")
+    Instant sharedAt;
+
     @Column(name = "deleted_at")
     Instant deletedAt;
 }

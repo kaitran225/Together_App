@@ -21,6 +21,9 @@ public record QuizDto(
         Integer timeLimitMinutes,
         Integer passingScore,
         Boolean isRandomized,
-        Boolean showAnswers
+        Boolean showAnswers,
+        String visibility,
+        String source,
+        Instant sharedAt
 ) {
 }

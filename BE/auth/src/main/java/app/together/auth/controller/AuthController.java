@@ -77,6 +77,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(MessageConstants.MESSAGE_EMAIL_VERIFY_SUCCESS));
     }
 
+    @PostMapping("/dev-verify-all")
+    public ResponseEntity<ApiResponse<String>> devVerifyAll() {
+        authService.devVerifyAllUsers();
+        return ResponseEntity.ok(ApiResponse.ok("All users verified successfully"));
+    }
+
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<String>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         authService.changePasswordRequest(request.oldPassword(), request.newPassword());

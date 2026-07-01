@@ -57,7 +57,7 @@ public class TaskService {
                         () -> new ResourceNotFoundException(MessageConstants.MESSAGE_PROJECT_NOT_FOUND, projectId));
         TeamMember teamMember = getActiveTeamMember(project.getTeamId(), userSso);
 
-        permissionCheckService.requireTeamRole(Permission.TEAM_CREATE, teamMember.getRole());
+        permissionCheckService.requireTeamRole(Permission.TASK_CREATE, teamMember.getRole());
 
         if (request.title() == null || request.title().isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_TASK_TITLE_REQUIRED);

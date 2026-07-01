@@ -27,10 +27,12 @@ export interface UserDto {
   emailVerified?: boolean | null
   createdAt?: string | null
   updatedAt?: string | null
+  skills?: string[] | null
+  learningGoals?: string[] | null
 }
 
 /** Subset returned by auth /api/v1/users/me; compatible with UserDto. */
-export type MeResponse = Pick<UserDto, 'userSso' | 'email' | 'fullName'>
+export type MeResponse = Pick<UserDto, 'userSso' | 'email' | 'fullName' | 'skills' | 'learningGoals'>
 
 export interface PageResponse<T> {
   content: T[]

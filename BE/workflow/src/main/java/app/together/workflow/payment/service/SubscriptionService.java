@@ -41,6 +41,7 @@ public class SubscriptionService {
      * Người dùng tự thực hiện nâng cấp/gia hạn Gói dịch vụ bằng số Coin đang có trong ví.
      */
     public SubscriptionResponse upgradeUserTier(String userSso, UpgradeTierRequest request){
+        requireUserSso(userSso);
         String targetTier = request.targetTier().trim().toUpperCase();
         if(!TIER_PRICE_PER_DAY.containsKey(targetTier)){
             throw new BadRequestException(MessageConstants.MESSAGE_COIN_PACKAGE_INVALID);
@@ -90,7 +91,7 @@ public class SubscriptionService {
 
         // 5. Ghi nhận nhật ký biến động ví tiền local (Transactions)
         UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
-                .orElseThrow(() -> new BadRequestException(MessageConstants.MESSAGE_USER_MASTER_DATA_NOT_FOUND));
+                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
 
         transactionRepository.save(Transaction.builder()
                         .userMasterDataId(masterData.getMasterDataId())
@@ -102,5 +103,11 @@ public class SubscriptionService {
                 .build());
 
         return new SubscriptionResponse(userSso, targetTier, newExpiry, totalCostCoins, wallet.getBalance());
+    }
+
+    private void requireUserSso(String userSso) {
+        if (userSso == null || userSso.isBlank()) {
+            throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
+        }
     }
 }

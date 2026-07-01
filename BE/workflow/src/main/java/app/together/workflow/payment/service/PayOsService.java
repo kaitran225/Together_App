@@ -72,6 +72,7 @@ public class PayOsService {
      * Tạo hóa đơn tạm và lấy link VietQR động của PayOS.
      */
     public CheckoutResponse createPaymentLink(String userSso, Long packageId) {
+        requireUserSso(userSso);
         CoinPackage coinPackage = coinPackageRepository.findById(packageId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_COIN_PACKAGE_NOT_FOUND, packageId));
 
@@ -191,7 +192,7 @@ public class PayOsService {
 
             // 4. Tìm kiếm userMasterDataId từ userSso để ghi nhận vào sổ cái local (Transactions) của bạn
             UserMasterData masterData = userMasterDataRepository.findByUserSso(transaction.getUserSso())
-                    .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_USER_NOT_FOUND, transaction.getUserSso()));
+                    .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(transaction.getUserSso()).build()));
 
             transactionRepository.save(Transaction.builder()
                     .userMasterDataId(masterData.getMasterDataId())
@@ -242,6 +243,12 @@ public class PayOsService {
             return hexString.toString();
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
+        }
+    }
+
+    private void requireUserSso(String userSso) {
+        if (userSso == null || userSso.isBlank()) {
+            throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
         }
     }
 

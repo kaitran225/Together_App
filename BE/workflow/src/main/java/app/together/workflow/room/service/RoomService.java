@@ -110,7 +110,7 @@ public class RoomService {
         if (durationMinutes > 0) {
             Long masterDataId = userMasterDataRepository.findByUserSso(userSso)
                     .map(UserMasterData::getMasterDataId)
-                    .orElse(null);
+                    .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()).getMasterDataId());
 
             if (masterDataId != null) {
                 roomActivityRepository.save(app.together.common.workflow.entity.RoomActivity.builder()

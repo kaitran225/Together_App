@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Button, Card, Input, SegmentedControl } from '../../../components/common'
 import { FILTERS, FAKE_ROOMS, MY_ROOM_IDS, SUGGESTED_IDS, STUDY_ROOMS_TABS, type Room } from '../../../mocks'
+import { readApi } from '../../../api/client'
 
 type TabKey = (typeof STUDY_ROOMS_TABS)[number]['key']
 
@@ -20,10 +21,52 @@ export default function StudyRoomDiscovery() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
   const [tab, setTab] = useState<TabKey>('explore')
+  const [rooms, setRooms] = useState<Room[]>([])
+
+  useEffect(() => {
+    readApi.getRooms()
+      .then((res) => {
+        if (res.success && res.data) {
+          const mapped: Room[] = res.data.map((r: any) => {
+            const activeCount = r.members ? r.members.filter((m: any) => m.isActive).length : 0
+            const t = r.title.toLowerCase()
+            const d = r.description?.toLowerCase() || ''
+            let topic: 'math' | 'science' | 'lang' = 'math'
+            if (t.includes('sci') || t.includes('bio') || t.includes('phy') || t.includes('chem') || d.includes('science') || d.includes('chemistry')) {
+              topic = 'science'
+            } else if (t.includes('lang') || t.includes('spanish') || t.includes('french') || t.includes('english') || t.includes('japanese')) {
+              topic = 'lang'
+            }
+            return {
+              id: String(r.roomId),
+              title: r.title,
+              topic,
+              tags: ['Study', topic.toUpperCase()],
+              description: r.description || '',
+              membersCurrent: activeCount,
+              membersMax: r.maxMembers || 10,
+            }
+          })
+          const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+          if (mapped.length > 0) {
+            setRooms(mapped)
+          } else {
+            setRooms(isMock ? FAKE_ROOMS : [])
+          }
+        } else {
+          const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+          setRooms(isMock ? FAKE_ROOMS : [])
+        }
+      })
+      .catch(() => {
+        const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+        setRooms(isMock ? FAKE_ROOMS : [])
+      })
+  }, [])
 
   const filteredBySearch = useMemo(
-    () => FAKE_ROOMS.filter((room: Room) => matchRoom(room, search, category)),
-    [search, category]
+    () => rooms.filter((room: Room) => matchRoom(room, search, category)),
+    [rooms, search, category]
   )
 
   const roomsToShow = useMemo(() => {
@@ -119,7 +162,7 @@ export default function StudyRoomDiscovery() {
                   ))}
                 </div>
               )}
-              <Link to="/study-room">
+              <Link to={`/study-room?roomId=${room.id}`}>
                 <Button variant="secondary" size="sm" className="text-xs border-2 border-neutral-200">Join</Button>
               </Link>
             </Card>

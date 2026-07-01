@@ -6,7 +6,7 @@ export type { ApiResponse, MeResponse } from '../types/dto'
 const AUTH_ISSUER = 'http://localhost:8880'
 
 /** Set VITE_USE_MOCK=true in .env to use fake user and health responses without backend. */
-const useMock = import.meta.env.VITE_USE_MOCK === 'true'
+export const useMock = import.meta.env.VITE_USE_MOCK === 'true'
 
 export const authApi = {
   loginUrl(): string {
@@ -23,6 +23,19 @@ export const authApi = {
     if (useMock) return Promise.resolve(getFakeMeResponse())
     const r = await fetch('/api/v1/users/me', {
       headers: { Authorization: `Bearer ${token}` },
+    })
+    return r.json()
+  },
+
+  async updateProfile(token: string, fullName?: string, avatarUrl?: string, skills?: string[], learningGoals?: string[]): Promise<ApiResponse<MeResponse>> {
+    if (useMock) return Promise.resolve(getFakeMeResponse())
+    const r = await fetch('/api/v1/users/me', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ fullName, avatarUrl, skills, learningGoals }),
     })
     return r.json()
   },
@@ -94,7 +107,22 @@ export const authApi = {
 export const readApi = {
   async health(): Promise<ApiResponse<{ service: string; status: string }>> {
     if (useMock) return Promise.resolve({ success: true, data: { service: 'read', status: 'UP' } })
-    const r = await fetch('http://localhost:8882/api/v1/read/health')
+    const r = await fetch('/api/v1/read/health')
+    return r.json()
+  },
+  async getRooms(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/read/rooms')
+    return r.json()
+  },
+  async getRoomDetail(roomId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/read/rooms/${roomId}`)
+    return r.json()
+  },
+  async getRoomTimeline(roomId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/read/rooms/${roomId}/events`)
     return r.json()
   },
 }
@@ -102,7 +130,913 @@ export const readApi = {
 export const workflowApi = {
   async health(): Promise<ApiResponse<{ service: string; status: string }>> {
     if (useMock) return Promise.resolve({ success: true, data: { service: 'workflow', status: 'UP' } })
-    const r = await fetch('http://localhost:8881/api/v1/workflow/health')
+    const r = await fetch('/api/v1/workflow/health')
+    return r.json()
+  },
+  async createRoom(title: string, description: string, maxMembers: number, isPublic: boolean, roomType = 'SOCIAL'): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/rooms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({
+        title,
+        description,
+        maxMembers,
+        isPublic,
+        roomType,
+      }),
+    })
+    return r.json()
+  },
+  async joinRoom(roomId: string | number, inviteCode = ''): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ inviteCode }),
+    })
+    return r.json()
+  },
+  async leaveRoom(roomId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/leave`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    })
+    return r.json()
+  },
+  async getWebRtcConfig(roomId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/webrtc-config`, {
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    })
+    return r.json()
+  },
+  async getUsers(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/users', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getNotifications(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/notifications', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async markNotificationAsRead(notificationId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async markAllNotificationsAsRead(): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/notifications/read-all', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getMyTeams(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/teams/my', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async createTeam(name: string, description: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/teams', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ name, description }),
+    })
+    return r.json()
+  },
+  async joinTeam(inviteCode: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/teams/join', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ inviteCode }),
+    })
+    return r.json()
+  },
+  async getTeamDetail(teamId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getProjects(teamId: string | number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/projects`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async createProject(teamId: string | number, name: string, description: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/projects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ name, description }),
+    })
+    return r.json()
+  },
+  async getBoard(projectId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}/board`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async moveTask(projectId: string | number, taskId: string | number, targetColumnId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}/board/tasks/${taskId}/move`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ targetColumnId }),
+    })
+    return r.json()
+  },
+  async createColumn(projectId: string | number, name: string, position: number, colorCode = '#ffffff'): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}/board/columns`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ name, position, colorCode }),
+    })
+    return r.json()
+  },
+  async createTask(projectId: string | number, title: string, description: string, columnId?: string | number, priority = 'MEDIUM', estimatedHours = 0): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ title, description, columnId, priority, estimatedHours }),
+    })
+    return r.json()
+  },
+  async getTask(taskId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getFocusRoomTasks(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/focus-room/tasks', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async createFocusRoomTask(title: string, dueDate?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { id: Date.now(), title, isCompleted: false } })
+    const r = await fetch('/api/v1/workflow/focus-room/tasks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ title, dueDate }),
+    })
+    return r.json()
+  },
+  async updateFocusRoomTask(taskId: number, title?: string, dueDate?: string, isCompleted?: boolean): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/focus-room/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ title, dueDate, isCompleted }),
+    })
+    return r.json()
+  },
+  async deleteFocusRoomTask(taskId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/focus-room/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async startSession(roomId: number | null, sessionType: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { sessionId: 123 } })
+    const r = await fetch('/api/v1/workflow/personal/tracking/sessions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ roomId, sessionType }),
+    })
+    return r.json()
+  },
+  async endSession(sessionId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { expEarned: 50 } })
+    const r = await fetch(`/api/v1/workflow/personal/tracking/sessions/${sessionId}/end`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+    })
+    return r.json()
+  },
+  async createNote(content: string, isPinned = false, tags = '', linkedToId?: number, linkedToType?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/tracking/notes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ content, isPinned, tags: tags || null, linkedToId, linkedToType }),
+    })
+    return r.json()
+  },
+  async getNotes(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/tracking/notes', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async deleteNote(noteId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/tracking/notes/${noteId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async generateQuiz(documentId: number, prompt: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/quizzes/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ documentId, prompt }),
+    })
+    return r.json()
+  },
+  async startQuizAttempt(quizId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { attemptId: 456 } })
+    const r = await fetch('/api/v1/workflow/personal/quiz-attempts/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ quizId }),
+    })
+    return r.json()
+  },
+  async submitQuizAttempt(attemptId: number, answers: any[]): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/quiz-attempts/${attemptId}/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ answers }),
+    })
+    return r.json()
+  },
+  async getQuizAttemptHistory(quizId: number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/personal/quiz-attempts/history/${quizId}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getQuizAttemptDetail(attemptId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/quiz-attempts/${attemptId}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async checkoutPayOs(packageId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { checkoutUrl: 'http://localhost:5173/dashboard' } })
+    const r = await fetch(`/api/v1/workflow/payment/checkout?packageId=${packageId}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async upgradeSubscription(targetTier: string, durationDays: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/payment/subscription/upgrade', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ targetTier, durationDays }),
+    })
+    return r.json()
+  },
+  async getQuizQuestions(quizId: number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/personal/quizzes/${quizId}/questions`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getQuizSets(q?: string, difficulty?: string): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const params = new URLSearchParams()
+    if (q) params.append('q', q)
+    if (difficulty) params.append('difficulty', difficulty)
+    const url = `/api/v1/workflow/personal/quiz-sets${params.toString() ? `?${params.toString()}` : ''}`
+    const r = await fetch(url, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async updateQuizSetSharing(quizId: number, visibility: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/quiz-sets/${quizId}/sharing`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ visibility }),
+    })
+    return r.json()
+  },
+  async uploadDocument(title: string, filePath: string, fileName: string, fileSize: number, fileType: string, mimeType: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { documentId: 789 } })
+    const r = await fetch('/api/v1/workflow/personal/documents', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ title, filePath, fileName, fileSize, fileType, mimeType }),
+    })
+    return r.json()
+  },
+  async getDocuments(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/documents', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async changeUserStatus(userSso: string, status: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/users/${userSso}/change-status?status=${encodeURIComponent(status)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async adjustUserWallet(userSso: string, amount: number, reason: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/users/${userSso}/adjust-wallet?amount=${amount}&reason=${encodeURIComponent(reason)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async setSystemConfig(key: string, value: string, description?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const url = `/api/v1/workflow/personal/admin/configs?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}${description ? `&description=${encodeURIComponent(description)}` : ''}`
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAuditLogs(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/audit-logs', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Meetings ──
+  async createMeeting(teamId: number, title: string, projectId?: number, agenda?: string, description?: string, scheduledStart?: string, scheduledEnd?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { meetingId: 1 } })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/meetings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({
+        title,
+        projectId,
+        agenda: agenda || 'Chương trình họp',
+        description: description || 'Mô tả cuộc họp',
+        scheduledStart: scheduledStart || new Date().toISOString(),
+        scheduledEnd: scheduledEnd || new Date(Date.now() + 3600000).toISOString()
+      }),
+    })
+    return r.json()
+  },
+  async joinMeeting(meetingId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/join`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async addMeetingNote(meetingId: number, content: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ content }),
+    })
+    return r.json()
+  },
+  async endMeeting(meetingId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/end`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getMeetingSummary(meetingId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/summary`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async transcribeMeeting(meetingId: number, file: File): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const formData = new FormData()
+    formData.append('file', file)
+    const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/transcribe`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: formData,
+    })
+    return r.json()
+  },
+  async exportProjectTasks(projectId: number): Promise<Blob> {
+    if (useMock) {
+      const csvContent = "Task ID,Title,Description,Status,Priority\n1,Sample Task,This is mock data,OPEN,MEDIUM"
+      return new Blob([csvContent], { type: 'text/csv' })
+    }
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}/export`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.blob()
+  },
+
+  // ── Schedules / Calendar ──
+  async createScheduleCategory(name: string, colorCode?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/schedules/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ name, colorCode }),
+    })
+    return r.json()
+  },
+  async getScheduleCategories(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/schedules/categories', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async createSchedule(title: string, startTime: string, endTime: string, categoryId?: number, description?: string, location?: string, isAllDay?: boolean): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/schedules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ title, startTime, endTime, categoryId, description, location, isAllDay }),
+    })
+    return r.json()
+  },
+  async getSchedules(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/schedules', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async deleteSchedule(scheduleId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/schedules/${scheduleId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Chat / AI Conversations ──
+  async createConversation(title?: string, contextType?: string): Promise<ApiResponse<any>> {
+    if (useMock) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          conversationId: Date.now(),
+          title: title || 'Trò chuyện mới',
+          contextType: contextType || 'GENERAL',
+          lastMessageAt: new Date().toISOString()
+        }
+      })
+    }
+    const r = await fetch('/api/v1/workflow/personal/chat/conversations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ title, contextType }),
+    })
+    return r.json()
+  },
+  async getConversations(): Promise<ApiResponse<any[]>> {
+    if (useMock) {
+      return Promise.resolve({
+        success: true,
+        data: [
+          { conversationId: 1, title: 'Giải thích quang hợp', lastMessageAt: new Date().toISOString() },
+          { conversationId: 2, title: 'Tóm tắt chương 3 Lịch sử', lastMessageAt: new Date().toISOString() }
+        ]
+      })
+    }
+    const r = await fetch('/api/v1/workflow/personal/chat/conversations', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async sendChatMessage(conversationId: number, content: string): Promise<ApiResponse<any>> {
+    if (useMock) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          messageId: Date.now(),
+          sender: 'ASSISTANT',
+          messageText: `Đây là câu trả lời thử nghiệm từ AI cho câu hỏi: "${content}"`,
+          sentAt: new Date().toISOString()
+        }
+      })
+    }
+    const r = await fetch(`/api/v1/workflow/personal/chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ messageText: content }),
+    })
+    return r.json()
+  },
+  async getChatMessages(conversationId: number): Promise<ApiResponse<any[]>> {
+    if (useMock) {
+      return Promise.resolve({
+        success: true,
+        data: [
+          { messageId: 101, sender: 'USER', messageText: 'Chào AI Tutor', sentAt: new Date().toISOString() },
+          { messageId: 102, sender: 'ASSISTANT', messageText: 'Xin chào! Tôi có thể giúp gì cho bạn hôm nay?', sentAt: new Date().toISOString() }
+        ]
+      })
+    }
+    const r = await fetch(`/api/v1/workflow/personal/chat/conversations/${conversationId}/messages`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Room Posts ──
+  async createRoomPost(roomId: number, content: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/posts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ content }),
+    })
+    return r.json()
+  },
+  async getRoomPosts(roomId: number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/posts`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async pinRoomPost(roomId: number, postId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/posts/${postId}/pin`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async deleteRoomPost(roomId: number, postId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/posts/${postId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Room Matching ──
+  async matchRoom(preferences: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/rooms/matching', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(preferences),
+    })
+    return r.json()
+  },
+
+  // ── Room Management ──
+  async closeRoom(roomId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/close`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async openRoom(roomId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async kickRoomMember(roomId: number, targetUserSso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/members/kick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ targetUserSso }),
+    })
+    return r.json()
+  },
+  async promoteRoomHost(roomId: number, targetUserSso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/members/promote-host`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ targetUserSso }),
+    })
+    return r.json()
+  },
+  async getRoomDetail(roomId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getRoomTimeline(roomId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/rooms/${roomId}/timeline`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Flashcard Review ──
+  async reviewFlashcard(flashcardId: number, quality: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/flashcards/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ flashcardId, quality }),
+    })
+    return r.json()
+  },
+
+  // ── Mindmaps ──
+  async createMindmap(documentId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/mindmaps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ documentId }),
+    })
+    return r.json()
+  },
+  async getMindmaps(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/mindmaps', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Team Management ──
+  async updateTeam(teamId: number, data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+  async deleteTeam(teamId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async addTeamMember(teamId: number, userSso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ userSso }),
+    })
+    return r.json()
+  },
+  async getTeamMembers(teamId: number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/members`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async removeTeamMember(teamId: number, targetUserSso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/members/${targetUserSso}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async leaveTeam(teamId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/leave`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async regenerateInviteCode(teamId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/regenerate-invite`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+
+  // ── Task Submissions ──
+  async submitTask(taskId: number, content: string, attachmentUrl?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ content, attachmentUrl }),
+    })
+    return r.json()
+  },
+  async getTaskSubmissions(taskId: number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}/submissions`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async evaluateSubmission(submissionId: number, grade: string, feedback: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/submissions/${submissionId}/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ grade, feedback }),
+    })
+    return r.json()
+  },
+
+  // ── Task Extra ──
+  async assignTask(taskId: number, assigneeSso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ assigneeSso }),
+    })
+    return r.json()
+  },
+  async addTaskDependency(taskId: number, dependsOnTaskId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}/dependencies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ dependsOnTaskId }),
+    })
+    return r.json()
+  },
+  async addTaskComment(taskId: number, content: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ content }),
+    })
+    return r.json()
+  },
+  async addTaskAttachment(taskId: number, fileName: string, fileUrl: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ fileName, fileUrl }),
+    })
+    return r.json()
+  },
+
+  // ── Admin Coin Packages ──
+  async createCoinPackage(data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/admin/coin-packages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+  async updateCoinPackage(packageId: number, data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/coin-packages/${packageId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+
+  // ── Project update/delete ──
+  async updateProject(projectId: number, data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+  async deleteProject(projectId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async deleteDocument(documentId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/documents/${documentId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
     return r.json()
   },
 }

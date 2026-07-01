@@ -67,6 +67,7 @@ public class Document extends BaseAuditEntity {
     @Column(name = "tags", columnDefinition = "text[]")
     String tags;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 

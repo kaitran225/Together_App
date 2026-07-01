@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, CloseIcon, DocumentIcon, IconButton, Input, MenuIcon, Modal, Progress, QuizletQuizModal, Textarea } from '../../../components/common'
-import { MOCK_QUIZLET_CARDS, SIDEBAR_CHATS, AI_SUPPORT_MESSAGES as MESSAGES, SUMMARY_HISTORY, MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
+import { MOCK_QUIZLET_CARDS, SUMMARY_HISTORY, MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
+import { workflowApi } from '../../../api/client'
 
 export default function AiSupport() {
   const [input, setInput] = useState('')
@@ -43,30 +44,130 @@ export default function AiSupport() {
 
   const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
+  // Real API state
+  const [conversations, setConversations] = useState<any[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
+  const [messages, setMessages] = useState<any[]>([])
+
+  const fetchConversations = async () => {
+    try {
+      const res = await workflowApi.getConversations()
+      if (res.success && res.data) {
+        setConversations(res.data)
+        if (res.data.length > 0 && !activeConversationId) {
+          setActiveConversationId(res.data[0].conversationId)
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const fetchMessages = async (convId: number) => {
+    try {
+      const res = await workflowApi.getChatMessages(convId)
+      if (res.success && res.data) {
+        setMessages(res.data)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    fetchConversations()
+  }, [])
+
+  useEffect(() => {
+    if (activeConversationId) {
+      fetchMessages(activeConversationId)
+    } else {
+      setMessages([])
+    }
+  }, [activeConversationId])
+
+  const handleNewChat = async () => {
+    try {
+      const res = await workflowApi.createConversation(`Trò chuyện ngày ${new Date().toLocaleDateString()}`)
+      if (res.success && res.data) {
+        const newConv = res.data
+        setConversations(prev => [newConv, ...prev])
+        setActiveConversationId(newConv.conversationId)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    const text = input.trim()
+    if (!text) return
+    setInput('')
+
+    let convId = activeConversationId
+    if (!convId) {
+      try {
+        const res = await workflowApi.createConversation(`Trò chuyện ngày ${new Date().toLocaleDateString()}`)
+        if (res.success && res.data) {
+          convId = res.data.conversationId
+          setConversations([res.data])
+          setActiveConversationId(convId)
+        } else {
+          return
+        }
+      } catch (err) {
+        console.error(err)
+        return
+      }
+    }
+
+    if (!convId) return
+
+    // Optimistically add user message
+    const tempUserMsg = {
+      messageId: Date.now(),
+      sender: 'USER',
+      messageText: text,
+      sentAt: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, tempUserMsg])
+
+    try {
+      const res = await workflowApi.sendChatMessage(convId, text)
+      if (res.success) {
+        fetchMessages(convId)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] min-h-[520px]">
       <div className="flex-1 grid grid-cols-[20fr_50fr_30fr] min-h-0 rounded-2xl border-2 border-neutral-200 bg-[var(--color-surface)] shadow-sm overflow-hidden">
         {/* Left: 20% */}
         <aside className="min-w-0 flex flex-col border-r-2 border-neutral-200 bg-neutral-50/80">
           <div className="p-3 border-b border-neutral-200">
-            <Link
-              to="/ai-support"
-              className="inline-flex w-full items-center justify-center gap-2 font-medium rounded-xl px-4 py-2 text-sm min-h-[44px] bg-[var(--color-surface)] text-neutral-900 border border-neutral-900 hover:bg-[var(--color-cream-200)]"
+            <Button
+              variant="primary"
+              onClick={handleNewChat}
+              className="inline-flex w-full items-center justify-center gap-2 font-medium rounded-xl px-4 py-2 text-sm min-h-[44px]"
             >
               + New chat
-            </Link>
+            </Button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
             <section>
               <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-2 mb-2">Conversations</p>
               <ul className="space-y-0.5">
-                {SIDEBAR_CHATS.map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      to="#"
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                        c.active
-                          ? 'bg-accent-muted text-neutral-900'
+                {conversations.map((c) => (
+                  <li key={c.conversationId}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveConversationId(c.conversationId)}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
+                        c.conversationId === activeConversationId
+                          ? 'bg-accent-muted text-neutral-900 font-semibold'
                           : 'text-neutral-700 hover:bg-neutral-200/80'
                       }`}
                     >
@@ -76,7 +177,7 @@ export default function AiSupport() {
                         </svg>
                       </span>
                       <span className="min-w-0 truncate flex-1">{c.title}</span>
-                    </Link>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -165,34 +266,37 @@ export default function AiSupport() {
             </h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-            {MESSAGES.map((msg) => (
-              <div key={msg.id} className={msg.role === 'assistant' ? 'flex justify-center' : 'flex justify-end'}>
-                <div className={msg.role === 'assistant' ? 'flex gap-2 max-w-[85%]' : 'max-w-[85%]'}>
-                  {msg.role === 'assistant' && (
-                    <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
-                      <AiBotIcon className="w-6 h-6" />
-                    </span>
-                  )}
-                  <div
-                    className={`rounded-xl px-3 py-2 border-2 ${
-                      msg.role === 'assistant'
-                        ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
-                        : 'bg-accent-muted border-primary/20 text-neutral-900'
-                    }`}
-                  >
-                    {msg.role === 'user' && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {msg.time}</p>}
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
-                    {msg.role === 'assistant' && msg.time && <p className="text-[10px] text-neutral-500 mt-1">{msg.time}</p>}
+            {messages.map((msg) => {
+              const isAssistant = msg.sender === 'ASSISTANT';
+              return (
+                <div key={msg.messageId} className={isAssistant ? 'flex justify-start' : 'flex justify-end'}>
+                  <div className={isAssistant ? 'flex gap-2 max-w-[85%]' : 'max-w-[85%]'}>
+                    {isAssistant && (
+                      <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
+                        <AiBotIcon className="w-6 h-6" />
+                      </span>
+                    )}
+                    <div
+                      className={`rounded-xl px-3 py-2 border-2 ${
+                        isAssistant
+                          ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
+                          : 'bg-accent-muted border-primary/20 text-neutral-900'
+                      }`}
+                    >
+                      {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                      <p className="text-sm leading-relaxed">{msg.messageText}</p>
+                      {isAssistant && msg.sentAt && <p className="text-[10px] text-neutral-500 mt-1">{new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="p-4 border-t-2 border-neutral-200 shrink-0">
             <ChatInputBar
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onSend={() => {}}
+              onSend={handleSendMessage}
               onFileChange={handleFileChange}
               acceptFiles={ACCEPT_FILES}
               placeholder="Type your question..."
@@ -222,34 +326,37 @@ export default function AiSupport() {
               <IconButton type="button" onClick={() => setDialogOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label="Close" icon={<CloseIcon className="w-5 h-5" />} />
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-              {MESSAGES.map((msg) => (
-                <div key={msg.id} className={msg.role === 'assistant' ? 'flex justify-center' : 'flex justify-end'}>
-                  <div className={msg.role === 'assistant' ? 'flex gap-2 max-w-[90%]' : 'max-w-[90%]'}>
-                    {msg.role === 'assistant' && (
-                      <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
-                        <AiBotIcon className="w-6 h-6" />
-                      </span>
-                    )}
-                    <div
-                      className={`rounded-xl px-3 py-2 border-2 ${
-                        msg.role === 'assistant'
-                          ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
-                          : 'bg-accent-muted border-primary/20 text-neutral-900'
-                      }`}
-                    >
-                      {msg.role === 'user' && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {msg.time}</p>}
-                      <p className="text-sm leading-relaxed">{msg.text}</p>
-                      {msg.role === 'assistant' && msg.time && <p className="text-[10px] text-neutral-500 mt-1">{msg.time}</p>}
+              {messages.map((msg) => {
+                const isAssistant = msg.sender === 'ASSISTANT';
+                return (
+                  <div key={msg.messageId} className={isAssistant ? 'flex justify-start' : 'flex justify-end'}>
+                    <div className={isAssistant ? 'flex gap-2 max-w-[90%]' : 'max-w-[90%]'}>
+                      {isAssistant && (
+                        <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
+                          <AiBotIcon className="w-6 h-6" />
+                        </span>
+                      )}
+                      <div
+                        className={`rounded-xl px-3 py-2 border-2 ${
+                          isAssistant
+                            ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
+                            : 'bg-accent-muted border-primary/20 text-neutral-900'
+                        }`}
+                      >
+                        {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                        <p className="text-sm leading-relaxed">{msg.messageText}</p>
+                        {isAssistant && msg.sentAt && <p className="text-[10px] text-neutral-500 mt-1">{new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="p-3 border-t-2 border-neutral-200 bg-[var(--color-surface)]">
               <ChatInputBar
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onSend={() => {}}
+                onSend={handleSendMessage}
                 onFileChange={handleFileChange}
                 acceptFiles={ACCEPT_FILES}
                 placeholder="Ask anything..."

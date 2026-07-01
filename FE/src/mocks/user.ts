@@ -49,6 +49,8 @@ export function getFakeMeResponse(): ApiResponse<MeResponse> {
       userSso: u.userSso,
       email: u.email,
       fullName: u.fullName ?? undefined,
+      skills: ['React', 'Java', 'Spring Boot'],
+      learningGoals: ['Học máy (Machine Learning)', 'Giao tiếp tiếng Anh'],
     },
   }
 }

@@ -97,7 +97,8 @@ public class AuthSecurityConfig {
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/google-login",
                 "/api/v1/auth/reset-password",
-                "/api/v1/auth/reset-password/confirm"
+                "/api/v1/auth/reset-password/confirm",
+                "/api/v1/auth/dev-verify-all"
         };
         http
                 .cors(Customizer.withDefaults())

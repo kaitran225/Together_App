@@ -54,7 +54,7 @@ public class GamificationListener {
 
         // ── 1. Cộng EXP ──
         int durationMinutes = Math.max(0, event.durationMinutes());
-        int expEarned = (durationMinutes * EXP_PER_MINUTE) + COMPLETION_BONUS_EXP;
+        int expEarned = durationMinutes > 0 ? durationMinutes : 1;
 
         int currentExp = Math.max(MIN_EXP, user.getExp() == null ? 0 : user.getExp());
 
@@ -90,9 +90,9 @@ public class GamificationListener {
         user.setLastActiveDate(today);
 
         // ── 3. Tính Level dựa trên tổng EXP ──
-        // Công thức: Level = floor(sqrt(totalExp / 100))
+        // Công thức: Level = 1 + (totalExp / 100)
         int totalExp = user.getExp();
-        int newLevel = (int) Math.floor(Math.sqrt((double) totalExp / 100.0));
+        int newLevel = (totalExp / 100) + 1;
         user.setLevel(Math.max(1, newLevel));
 
         userRepository.save(user);

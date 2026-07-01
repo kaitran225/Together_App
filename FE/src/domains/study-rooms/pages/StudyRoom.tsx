@@ -1,13 +1,99 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, IconButton, Modal } from '../../../components/common'
 import { STUDY_ROOM_CHAT_MESSAGES as CHAT_MESSAGES, STUDY_ROOM_PARTICIPANTS as PARTICIPANTS } from '../../../mocks'
+import { readApi, workflowApi } from '../../../api/client'
+import { useAuth } from '../../../contexts/AuthContext'
+import { StompClient } from '../../../api/websocket'
 
 export default function StudyRoom() {
+  const [searchParams] = useSearchParams()
+  const roomId = searchParams.get('roomId')
+
+  const { user } = useAuth()
+  const [messages, setMessages] = useState<any[]>(CHAT_MESSAGES)
+  const [stompClient, setStompClient] = useState<StompClient | null>(null)
+
   const [showEndModal, setShowEndModal] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [micOn, setMicOn] = useState(true)
   const [videoOn, setVideoOn] = useState(true)
+
+  const [roomTitle, setRoomTitle] = useState('Study Room')
+  const [iceServers, setIceServers] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!roomId) return
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws`
+    const client = new StompClient(wsUrl)
+    setStompClient(client)
+
+    client.connect()
+      .then(() => {
+        client.subscribe(`/topic/rooms/${roomId}/chat`, (msg) => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              user: msg.senderSso || 'Participant',
+              text: msg.message,
+              time: msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+              own: msg.senderSso === user?.username,
+              ai: false
+            }
+          ])
+        })
+      })
+      .catch((err) => console.error('WebSocket connection error:', err))
+
+    return () => {
+      client.disconnect()
+    }
+  }, [roomId, user?.username])
+
+  useEffect(() => {
+    if (!roomId) return
+
+    workflowApi.joinRoom(roomId)
+      .then((res) => {
+        if (res.success) {
+          console.log('Joined room in backend successfully.')
+        }
+      })
+      .catch((err) => console.error('Failed to join room in backend:', err))
+
+    readApi.getRoomDetail(roomId)
+      .then((res) => {
+        if (res.success && res.data) {
+          setRoomTitle(res.data.title || 'Study Room')
+        }
+      })
+      .catch((err) => console.error('Failed to fetch room detail:', err))
+
+    workflowApi.getWebRtcConfig(roomId)
+      .then((res) => {
+        if (res.success && res.data) {
+          if (Array.isArray(res.data.iceServers)) {
+            setIceServers(res.data.iceServers)
+            window.localStorage.setItem('webrtc-ice-servers', JSON.stringify(res.data.iceServers))
+          }
+          if (res.data.enableMic !== undefined) setMicOn(res.data.enableMic)
+          if (res.data.enableVideo !== undefined) setVideoOn(res.data.enableVideo)
+        }
+      })
+      .catch((err) => console.error('Failed to fetch WebRTC config:', err))
+  }, [roomId])
+
+  const handleLeaveRoom = async () => {
+    if (roomId) {
+      try {
+        await workflowApi.leaveRoom(roomId)
+      } catch (err) {
+        console.error('Error leaving room:', err)
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-neutral-200 dark:bg-[var(--color-background)] gap-3 p-3">
@@ -22,7 +108,7 @@ export default function StudyRoom() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 14.253v2.47M12 3.41v2.47M3.288 8.49h2.47M18.712 8.49h2.47M2 12c0 5.523 4.477 10 10 10s10-4.477 10-10S17.523 2 12 2 2 6.477 2 12zm10 4.5v2.5m-2.5-2.5h5" />
             </svg>
           </span>
-          <h1 className="text-base md:text-lg font-bold text-neutral-900 truncate tracking-tight">Meeting room</h1>
+          <h1 className="text-base md:text-lg font-bold text-neutral-900 truncate tracking-tight">{roomTitle}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
           <span className="px-2.5 py-1 text-sm border-2 border-neutral-300 rounded-xl bg-neutral-100 font-mono tabular-nums text-neutral-900 font-semibold">
@@ -45,7 +131,10 @@ export default function StudyRoom() {
       {/* Main: video grid + chat sidebar — white panels on darker background */}
       <div className="flex-1 flex min-h-0 gap-3 overflow-hidden">
         {/* Video grid — white card with stronger border/shadow */}
-        <main className="flex-1 min-w-0 p-4 flex items-center justify-center bg-white rounded-2xl border-2 border-neutral-300 shadow-md overflow-auto">
+        <main className="flex-1 min-w-0 p-4 flex flex-col gap-3 items-center justify-center bg-white rounded-2xl border-2 border-neutral-300 shadow-md overflow-auto">
+          <div className="text-[11px] text-neutral-600 w-full max-w-4xl text-left">
+            ICE servers loaded: {iceServers.length > 0 ? iceServers.length : '0'}
+          </div>
           <div className="grid grid-cols-3 gap-3 w-full max-w-4xl aspect-video">
             {PARTICIPANTS.slice(0, 9).map((p, i) => (
               <div
@@ -68,7 +157,7 @@ export default function StudyRoom() {
             <h2 className="text-sm font-semibold text-neutral-900">Conversation</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
-            {CHAT_MESSAGES.map((m, i) => (
+            {messages.map((m, i) => (
               <div key={i} className={m.ai ? 'flex justify-center' : m.own ? 'flex justify-end' : ''}>
                 <div className={m.ai ? 'flex gap-2 max-w-[90%]' : 'max-w-[90%]'}>
                   {m.ai && (
@@ -103,7 +192,16 @@ export default function StudyRoom() {
             <ChatInputBar
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onSend={() => {}}
+              onSend={() => {
+                if (!chatInput.trim() || !stompClient || !roomId) return
+                stompClient.send('/app/room.chat', {
+                  roomId: String(roomId),
+                  senderSso: user?.username || 'Participant',
+                  message: chatInput.trim(),
+                  sentAt: new Date().toISOString()
+                })
+                setChatInput('')
+              }}
               onFileChange={() => {}}
               placeholder="Type a message..."
             />
@@ -121,7 +219,7 @@ export default function StudyRoom() {
           <IconButton label="Share screen" className="border-2 border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 hover:border-neutral-400" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>} />
           <IconButton label="Participants" className="border-2 border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 hover:border-neutral-400" icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>} />
         </div>
-        <Link to="/study-rooms" className="ml-4">
+        <Link to="/study-rooms" className="ml-4" onClick={handleLeaveRoom}>
           <Button variant="secondary" size="sm" className="gap-1.5 rounded-xl text-[11px] font-bold py-1.5 h-8 border-2 border-neutral-900">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
@@ -142,7 +240,7 @@ export default function StudyRoom() {
                 Continue
               </Button>
               <Link to="/study-rooms" className="flex-1">
-                <Button variant="secondary" size="md" className="w-full !bg-error/10 !border-error/50 !text-error hover:!bg-error/20">
+                <Button variant="secondary" size="md" className="w-full !bg-error/10 !border-error/50 !text-error hover:!bg-error/20" onClick={handleLeaveRoom}>
                   End session
                 </Button>
               </Link>

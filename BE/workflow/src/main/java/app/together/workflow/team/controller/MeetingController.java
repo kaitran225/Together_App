@@ -42,6 +42,14 @@ public class MeetingController {
         return ApiResponse.ok(meetingService.endMeeting(meetingId, currentUserSso));
     }
 
+    @PostMapping("/meetings/{meetingId}/transcribe")
+    public ApiResponse<MeetingResponse> transcribeMeeting(
+            @PathVariable Long meetingId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(meetingService.transcribeMeeting(meetingId, currentUserSso, file));
+    }
+
     @GetMapping("/meetings/{meetingId}/summary")
     public ApiResponse<MeetingSummaryResponse> getMeetingSummary(@PathVariable Long meetingId) {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();

@@ -10,7 +10,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "user_transactions")
+@Table(name = "user_transactions", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

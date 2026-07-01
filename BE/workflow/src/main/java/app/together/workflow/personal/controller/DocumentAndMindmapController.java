@@ -18,32 +18,32 @@ public class DocumentAndMindmapController {
 
     @PostMapping("/documents")
     public ApiResponse<DocumentResponse> uploadDocument(@RequestBody UploadDocumentRequest request) {
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(documentAndMindmapService.uploadDocument(currentUserSso, request));
     }
 
     @GetMapping("/documents")
     public ApiResponse<List<DocumentResponse>> getMyDocuments() {
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(documentAndMindmapService.getMyDocuments(currentUserSso));
     }
 
     @DeleteMapping("/documents/{documentId}")
     public ApiResponse<Void> deleteDocument(@PathVariable Long documentId) {
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         documentAndMindmapService.deleteDocument(documentId, currentUserSso);
         return ApiResponse.ok(null);
     }
 
     @PostMapping("/mindmaps")
     public ApiResponse<MindmapResponse> saveMindmap(@RequestBody SaveMindmapRequest request) {
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(documentAndMindmapService.saveMindmap(currentUserSso, request));
     }
 
     @GetMapping("/mindmaps")
     public ApiResponse<List<MindmapResponse>> getMyMindmaps() {
-        String currentUserSso = SecurityUtils.getCurrentUserSsoOrNull();
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(documentAndMindmapService.getMindmaps(currentUserSso));
     }
 }

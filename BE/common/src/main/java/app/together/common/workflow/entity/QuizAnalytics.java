@@ -29,18 +29,22 @@ public class QuizAnalytics extends BaseAuditEntity {
     @EqualsAndHashCode.Include
     Long userMasterDataId;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "weak_topics", columnDefinition = "jsonb")
     String weakTopics;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "strong_topics", columnDefinition = "jsonb")
     String strongTopics;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "mistake_patterns", columnDefinition = "jsonb")
     String mistakePatterns;
 
     @Column(name = "recommendations", columnDefinition = "TEXT")
     String recommendations;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "improvement_areas", columnDefinition = "jsonb")
     String improvementAreas;
 

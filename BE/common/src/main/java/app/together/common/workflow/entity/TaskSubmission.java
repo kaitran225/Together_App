@@ -35,6 +35,7 @@ public class TaskSubmission extends BaseAuditEntity {
     @Column(name = "content", columnDefinition = "TEXT")
     String content; // Nội dung mô tả sản phẩm nộp
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "attachments", columnDefinition = "jsonb")
     String attachments; // URL file bài làm đính kèm
 

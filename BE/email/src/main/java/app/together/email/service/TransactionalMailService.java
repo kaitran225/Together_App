@@ -3,6 +3,7 @@ package app.together.email.service;
 import app.together.common.email.api.EmailDispatchType;
 import app.together.common.email.api.TransactionalEmailRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TransactionalMailService {
 
     private final JavaMailSender emailSender;
@@ -26,6 +28,8 @@ public class TransactionalMailService {
 
         if (req.type() == EmailDispatchType.VERIFY_ACCOUNT) {
             String link = base + "/verify-email?token=" + req.rawToken();
+            log.info("=== LOCAL DEV: Verification link for {} is: {} ===", req.toEmail(), link);
+            System.out.println("=== LOCAL DEV: Verification link for " + req.toEmail() + " is: " + link + " ===");
             message.setSubject("Xác thực tài khoản của bạn - exe");
             message.setText("Chào bạn,\n\n"
                     + "Bạn đã đăng ký tài khoản tại exe.\n"
@@ -34,6 +38,8 @@ public class TransactionalMailService {
                     + "Nếu bạn không yêu cầu, vui lòng bỏ qua email này.");
         } else if (req.type() == EmailDispatchType.PASSWORD_RESET) {
             String link = base + "/reset-password?token=" + req.rawToken();
+            log.info("=== LOCAL DEV: Reset Password link for {} is: {} ===", req.toEmail(), link);
+            System.out.println("=== LOCAL DEV: Reset Password link for " + req.toEmail() + " is: " + link + " ===");
             message.setSubject("Đặt lại mật khẩu.");
             message.setText("Chào bạn,\n\n"
                     + "Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng nhấn vào đường link bên dưới:\n"
@@ -44,6 +50,10 @@ public class TransactionalMailService {
             throw new IllegalArgumentException("Unsupported email type: " + req.type());
         }
 
-        emailSender.send(message);
+        try {
+            emailSender.send(message);
+        } catch (Exception e) {
+            log.error("Failed to send SMTP email to {}, link printed above", req.toEmail(), e);
+        }
     }
 }

@@ -27,8 +27,9 @@ const mapToPublicUser = (dto: any): PublicUser => {
     preferences: {
       theme: 'system',
       notifications: { email: true, push: true, inApp: true },
-    }
-  }
+    },
+    ...dto // Spread all backend attributes so exp, level, streak, planType, etc., are accessible via (user as any)
+  } as any
 }
 
 // Temporary debug switch: bypass login gates while UI debugging.
@@ -47,6 +48,7 @@ type AuthContextValue = {
   loginWithGoogle: (idToken: string) => Promise<{ ok: boolean; error?: string; user?: PublicUser }>
   logout: () => void
   refreshUsers: () => void
+  refreshProfile: () => Promise<void>
   createMockUser: (input: CreateUserInput) => { ok: boolean; error?: string }
   updateMockUser: (id: string, updates: Partial<PublicUser>) => { ok: boolean; error?: string }
   toggleMockUserStatus: (id: string) => { ok: boolean; error?: string }
@@ -231,6 +233,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true }
   }, [refreshUsers, user])
 
+  const refreshProfile = useCallback(async () => {
+    if (useMock) return
+    const token = getStoredToken()
+    if (token) {
+      try {
+        const res = await authApi.me(token)
+        if (res.success && res.data) {
+          setUser(mapToPublicUser(res.data))
+        }
+      } catch (e) {
+        console.error('Failed to refresh profile:', e)
+      }
+    }
+  }, [])
+
   const value = useMemo<AuthContextValue>(() => ({
     user: effectiveUser,
     users,
@@ -240,6 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loginWithGoogle,
     logout,
     refreshUsers,
+    refreshProfile,
     createMockUser,
     updateMockUser,
     toggleMockUserStatus,
@@ -253,6 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loginWithGoogle,
     logout,
     refreshUsers,
+    refreshProfile,
     toggleMockUserStatus,
     updateMockUser,
     updateOwnPreferences,

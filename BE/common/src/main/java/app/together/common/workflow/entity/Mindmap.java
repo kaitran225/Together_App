@@ -32,6 +32,7 @@ public class Mindmap extends BaseAuditEntity {
     @Column(nullable = false)
     String title;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     String content;
 

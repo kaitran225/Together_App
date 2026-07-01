@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button } from './ui'
 import { MOCK_QUESTIONS, type QuizQuestion } from '../mocks'
+import { workflowApi } from '../api/client'
 
 export type QuizResult = {
   score: number
@@ -10,13 +11,20 @@ export type QuizResult = {
   wrongQuestions: { topic: string; questionNumbers: number[] }[]
   suggestedTopics: { title: string; percent: number }[]
 }
-
-function computeResult(answers: (number | null)[], questions: QuizQuestion[], timeSpent: string): QuizResult {
+function computeResult(answers: (number | null)[], questions: any[], timeSpent: string): QuizResult {
   let correctCount = 0
   const wrongIndices: number[] = []
   answers.forEach((a, i) => {
-    if (a === questions[i].correctIndex) correctCount++
-    else wrongIndices.push(i + 1)
+    const q = questions[i]
+    // If it's mock, use correctIndex, otherwise match correct string
+    if (typeof q.correctIndex === 'number') {
+      if (a === q.correctIndex) correctCount++
+      else wrongIndices.push(i + 1)
+    } else {
+      const selectedStr = a !== null ? q.options[a] : ''
+      if (selectedStr === q.correctAnswer) correctCount++
+      else wrongIndices.push(i + 1)
+    }
   })
   const wrongQuestions =
     wrongIndices.length > 0
@@ -39,14 +47,61 @@ function computeResult(answers: (number | null)[], questions: QuizQuestion[], ti
 type QuizletQuizModalProps = {
   onClose: () => void
   questions?: QuizQuestion[]
+  quizId?: number
 }
 
-export function QuizletQuizModal({ onClose, questions = MOCK_QUESTIONS }: QuizletQuizModalProps) {
+export function QuizletQuizModal({ onClose, questions: initialQuestions = MOCK_QUESTIONS, quizId }: QuizletQuizModalProps) {
+  const [questions, setQuestions] = useState<any[]>(initialQuestions)
+  const [attemptId, setAttemptId] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'quiz' | 'result'>('quiz')
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState<(number | null)[]>(questions.map(() => null))
-  const [startTime] = useState(Date.now())
+  const [answers, setAnswers] = useState<(number | null)[]>([])
+  const [startTime, setStartTime] = useState(Date.now())
   const [result, setResult] = useState<QuizResult | null>(null)
+
+  useEffect(() => {
+    if (quizId) {
+      setLoading(true)
+      workflowApi.startQuizAttempt(quizId)
+        .then((res) => {
+          if (res.success && res.data) {
+            setAttemptId(res.data.attemptId)
+          }
+        })
+        .catch((err) => console.error(err))
+
+      workflowApi.getQuizQuestions(quizId)
+        .then((res) => {
+          if (res.success && res.data) {
+            const mapped = res.data.map((q: any) => {
+              let parsedOpts: string[] = []
+              try {
+                parsedOpts = JSON.parse(q.options)
+              } catch (e) {
+                parsedOpts = []
+              }
+              return {
+                id: q.questionId,
+                question: q.questionText,
+                options: parsedOpts,
+                correctAnswer: q.correctAnswer,
+                explanation: q.explanation
+              }
+            })
+            setQuestions(mapped)
+            setAnswers(mapped.map(() => null))
+            setStartTime(Date.now())
+          }
+        })
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false))
+    } else {
+      setQuestions(initialQuestions)
+      setAnswers(initialQuestions.map(() => null))
+      setStartTime(Date.now())
+    }
+  }, [quizId, initialQuestions])
 
   const currentQuestion = questions[currentIndex]
   const isLast = currentIndex === questions.length - 1
@@ -63,16 +118,62 @@ export function QuizletQuizModal({ onClose, questions = MOCK_QUESTIONS }: Quizle
     [currentIndex]
   )
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (isLast) {
       const elapsed = Math.round((Date.now() - startTime) / 1000)
       const timeStr = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
-      setResult(computeResult(answers, questions, timeStr))
+
+      if (quizId && attemptId) {
+        const submissions = answers.map((ansIndex, idx) => {
+          const q = questions[idx]
+          return {
+            questionId: q.id,
+            selectedAnswer: ansIndex !== null ? q.options[ansIndex] : ''
+          }
+        })
+        try {
+          const res = await workflowApi.submitQuizAttempt(attemptId, submissions)
+          if (res.success && res.data) {
+            const resData = res.data
+            const wrongQuestions = resData.results
+              .filter((r: any) => !r.isCorrect)
+              .map((r: any, idx: number) => ({
+                topic: r.questionText,
+                questionNumbers: [idx + 1]
+              }))
+            setResult({
+              score: resData.pointsEarned,
+              total: resData.pointsPossible,
+              correctCount: resData.results.filter((r: any) => r.isCorrect).length,
+              timeSpent: timeStr,
+              wrongQuestions,
+              suggestedTopics: [
+                { title: 'Based on your wrong answers', percent: 80 }
+              ]
+            })
+          }
+        } catch (e) {
+          console.error(e)
+          setResult(computeResult(answers, questions, timeStr))
+        }
+      } else {
+        setResult(computeResult(answers, questions, timeStr))
+      }
       setStep('result')
     } else {
       setCurrentIndex((i) => i + 1)
     }
-  }, [isLast, answers, questions, startTime])
+  }, [isLast, answers, questions, startTime, quizId, attemptId])
+
+  if (loading || !currentQuestion) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/50" onClick={onClose}>
+        <div className="bg-white dark:bg-[var(--color-surface)] rounded-2xl p-10 shadow-xl max-w-sm text-center">
+          <p className="text-sm font-medium text-neutral-900">Loading quiz content...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (step === 'result' && result) {
     return (
@@ -184,13 +285,13 @@ export function QuizletQuizModal({ onClose, questions = MOCK_QUESTIONS }: Quizle
                 style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
               />
             </div>
-            <p className="text-[11px] font-bold uppercase text-neutral-500 dark:text-neutral-600 mb-4">Topic: Neural Networks</p>
+            <p className="text-[11px] font-bold uppercase text-neutral-500 dark:text-neutral-600 mb-4">Topic: Quiz Study</p>
             <p className="text-base font-bold text-neutral-900 dark:text-neutral-900 leading-snug max-w-xl mx-auto">
               &quot;{currentQuestion.question}&quot;
             </p>
           </div>
           <div className="flex-shrink-0 flex flex-col sm:flex-row gap-5 justify-center px-10 py-6 border-t border-neutral-200 dark:border-neutral-600 bg-white dark:bg-[var(--color-surface)]">
-            {currentQuestion.options.map((opt, idx) => (
+            {currentQuestion.options.map((opt: string, idx: number) => (
               <Button
                 key={idx}
                 variant={answers[currentIndex] === idx ? 'primary' : 'secondary'}

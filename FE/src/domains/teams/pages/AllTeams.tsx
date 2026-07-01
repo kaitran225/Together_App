@@ -1,12 +1,13 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, IconButton, Input, SettingsIcon } from '../../../components/common'
+import { Button, IconButton, Input, SettingsIcon, Modal, Card } from '../../../components/common'
 import { myTeamsData, archivedData } from '../../../mocks'
+import { workflowApi } from '../../../api/client'
 
-function MyTeamCard({ tag, code, subtitle, members }: (typeof myTeamsData)[0]) {
+function MyTeamCard({ id, tag, code, subtitle, members }: { id: string; tag: string; code: string; subtitle: string; members: number }) {
   return (
     <Link
-      to="/teams/board"
+      to={`/teams/board?teamId=${id}`}
       className="group flex-shrink-0 min-w-[180px] w-[210px] sm:min-w-[220px] sm:w-[240px] md:w-[260px] flex flex-col rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden transition-all duration-200 shadow-none hover:-translate-y-0.5 hover:border-primary/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       <div className="p-3 pb-2">
@@ -62,6 +63,93 @@ function ArchivedCard({ name, active }: (typeof archivedData)[0]) {
 
 export default function AllTeams() {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [teams, setTeams] = useState<any[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [joinOpen, setJoinOpen] = useState(false)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [newTeamDesc, setNewTeamDesc] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const loadTeams = () => {
+    workflowApi.getMyTeams()
+      .then((res) => {
+        if (res.success && res.data) {
+          const mapped = res.data.map((t: any) => ({
+            id: String(t.teamId),
+            tag: t.isPrivate ? 'PRIVATE' : 'PUBLIC',
+            code: t.name,
+            subtitle: t.description || '',
+            members: t.currentMemberCount || 1,
+          }))
+          const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+          if (mapped.length > 0) {
+            setTeams(mapped)
+          } else {
+            setTeams(isMock ? myTeamsData : [])
+          }
+        } else {
+          const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+          setTeams(isMock ? myTeamsData : [])
+        }
+      })
+      .catch(() => {
+        const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+        setTeams(isMock ? myTeamsData : [])
+      })
+  }
+
+  useEffect(() => {
+    loadTeams()
+  }, [])
+
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim()) {
+      setError('Team name is required.')
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await workflowApi.createTeam(newTeamName.trim(), newTeamDesc.trim())
+      if (res.success) {
+        setCreateOpen(false)
+        setNewTeamName('')
+        setNewTeamDesc('')
+        loadTeams()
+      } else {
+        setError(res.message || 'Failed to create team.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleJoinTeam = async () => {
+    if (!inviteCode.trim()) {
+      setError('Invite code is required.')
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await workflowApi.joinTeam(inviteCode.trim())
+      if (res.success) {
+        setJoinOpen(false)
+        setInviteCode('')
+        loadTeams()
+      } else {
+        setError(res.message || 'Failed to join team.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-3 p-3 md:p-4">
@@ -122,12 +210,19 @@ export default function AllTeams() {
                 ref={scrollRef}
                 className="flex gap-2 overflow-x-auto scroll-smooth py-1 min-h-[180px] [scrollbar-width:thin]"
               >
-                {myTeamsData.map((t) => (
-                  <MyTeamCard key={t.id} {...t} />
-                ))}
+                {teams.length === 0 ? (
+                  <div className="flex items-center justify-center min-h-[180px] text-neutral-500">
+                    <p className="text-sm">No teams yet. Create or join a team to get started.</p>
+                  </div>
+                ) : (
+                  teams.map((t) => (
+                    <MyTeamCard key={t.id} {...t} />
+                  ))
+                )}
               </div>
             </div>
           </section>
+          {import.meta.env.VITE_USE_MOCK === 'true' && (
           <section>
             <h2 className="inline-block px-3 py-1.5 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] text-neutral-800 text-xs font-bold uppercase tracking-wide mb-2">
               Archived teams
@@ -140,6 +235,7 @@ export default function AllTeams() {
               ))}
             </div>
           </section>
+          )}
         </main>
 
         {/* Right sidebar — full width when stacked, fixed width on lg+ */}
@@ -148,16 +244,75 @@ export default function AllTeams() {
             <h2 className="text-sm font-semibold text-neutral-900">Quick actions</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 min-h-0 flex flex-col gap-4">
-            <Link
-              to="/team-management"
+            <button
+              onClick={() => { setError(''); setCreateOpen(true); }}
               className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-6 sm:py-8 px-4 shadow-none"
             >
               <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-primary/20 text-neutral-900 text-xl font-bold leading-tight">+</span>
               <span className="text-sm font-bold mt-2">Create new team</span>
-            </Link>
+            </button>
+            <button
+              onClick={() => { setError(''); setJoinOpen(true); }}
+              className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-6 sm:py-8 px-4 shadow-none"
+            >
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-primary/20 text-neutral-900 text-xl font-bold leading-tight">→</span>
+              <span className="text-sm font-bold mt-2">Join team by code</span>
+            </button>
           </div>
         </aside>
       </div>
+
+      {/* Create Team Modal */}
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} size="max-w-md" title="Create New Team">
+        <Card className="p-5 w-full">
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">Create New Team</h3>
+          {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
+          <div className="flex flex-col gap-4 mb-4">
+            <Input
+              label="Team Name"
+              placeholder="e.g. Science Study Group"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              required
+            />
+            <Input
+              label="Description"
+              placeholder="What is this team about?"
+              value={newTeamDesc}
+              onChange={(e) => setNewTeamDesc(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="primary" className="flex-1" onClick={handleCreateTeam} disabled={loading}>
+              {loading ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+        </Card>
+      </Modal>
+
+      {/* Join Team Modal */}
+      <Modal open={joinOpen} onClose={() => setJoinOpen(false)} size="max-w-md" title="Join Team">
+        <Card className="p-5 w-full">
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">Join Team</h3>
+          {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
+          <div className="flex flex-col gap-4 mb-4">
+            <Input
+              label="Invite Code"
+              placeholder="Enter invite code"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => setJoinOpen(false)}>Cancel</Button>
+            <Button variant="primary" className="flex-1" onClick={handleJoinTeam} disabled={loading}>
+              {loading ? 'Joining...' : 'Join'}
+            </Button>
+          </div>
+        </Card>
+      </Modal>
     </div>
   )
 }

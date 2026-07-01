@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button, IconButton } from '../common'
+import { IconButton } from '../common'
 import { ThemeSwitch } from '../ThemeSwitch'
+import { LanguageSwitch } from '../LanguageSwitch'
 import { useState } from 'react'
 
 type BreadcrumbItem = { label: string; href?: string }
@@ -216,6 +217,7 @@ export function DashboardHeader() {
           </>
         ) : (
           <>
+            <LanguageSwitch />
             <ThemeSwitch />
         <IconButton
           type="button"
@@ -246,27 +248,7 @@ export function DashboardHeader() {
           </span>
           <div className="hidden sm:block text-left min-w-0">
             <p className="text-xs font-medium text-neutral-900 truncate leading-tight">{user?.fullName ?? 'Guest'}</p>
-            <p className="text-[10px] text-neutral-500 truncate leading-tight">@{user?.username ?? 'guest'}</p>
           </div>
-        </Link>
-        <Button
-          type="button"
-          onClick={logout}
-          variant="secondary"
-          size="sm"
-          className="hidden sm:inline-flex"
-        >
-          Logout
-        </Button>
-        <Link
-          to="/focus-room"
-          className={`hidden sm:inline-flex px-4 py-2 text-xs font-bold rounded-full flex-shrink-0 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black ${
-            isHome
-              ? 'bg-[var(--color-warning)] text-black hover:brightness-95 focus:ring-[var(--color-warning)]'
-              : 'bg-[var(--color-error)] text-white hover:brightness-95 focus:ring-[var(--color-error)]'
-          }`}
-        >
-          Focus room
         </Link>
           </>
         )}

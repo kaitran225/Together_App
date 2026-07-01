@@ -12,7 +12,7 @@ import app.together.common.workflow.repository.StudySessionRepository;
 import app.together.common.workflow.repository.UserMasterDataRepository;
 import app.together.workflow.personal.dto.NoteAndSessionDtos.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.PermissionDeniedDataAccessException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +28,11 @@ public class NoteAndSessionService {
     private final QuickNoteRepository quickNoteRepository;
     private final StudySessionRepository studySessionRepository;
     private final UserMasterDataRepository userMasterDataRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // Quản lý ghi chú
     public QuickNoteResponse createNote(String userSso, CreateNoteRequest request) {
+        requireUserSso(userSso);
         if (request.content() == null || request.content().isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_QUICK_NOTE_CONTENT_REQUIRED);
         }
@@ -50,17 +52,19 @@ public class NoteAndSessionService {
 
     @Transactional(readOnly = true)
     public List<QuickNoteResponse> getMyNotes(String userSso) {
+        requireUserSso(userSso);
         return quickNoteRepository.findByUserSsoAndDeletedAtIsNullOrderByIsPinnedDescCreatedAtDesc(userSso).stream()
                 .map(this::toQuickNoteResponse)
                 .toList();
     }
 
     public void deleteNote(String userSso, Long noteId){
+        requireUserSso(userSso);
         QuickNote note = quickNoteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_QUICK_NOTE_NOT_FOUND, noteId));
 
         if(!note.getUserSso().equals(userSso)){
-            throw new PermissionDeniedDataAccessException(MessageConstants.MESSAGE_PERMISSION_DENIED, null);
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
         }
 
         note.setDeletedAt(Instant.now());
@@ -69,8 +73,9 @@ public class NoteAndSessionService {
 
     // Quản lý phiên tự học + tích EXP
     public StudySessionResponse startStudySession(String userSso, StartSessionRequest request){
+        requireUserSso(userSso);
         UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
-                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_USER_NOT_FOUND, userSso));
+                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
 
         StudySession session = StudySession.builder()
                 .userMasterDataId(masterData.getMasterDataId())
@@ -85,14 +90,15 @@ public class NoteAndSessionService {
     }
 
     public StudySessionResponse endStudySession(Long sessionId, String userSso){
+        requireUserSso(userSso);
         StudySession session = studySessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_STUDY_SESSION_NOT_FOUND, sessionId));
 
         UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
-                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_USER_NOT_FOUND, userSso));
+                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
 
         if(!session.getUserMasterDataId().equals(masterData.getMasterDataId())){
-            throw new PermissionDeniedDataAccessException(MessageConstants.MESSAGE_PERMISSION_DENIED, null);
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
         }
 
         Instant now = Instant.now();
@@ -100,7 +106,7 @@ public class NoteAndSessionService {
 
         // Tính kình nghiệm
         long minutesStudied = Duration.between(session.getStartTime(), now).toMinutes(); // chuyển sang phút
-        int expEarned = (int) (minutesStudied * 5);
+        int expEarned = (int) minutesStudied;
         if(expEarned <= 0){
             expEarned = 1; // học dưới 1 phút vẫn được 1 điểm kinh nghiệm
         }
@@ -108,7 +114,17 @@ public class NoteAndSessionService {
         session.setExpEarned(expEarned);
         StudySession  saved = studySessionRepository.save(session);
 
+        // Bắn sự kiện bất đồng bộ nội bộ để service Gamification/Auth bắt được để cộng Exp/Streak
+        eventPublisher.publishEvent(new app.together.workflow.room.event.StudySessionCompletedEvent(userSso,
+                (int) minutesStudied, now));
+
         return toSessionResponse(saved); // có thể thông báo hệ thống gamification về kinh nghiệm mới
+    }
+
+    private void requireUserSso(String userSso) {
+        if (userSso == null || userSso.isBlank()) {
+            throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
+        }
     }
 
     public QuickNoteResponse toQuickNoteResponse(QuickNote q) {

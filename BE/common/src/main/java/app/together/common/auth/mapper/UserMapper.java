@@ -11,6 +11,8 @@ import org.mapstruct.MappingTarget;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserMapper {
 
+    @Mapping(target = "skills", ignore = true)
+    @Mapping(target = "learningGoals", ignore = true)
     UserDto toDto(User entity);
 
     @Mapping(target = "userId", ignore = true)

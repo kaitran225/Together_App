@@ -10,7 +10,6 @@ import app.together.common.workflow.repository.ScheduleCategoryRepository;
 import app.together.common.workflow.repository.ScheduleRepository;
 import app.together.workflow.personal.dto.PersonalScheduleDtos.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.PermissionDeniedDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +26,8 @@ public class PersonalScheduleService {
 
     // Quản lý lịch
     public CategoryResponse createCategory(String userSso, CreateCategoryRequest reqeust){
-        if(reqeust.name() == null && reqeust.name().isBlank()){
+        requireUserSso(userSso);
+        if(reqeust.name() == null || reqeust.name().isBlank()){
             throw new BadRequestException(MessageConstants.MESSAGE_SCHEDULE_TITLE_REQUIRED);
         }
 
@@ -50,6 +50,7 @@ public class PersonalScheduleService {
 
     @Transactional(readOnly = true)
     public List<CategoryResponse> getMyCategories(String userSso){
+        requireUserSso(userSso);
         return scheduleCategoryRepository.findByUserSso(userSso).stream()
                 .map(c -> new CategoryResponse(
                         c.getCategoryId(),
@@ -61,6 +62,7 @@ public class PersonalScheduleService {
 
     // Quản lý lịch trình
     public ScheduleResponse createSchedule(String userSso, CreateScheduleRequest request){
+        requireUserSso(userSso);
         if(request.title() == null || request.title().isBlank()){
             throw new BadRequestException(MessageConstants.MESSAGE_SCHEDULE_TITLE_REQUIRED);
         }
@@ -92,22 +94,30 @@ public class PersonalScheduleService {
 
     @Transactional(readOnly = true)
     public List<ScheduleResponse> getMySchedules(String userSso){
+        requireUserSso(userSso);
         return scheduleRepository.findByUserSsoAndDeletedAtIsNull(userSso).stream()
                 .map(this::toScheduleResponse)
                 .toList();
     }
 
     public void deleteSchedule(String userSso, Long scheduleId){
+        requireUserSso(userSso);
         Schedule schedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_SCHEDULE_INVALID, scheduleId));
 
         if(!schedule.getUserSso().equals(userSso)){
-            throw new PermissionDeniedDataAccessException(MessageConstants.MESSAGE_PERMISSION_DENIED, null);
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
         }
 
         schedule.setDeletedAt(Instant.now());
         scheduleRepository.save(schedule);
 
+    }
+
+    private void requireUserSso(String userSso) {
+        if (userSso == null || userSso.isBlank()) {
+            throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
+        }
     }
 
     private ScheduleResponse toScheduleResponse(Schedule schedule){

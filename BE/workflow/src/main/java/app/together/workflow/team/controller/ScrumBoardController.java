@@ -12,7 +12,7 @@ import app.together.workflow.team.dto.ScrumBoardDtos.CreateColumnRequest;
 import app.together.workflow.team.dto.ScrumBoardDtos.MoveTaskRequest;
 import app.together.workflow.team.dto.ScrumBoardDtos.ScrumBoardResponse;
 import app.together.workflow.team.service.ScrumBoardService;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import org.springframework.web.bind.annotation.RequestBody;
 import lombok.RequiredArgsConstructor;
 
 @RestController

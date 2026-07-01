@@ -1,6 +1,8 @@
 package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -39,6 +41,7 @@ public class Transaction extends BaseAuditEntity {
     @Column(columnDefinition = "TEXT")
     String description;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 }

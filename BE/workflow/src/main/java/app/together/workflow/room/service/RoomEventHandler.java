@@ -19,11 +19,20 @@ public class RoomEventHandler {
     private final RoomEventRepository roomEventRepository;
 
     public RoomEventEntity record(Long roomId, String eventType, String actorSso, String payload) {
+        String jsonPayload = payload;
+        if (payload != null) {
+            String trimmed = payload.trim();
+            if (!(trimmed.startsWith("{") && trimmed.endsWith("}")) &&
+                !(trimmed.startsWith("[") && trimmed.endsWith("]")) &&
+                !(trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
+                jsonPayload = "\"" + payload.replace("\"", "\\\"") + "\"";
+            }
+        }
         return roomEventRepository.save(RoomEventEntity.builder()
                 .roomId(roomId)
                 .eventType(eventType)
                 .actorSso(actorSso)
-                .payload(payload)
+                .payload(jsonPayload)
                 .eventAt(Instant.now())
                 .build());
     }

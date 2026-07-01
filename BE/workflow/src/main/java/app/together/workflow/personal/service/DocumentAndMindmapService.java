@@ -26,6 +26,7 @@ public class DocumentAndMindmapService {
 
     // Quản lý tài liệu
     public DocumentResponse uploadDocument(String userSso, UploadDocumentRequest request) {
+        requireUserSso(userSso);
         Document document = Document.builder()
                 .userSso(userSso)
                 .title(request.title().trim())
@@ -44,12 +45,14 @@ public class DocumentAndMindmapService {
 
     @Transactional(readOnly = true)
     public List<DocumentResponse> getMyDocuments(String userSso) {
+        requireUserSso(userSso);
         return documentRepository.findByUserSsoAndDeletedAtIsNull(userSso).stream()
                 .map(this::toDocumentResponse)
                 .toList();
     }
 
     public void deleteDocument(Long documentId, String userSso) {
+        requireUserSso(userSso);
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_DOCUMENT_NOT_FOUND, documentId));
 
@@ -63,6 +66,7 @@ public class DocumentAndMindmapService {
 
     // Quản lý Mindmap
     public MindmapResponse saveMindmap(String userSso, SaveMindmapRequest request) {
+        requireUserSso(userSso);
         if (request.documentId() != null) {
             Document doc = documentRepository.findById(request.documentId())
                     .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_DOCUMENT_NOT_FOUND, request.documentId()));
@@ -84,9 +88,16 @@ public class DocumentAndMindmapService {
 
     @Transactional(readOnly = true)
     public List<MindmapResponse> getMindmaps(String userSso) {
+        requireUserSso(userSso);
         return mindmapRepository.findByUserSso(userSso).stream()
                 .map(this::toMindmapResponse)
                 .toList();
+    }
+
+    private void requireUserSso(String userSso) {
+        if (userSso == null || userSso.isBlank()) {
+            throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
+        }
     }
 
     private DocumentResponse toDocumentResponse(Document document) {

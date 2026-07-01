@@ -9,6 +9,7 @@ import app.together.common.workflow.repository.ChatMessageRepository;
 import app.together.workflow.personal.client.AiServiceClient;
 import app.together.workflow.personal.dto.ChatDtos.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class PersonalChatService {
     private final ChatConversationRepository chatConversationRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -56,14 +58,24 @@ public class PersonalChatService {
         ChatMessage userMessage = ChatMessage.builder()
                 .conversationId(conversationId)
                 .sender("USER")
-                .messageText(request.messageText().trim())
+                .messageText(request.messageText() != null ? request.messageText().trim() : "")
                 .sentAt(now)
                 .build();
         chatMessageRepository.save(userMessage);
 
         // 2. Sử dụng Feign Client gọi sang AI Service (FastAPI AI Server) như đúng sơ đồ kiến trúc của bạn
         // AI Service sẽ xử lý: Prompt Builder -> LLM Chatbot -> Tool Executioner -> Trả về JSON Type
-        AiServiceResponse aiResponse = aiServiceClient.getMessage(request.messageText().trim());
+        AiServiceResponse aiResponse;
+        try {
+            aiResponse = aiServiceClient.getMessage(request.messageText().trim());
+        } catch (Exception e) {
+            log.error("Failed to call AI Service, returning offline fallback response", e);
+            aiResponse = new AiServiceResponse(
+                "Xin chào! Tôi là Together AI Chatbot. Hiện tại kết nối đến AI Service đang ngoại tuyến, tôi đang phản hồi ở chế độ offline. Tôi có thể giúp gì cho bạn?",
+                "CHAT",
+                "{}"
+            );
+        }
 
         // 3. Lưu tin nhắn phản hồi của AI Chatbot vào database
         ChatMessage aiMessage = ChatMessage.builder()
@@ -81,6 +93,13 @@ public class PersonalChatService {
         chatConversationRepository.save(conversation);
 
         return toMessageResponse(savedAiMessage);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatConversationResponse> getConversations(String userSso) {
+        return chatConversationRepository.findByUserSsoOrderByLastMessageAtDesc(userSso).stream()
+                .map(this::toConversationResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

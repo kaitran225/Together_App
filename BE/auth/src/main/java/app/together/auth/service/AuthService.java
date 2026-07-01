@@ -383,6 +383,15 @@ public class AuthService {
         return ApiResponse.ok(MessageConstants.MESSAGE_PASSWORD_CHANGE_SUCCESS);
     }
 
+    @Transactional
+    public void devVerifyAllUsers() {
+        userRepository.findAll().forEach(user -> {
+            user.setEmailVerified(true);
+            user.setStatus(UserStatus.ACTIVE.toString());
+            userRepository.save(user);
+        });
+    }
+
     private void checkValidUser(User user) {
         if (user == null) {
             throw new ResourceNotFoundException(
