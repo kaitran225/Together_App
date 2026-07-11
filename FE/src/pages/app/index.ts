@@ -13,7 +13,7 @@ export {
 export { MeetingLobby, MainMeetingBoard } from '../../domains/meetings'
 export { BoardPage, SprintBoard, SprintMemberBoard, AllTeams, TeamManagement, ScrumBoard } from '../../domains/teams'
 export { MeetAi, AiSupport, Quizlet, QuizletResult } from '../../domains/ai'
-export { ProfileWithSidebar, Personalize, Personalize2, Personalize3 } from '../../domains/profile'
+export { ProfileWithSidebar, PublicProfile, Personalize, Personalize2, Personalize3 } from '../../domains/profile'
 export { Calendar } from '../../domains/calendar'
 export { Notification } from '../../domains/notifications'
 export { Transaction, Subscription, Shop } from '../../domains/billing'

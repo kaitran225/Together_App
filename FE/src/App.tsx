@@ -32,6 +32,7 @@ import {
   Quizlet,
   QuizletResult,
   ProfileWithSidebar,
+  PublicProfile,
   Personalize,
   Personalize2,
   Personalize3,
@@ -61,6 +62,10 @@ function ProtectedDashboardRoute({ element }: { element: ReactElement }) {
   )
 }
 
+function PublicDashboardRoute({ element }: { element: ReactElement }) {
+  return <DashboardLayout>{element}</DashboardLayout>
+}
+
 function AdminRoute({ element }: { element: ReactElement }) {
   return (
     <RequireAuth>
@@ -75,7 +80,7 @@ export default function App() {
   const location = useLocation()
   const { isAuthenticated, user } = useAuth()
   const isStandalone = STANDALONE_PATHS.includes(location.pathname)
-  const defaultAuthedRoute = user?.role === 'ADMIN' ? '/admin' : '/dashboard'
+  const defaultAuthedRoute = user?.systemRole === 'ADMIN' ? '/admin' : '/dashboard'
 
   return (
     <div className={isStandalone ? 'min-h-screen' : ''}>
@@ -110,6 +115,7 @@ export default function App() {
         <Route path="/quizlet" element={<ProtectedDashboardRoute element={<Quizlet />} />} />
         <Route path="/quizlet-result" element={<ProtectedDashboardRoute element={<QuizletResult />} />} />
         <Route path="/profile" element={<ProtectedDashboardRoute element={<ProfileWithSidebar />} />} />
+        <Route path="/profile/:sso" element={<PublicDashboardRoute element={<PublicProfile />} />} />
         <Route path="/personalize" element={<ProtectedDashboardRoute element={<Personalize />} />} />
         <Route path="/personalize-2" element={<ProtectedDashboardRoute element={<Personalize2 />} />} />
         <Route path="/personalize-3" element={<ProtectedDashboardRoute element={<Personalize3 />} />} />

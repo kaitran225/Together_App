@@ -41,19 +41,28 @@ export default function FocusRoom() {
   useEffect(() => {
     // Start study session if not already in one
     const savedSessionId = localStorage.getItem('active_study_session_id')
+    const savedStartTime = localStorage.getItem('active_study_session_start_time')
+
     if (savedSessionId) {
       setSessionId(Number(savedSessionId))
+      if (savedStartTime) {
+        const elapsed = Math.floor((Date.now() - new Date(savedStartTime).getTime()) / 1000)
+        setSeconds(elapsed > 0 ? elapsed : 0)
+      }
     } else {
-      if (startedRef.current) return
-      startedRef.current = true
-      workflowApi.startSession(null, 'SELF_STUDY')
-        .then((res) => {
-          if (res.success && res.data) {
-            setSessionId(res.data.sessionId)
-            localStorage.setItem('active_study_session_id', String(res.data.sessionId))
-          }
-        })
-        .catch((err) => console.error(err))
+      if (!startedRef.current) {
+        startedRef.current = true
+        const startTimeStr = new Date().toISOString()
+        localStorage.setItem('active_study_session_start_time', startTimeStr)
+        workflowApi.startSession(null, 'SELF_STUDY')
+          .then((res) => {
+            if (res.success && res.data) {
+              setSessionId(res.data.sessionId)
+              localStorage.setItem('active_study_session_id', String(res.data.sessionId))
+            }
+          })
+          .catch((err) => console.error(err))
+      }
     }
 
     const interval = setInterval(() => {
@@ -112,13 +121,19 @@ export default function FocusRoom() {
     try {
       const res = await workflowApi.getFocusRoomTasks()
       if (res.success && res.data) {
-        const uncompleted = res.data.filter((t: any) => !t.isCompleted).map((t: any) => ({
+        const mapped = res.data.map((t: any) => ({
           id: t.id,
           title: t.title,
           due: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'Personal Task',
           isCompleted: t.isCompleted
         }))
-        setTasks(uncompleted)
+        const sorted = [...mapped].sort((a: any, b: any) => {
+          if (a.isCompleted !== b.isCompleted) {
+            return a.isCompleted ? 1 : -1
+          }
+          return 0
+        })
+        setTasks(sorted)
       }
     } catch (e) {
       console.error('Error loading tasks:', e)
@@ -145,9 +160,20 @@ export default function FocusRoom() {
     }
   }
 
-  const handleCompleteTask = async (task: any) => {
+  const handleToggleTaskCompletion = async (task: any) => {
     try {
-      const res = await workflowApi.updateFocusRoomTask(task.id, undefined, undefined, true)
+      const res = await workflowApi.updateFocusRoomTask(task.id, undefined, undefined, !task.isCompleted)
+      if (res.success) {
+        await loadTasks()
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleDeleteTask = async (taskId: number) => {
+    try {
+      const res = await workflowApi.deleteFocusRoomTask(taskId)
       if (res.success) {
         await loadTasks()
       }
@@ -208,11 +234,14 @@ export default function FocusRoom() {
         if (res.success && res.data) {
           setExpEarned(res.data.expEarned || 0)
           localStorage.removeItem('active_study_session_id')
+          localStorage.removeItem('active_study_session_start_time')
           await refreshProfile()
           setIsEnded(true)
         }
       } catch (err) {
         console.error(err)
+        localStorage.removeItem('active_study_session_id')
+        localStorage.removeItem('active_study_session_start_time')
         setIsEnded(true)
       }
     } else {
@@ -257,7 +286,7 @@ export default function FocusRoom() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeSwitch />
-          <span className="px-4 py-2 rounded-lg bg-[var(--color-charcoal)] border border-[var(--color-border)] font-mono text-sm tabular-nums text-neutral-900">
+          <span className="px-4 py-2 rounded-lg bg-[var(--color-charcoal)] border border-[var(--color-border)] font-mono text-sm tabular-nums text-neutral-900 dark:text-neutral-100">
             {formatTime(seconds)}
           </span>
           <Button
@@ -286,7 +315,7 @@ export default function FocusRoom() {
               </svg>
               <span className="text-xs font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-400">Current streak</span>
             </div>
-            <p className="text-2xl font-bold text-neutral-900 dark:text-highlight">{(user as any)?.streak ?? 0} Days</p>
+            <p className="text-2xl font-bold text-neutral-900 dark:text-highlight">{user?.streak ?? 0} Days</p>
           </Card>
           
           <Card className="p-4 border border-[var(--color-border)] shadow-none flex-1 min-h-0 flex flex-col rounded-2xl">
@@ -298,19 +327,47 @@ export default function FocusRoom() {
                 <p className="text-xs text-neutral-500">No tasks assigned today.</p>
               ) : (
                 tasks.map((t) => (
-                  <div key={t.id} className="flex items-start gap-2 bg-[var(--color-background)] border border-[var(--color-border)] p-2 rounded-xl group hover:border-primary transition-colors">
+                  <div key={t.id} className={`flex items-center gap-3 bg-[var(--color-background)] border p-2.5 rounded-xl group transition-all duration-200 ${
+                    t.isCompleted 
+                      ? 'border-[var(--color-border)] opacity-60' 
+                      : 'border-[var(--color-border)] hover:border-primary hover:shadow-sm'
+                  }`}>
                     <button
                       type="button"
-                      onClick={() => handleCompleteTask(t)}
-                      className="w-4 h-4 rounded-full border border-neutral-400 mt-0.5 shrink-0 flex items-center justify-center hover:bg-primary/10 hover:border-primary transition-colors"
-                      title="Mark as completed"
+                      onClick={() => handleToggleTaskCompletion(t)}
+                      className={`w-6 h-6 rounded-full border shrink-0 flex items-center justify-center transition-all ${
+                        t.isCompleted
+                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                          : 'border-neutral-450 hover:bg-primary/10 hover:border-primary'
+                      }`}
+                      title={t.isCompleted ? "Mark as uncompleted" : "Mark as completed"}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {t.isCompleted ? (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
                     </button>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-neutral-900 truncate">{t.title}</p>
-                      <p className="text-[10px] text-neutral-500 truncate">{t.due}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-semibold truncate transition-all ${
+                        t.isCompleted ? 'text-neutral-450 line-through' : 'text-neutral-900 dark:text-neutral-100'
+                      }`}>{t.title}</p>
+                      <p className={`text-[10px] truncate transition-all ${
+                        t.isCompleted ? 'text-neutral-450 line-through' : 'text-neutral-500'
+                      }`}>{t.due}</p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(t.id)}
+                      className="opacity-0 group-hover:opacity-100 text-neutral-450 hover:text-error ml-auto shrink-0 transition-all p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
+                      title="Delete task"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 ))
               )}

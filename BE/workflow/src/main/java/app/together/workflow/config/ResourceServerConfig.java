@@ -8,6 +8,9 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -22,18 +25,36 @@ public class ResourceServerConfig {
         private String allowedOrigins;
 
         @Bean
+        @Order(1)
+        public SecurityFilterChain websocketSecurityFilterChain(HttpSecurity http) throws Exception {
+                http
+                                .securityMatchers(matchers -> matchers.requestMatchers(
+                                        new AntPathRequestMatcher("/ws/**"),
+                                        new AntPathRequestMatcher("/ws")
+                                ))
+                                .cors(Customizer.withDefaults())
+                                .csrf(csrf -> csrf.disable())
+                                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+                return http.build();
+        }
+
+        @Bean
+        @Order(2)
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
                                 .cors(Customizer.withDefaults())
                                 .csrf(csrf -> csrf.disable())
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers(
-                                                                "/v3/api-docs/**",
-                                                                "/swagger-ui/**",
-                                                                "/swagger-ui.html")
+                                                                new AntPathRequestMatcher("/v3/api-docs/**"),
+                                                                new AntPathRequestMatcher("/swagger-ui/**"),
+                                                                new AntPathRequestMatcher("/swagger-ui.html"))
                                                 .permitAll()
-                                                .requestMatchers("/api/v1/workflow/health").permitAll()
-                                                .requestMatchers("/api/v1/workflow/payos/webhook").permitAll()
+                                                .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/health")).permitAll()
+                                                .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payos/webhook")).permitAll()
+                                                .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payment/payos/webhook")).permitAll()
+                                                .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payment/coin-packages")).permitAll()
+                                                .requestMatchers(new AntPathRequestMatcher("/error")).permitAll()
                                                 .anyRequest().authenticated())
                                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
                 return http.build();

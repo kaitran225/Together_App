@@ -27,49 +27,65 @@ export class StompClient {
       }
 
       this.ws.onmessage = (event) => {
-        const frameStr = event.data as string
-        const lines = frameStr.split('\n')
-        const command = lines[0].trim()
+        const dataStr = event.data as string
+        if (dataStr === '\n') {
+          return // Heartbeat ping/pong
+        }
 
-        if (command === 'CONNECTED') {
-          this.connected = true
-          resolve()
-          this.onConnectCallbacks.forEach((cb) => cb())
-          this.onConnectCallbacks = []
-          // Resubscribe if reconnected
-          this.subscriptions.forEach((sub, id) => {
-            this.sendSubscribe(id, sub.destination)
-          })
-        } else if (command === 'MESSAGE') {
-          // Parse headers and body
-          let bodyIndex = -1
-          for (let i = 1; i < lines.length; i++) {
-            if (lines[i].trim() === '') {
-              bodyIndex = i + 1
-              break
-            }
-          }
-          if (bodyIndex !== -1) {
-            const bodyStr = lines.slice(bodyIndex).join('\n').replace(/\0$/, '').trim()
-            let parsed = bodyStr
-            try {
-              parsed = JSON.parse(bodyStr)
-            } catch {
-              // fallback
-            }
-            // Find subscription id from headers
-            let subId = ''
-            for (let i = 1; i < bodyIndex - 1; i++) {
-              const parts = lines[i].split(':')
-              if (parts[0].trim() === 'subscription') {
-                subId = parts[1].trim()
+        const rawFrames = dataStr.split('\0')
+        for (const rawFrame of rawFrames) {
+          const trimmedFrame = rawFrame.trim()
+          if (!trimmedFrame) continue
+
+          const lines = trimmedFrame.split('\n')
+          const command = lines[0].trim()
+
+          if (command === 'CONNECTED') {
+            this.connected = true
+            resolve()
+            // Resubscribe if reconnected / first connect (subscribe first so we are listening)
+            this.subscriptions.forEach((sub, id) => {
+              this.sendSubscribe(id, sub.destination)
+            })
+            // Defer queued callbacks to next event loop tick so subscriptions are registered
+            setTimeout(() => {
+              this.onConnectCallbacks.forEach((cb) => cb())
+              this.onConnectCallbacks = []
+            }, 50)
+          } else if (command === 'MESSAGE') {
+            // Find where body starts (first empty line)
+            let bodyIndex = -1
+            for (let i = 1; i < lines.length; i++) {
+              if (lines[i].trim() === '') {
+                bodyIndex = i + 1
                 break
               }
             }
-            if (subId) {
-              const sub = this.subscriptions.get(subId)
-              if (sub) {
-                sub.callback(parsed)
+
+            if (bodyIndex !== -1) {
+              const bodyStr = lines.slice(bodyIndex).join('\n').trim()
+              let parsed = bodyStr
+              try {
+                parsed = JSON.parse(bodyStr)
+              } catch {
+                // fallback
+              }
+
+              // Find subscription id from headers
+              let subId = ''
+              for (let i = 1; i < bodyIndex - 1; i++) {
+                const parts = lines[i].split(':')
+                if (parts.length >= 2 && parts[0].trim() === 'subscription') {
+                  subId = parts.slice(1).join(':').trim()
+                  break
+                }
+              }
+
+              if (subId) {
+                const sub = this.subscriptions.get(subId)
+                if (sub) {
+                  sub.callback(parsed)
+                }
               }
             }
           }
@@ -116,7 +132,8 @@ export class StompClient {
 
   send(destination: string, body: any) {
     const bodyStr = typeof body === 'string' ? body : JSON.stringify(body)
-    const frame = `SEND\ndestination:${destination}\ncontent-type:application/json\ncontent-length:${bodyStr.length}\n\n${bodyStr}\0`
+    // Omit content-length to prevent STOMP parsing errors with multi-byte characters
+    const frame = `SEND\ndestination:${destination}\ncontent-type:application/json\n\n${bodyStr}\0`
     if (this.connected) {
       this.ws?.send(frame)
     } else {

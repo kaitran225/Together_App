@@ -9,4 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MeetingRepository extends JpaRepository<Meeting, Long> {
 
     Optional<Meeting> findByTeamId(Long teamId);
+
+    Optional<Meeting> findFirstByTeamIdAndActualEndIsNullOrderByCreatedAtDesc(Long teamId);
 }

@@ -201,8 +201,12 @@ export function DashboardHeader() {
                 aria-haspopup="menu"
                 aria-expanded={openUserMenu}
               >
-                <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-semibold">
-                  A
+                <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-semibold overflow-hidden">
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="Admin" className="w-full h-full object-cover" />
+                  ) : (
+                    'A'
+                  )}
                 </span>
                 <span className="hidden sm:inline text-xs font-medium text-neutral-900">Admin</span>
                 <svg className="w-3.5 h-3.5 text-neutral-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
@@ -241,10 +245,14 @@ export function DashboardHeader() {
           className="flex items-center gap-1.5 p-1 pr-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 flex-shrink-0 transition-colors duration-150 active:scale-[0.98]"
         >
           <span
-            className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-semibold flex-shrink-0"
+            className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"
             aria-hidden
           >
-            N
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.fullName || 'User'} className="w-full h-full object-cover" />
+            ) : (
+              (user?.fullName || user?.email || 'N').charAt(0).toUpperCase()
+            )}
           </span>
           <div className="hidden sm:block text-left min-w-0">
             <p className="text-xs font-medium text-neutral-900 truncate leading-tight">{user?.fullName ?? 'Guest'}</p>

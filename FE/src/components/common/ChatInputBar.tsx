@@ -66,6 +66,12 @@ export function ChatInputBar({
             value={value}
             onChange={onChange}
             aria-label={ariaLabelMessage}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                onSend()
+              }
+            }}
           />
         </div>
         <Button variant="cta" size="sm" className="h-10 rounded-lg shrink-0 px-4" onClick={onSend}>

@@ -78,6 +78,16 @@ public class RoomService {
                 .map(existing -> roomStateService.reactivateMember(existing, now))
                 .orElseGet(() -> roomStateService.buildNewMember(roomId, userSso, now));
 
+        // Kiểm tra xem phòng có host active nào khác không
+        boolean hasActiveHost = roomMemberRepository.findByRoomId(roomId).stream()
+                .anyMatch(m -> Boolean.TRUE.equals(m.getIsActive()) && RoomRole.HOST.equals(m.getRole()) && !m.getUserSso().equals(userSso));
+
+        if (!hasActiveHost) {
+            member.setRole(RoomRole.HOST);
+            room.setExpiresAt(null);
+            roomRepository.save(room);
+        }
+
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
         roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_JOINED, userSso, room.getStatus());
@@ -92,9 +102,6 @@ public class RoomService {
         roomGuardService.requireRoomOpenOrFull(room);
 
         RoomMember member = roomGuardService.requireActiveMember(roomId, userSso);
-        if (RoomRole.HOST.equals(member.getRole())) {
-            throw new BadRequestException(MessageConstants.MESSAGE_ROOM_MEMBER_CANNOT_LEAVE);
-        }
 
         Instant now = Instant.now();
         long durationMinutes = 0;
@@ -105,6 +112,37 @@ public class RoomService {
         roomStateService.deactivateMember(member, now);
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
+
+        // Nếu user rời đi là host
+        if (RoomRole.HOST.equals(member.getRole())) {
+            List<RoomMember> otherActiveMembers = roomMemberRepository.findByRoomId(roomId).stream()
+                    .filter(m -> Boolean.TRUE.equals(m.getIsActive()) && !m.getUserSso().equals(userSso))
+                    .collect(java.util.stream.Collectors.toList());
+
+            if (!otherActiveMembers.isEmpty()) {
+                // Tự động chuyển host sang member active lâu nhất (joinedAt sớm nhất)
+                RoomMember newHost = otherActiveMembers.stream()
+                        .min(java.util.Comparator.comparing(RoomMember::getJoinedAt))
+                        .orElse(otherActiveMembers.get(0));
+
+                member.setRole(RoomRole.PARTICIPANT);
+                newHost.setRole(RoomRole.HOST);
+                roomMemberRepository.save(newHost);
+                roomMemberRepository.save(member);
+
+                room.setExpiresAt(null);
+                roomRepository.save(room);
+
+                roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_HOST_TRANSFERRED, userSso, newHost.getUserSso());
+            } else {
+                // Không có ai khác trong phòng, nếu là SOCIAL room, set expiresAt sau 1 tiếng
+                if (app.together.common.workflow.enums.RoomType.SOCIAL.equals(room.getRoomType())) {
+                    room.setExpiresAt(now.plus(1, java.time.temporal.ChronoUnit.HOURS));
+                    roomRepository.save(room);
+                }
+            }
+        }
+
         roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_LEFT, userSso, member.getUserSso());
         // Nếu thời gian học trên 0 phút, lưu hoạt động học tập và kích hoạt Event Gamification
         if (durationMinutes > 0) {

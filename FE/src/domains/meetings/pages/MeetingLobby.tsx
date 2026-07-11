@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, Input } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
+import { useAuth } from '../../../contexts/AuthContext'
 
 export default function MeetingLobby() {
+  const { user } = useAuth()
   const navigate = useNavigate()
+  const [activeNowCount, setActiveNowCount] = useState(0)
   const [roomCode, setRoomCode] = useState('')
   const [teams, setTeams] = useState<any[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
@@ -17,11 +20,20 @@ export default function MeetingLobby() {
 
   useEffect(() => {
     workflowApi.getMyTeams()
-      .then((res) => {
+      .then(async (res) => {
         if (res.success && res.data) {
           setTeams(res.data)
           if (res.data.length > 0) {
             setSelectedTeamId(res.data[0].teamId.toString())
+            
+            try {
+              const activePromises = res.data.map((t: any) => workflowApi.getActiveMeeting(t.teamId))
+              const activeResults = await Promise.all(activePromises)
+              const count = activeResults.filter(r => r.success && r.data != null).length
+              setActiveNowCount(count)
+            } catch (e) {
+              console.error('Error fetching active meetings:', e)
+            }
           }
         }
       })
@@ -119,15 +131,17 @@ export default function MeetingLobby() {
           <div className="grid grid-cols-3 gap-2 md:gap-3 text-center">
             <Card className="p-3 md:p-4">
               <p className="text-[10px] uppercase tracking-wide text-neutral-500">Active now</p>
-              <p className="text-lg font-bold text-neutral-900 dark:text-primary">12</p>
+              <p className="text-lg font-bold text-neutral-900 dark:text-primary">{activeNowCount}</p>
             </Card>
             <Card className="p-3 md:p-4">
               <p className="text-[10px] uppercase tracking-wide text-neutral-500">Study teams</p>
-              <p className="text-lg font-bold text-neutral-900 dark:text-success">{teams.length || 24}</p>
+              <p className="text-lg font-bold text-neutral-900 dark:text-success">{teams.length}</p>
             </Card>
             <Card className="p-3 md:p-4">
               <p className="text-[10px] uppercase tracking-wide text-neutral-500">Daily goal</p>
-              <p className="text-lg font-bold text-neutral-900 dark:text-highlight">2h</p>
+              <p className="text-lg font-bold text-neutral-900 dark:text-highlight">
+                {user?.planType === 'PREMIUM' ? '8h' : '2h'}
+              </p>
             </Card>
           </div>
         </div>

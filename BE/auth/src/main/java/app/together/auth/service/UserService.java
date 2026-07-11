@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -102,8 +104,54 @@ public class UserService {
         return enrichUserDto(user);
     }
 
+    @Transactional
+    public void checkAndIncrementLoginStreak(String userSso) {
+        User user = userRepository.findByUserSso(userSso).orElse(null);
+        if (user == null) return;
+        
+        // Cập nhật streak khi đăng nhập / truy cập lần đầu trong ngày
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate lastActive = user.getLastActiveDate();
+        if (lastActive == null || !lastActive.equals(today)) {
+            int currentStreak = user.getStreak() != null ? user.getStreak() : 0;
+            int longestStreak = user.getLongestStreak() != null ? user.getLongestStreak() : 0;
+            int exp = user.getExp() != null ? user.getExp() : 0;
+
+            if (lastActive == null) {
+                currentStreak = 1;
+            } else if (lastActive.equals(today.minusDays(1))) {
+                currentStreak++;
+                exp += 10 * currentStreak; // STREAK_BONUS_EXP
+            } else {
+                currentStreak = 1;
+            }
+
+            if (currentStreak > longestStreak) {
+                longestStreak = currentStreak;
+            }
+
+            user.setStreak(currentStreak);
+            user.setLongestStreak(longestStreak);
+            user.setLastActiveDate(today);
+            user.setExp(exp);
+            userRepository.save(user);
+        }
+    }
+
     public List<UserDto> getAllUserDtos() {
         return userRepository.findAll().stream()
+                .map(this::enrichUserDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<UserDto> getUserDtosBySsoList(List<String> userSsoList) {
+        if (userSsoList == null || userSsoList.isEmpty()) {
+            return List.of();
+        }
+        return userSsoList.stream()
+                .distinct()
+                .map(sso -> userRepository.findByUserSso(sso).orElse(null))
+                .filter(java.util.Objects::nonNull)
                 .map(this::enrichUserDto)
                 .collect(Collectors.toList());
     }

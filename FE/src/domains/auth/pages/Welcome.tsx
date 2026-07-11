@@ -19,7 +19,7 @@ export default function Welcome() {
         setError(result.error ?? 'Login failed.')
         return
       }
-      const role = result.user?.role
+      const role = result.user?.systemRole
       navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.')
@@ -28,8 +28,8 @@ export default function Welcome() {
 
   useEffect(() => {
     if (!isAuthenticated) return
-    navigate(user?.role === 'ADMIN' ? '/admin' : '/dashboard')
-  }, [isAuthenticated, navigate, user?.role])
+    navigate(user?.systemRole === 'ADMIN' ? '/admin' : '/dashboard')
+  }, [isAuthenticated, navigate, user?.systemRole])
 
   useEffect(() => {
     const handleGoogleCredential = async (response: any) => {
@@ -40,7 +40,7 @@ export default function Welcome() {
           return
         }
         setError('')
-        const role = result.user?.role
+        const role = result.user?.systemRole
         navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
       } catch (err: any) {
         setError(err.message || 'An unexpected error occurred during Google Login.')
@@ -86,10 +86,10 @@ export default function Welcome() {
         </div>
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div id="google-btn" className="w-full flex justify-center min-h-[44px]"></div>
-          <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
+          {/* <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
             <span className="text-[#1877F2] font-bold">f</span>
             <span>Continue with Facebook</span>
-          </Button>
+          </Button> */}
           <div className="relative py-2">
             <hr className="border-t border-[var(--color-border)]" />
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--color-surface)] px-3 text-sm text-neutral-500">or</span>

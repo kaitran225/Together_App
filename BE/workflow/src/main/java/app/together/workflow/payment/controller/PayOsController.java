@@ -3,7 +3,9 @@ package app.together.workflow.payment.controller;
 import app.together.common.shared.dto.ApiResponse;
 import app.together.common.shared.util.SecurityUtils;
 import app.together.workflow.payment.dto.PaymentDtos.*;
+import app.together.common.workflow.dto.CoinPackageDto;
 import app.together.workflow.payment.service.PayOsService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,5 +26,10 @@ public class PayOsController {
     public ApiResponse<String> handlePayOsWebhook(@RequestBody PayOsWebhookPayload payload) {
         payOsService.handlePayOsWebHook(payload);
         return ApiResponse.ok("success");
+    }
+
+    @GetMapping("/coin-packages")
+    public ApiResponse<List<CoinPackageDto>> getCoinPackages() {
+        return ApiResponse.ok(payOsService.getActiveCoinPackages());
     }
 }

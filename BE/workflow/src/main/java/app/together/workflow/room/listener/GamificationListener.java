@@ -90,10 +90,20 @@ public class GamificationListener {
         user.setLastActiveDate(today);
 
         // ── 3. Tính Level dựa trên tổng EXP ──
-        // Công thức: Level = 1 + (totalExp / 100)
         int totalExp = user.getExp();
-        int newLevel = (totalExp / 100) + 1;
-        user.setLevel(Math.max(1, newLevel));
+        
+        int tempLevel = 1;
+        int remainingExp = totalExp;
+        while (true) {
+            int nextLevelExp = ((tempLevel - 1) / 10 + 1) * 100;
+            if (remainingExp >= nextLevelExp) {
+                remainingExp -= nextLevelExp;
+                tempLevel++;
+            } else {
+                break;
+            }
+        }
+        user.setLevel(Math.max(1, tempLevel));
 
         userRepository.save(user);
 

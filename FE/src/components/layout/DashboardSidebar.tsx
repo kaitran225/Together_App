@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { AiBotIcon, Button } from '../common'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTranslation } from '../../contexts/LanguageContext'
-import type { UserRole } from '../../mocks/auth'
 
 const userNavItems = [
   { to: '/dashboard', labelKey: 'nav.home' },
@@ -131,7 +130,7 @@ export function DashboardSidebar() {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const { user, logout } = useAuth()
-  const role = (user?.role ?? 'USER') as UserRole
+  const role = (user?.systemRole ?? 'USER') as string
   const navItems = role === 'ADMIN' ? adminNavItems : userNavItems
   const navIcons = role === 'ADMIN' ? (['admin', 'users', 'moderation', 'rooms', 'reports', 'revenue', 'support'] as const) : iconKeys
   const homePath = role === 'ADMIN' ? '/admin/overview' : '/dashboard'

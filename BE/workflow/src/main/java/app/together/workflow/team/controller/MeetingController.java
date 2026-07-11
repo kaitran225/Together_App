@@ -55,4 +55,10 @@ public class MeetingController {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(meetingService.getMeetingSummary(meetingId, currentUserSso));
     }
+
+    @GetMapping("/teams/{teamId}/meetings/active")
+    public ApiResponse<MeetingResponse> getActiveMeeting(@PathVariable Long teamId) {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(meetingService.getActiveMeeting(teamId, currentUserSso));
+    }
 }

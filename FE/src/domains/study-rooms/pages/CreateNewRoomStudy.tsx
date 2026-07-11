@@ -1,17 +1,25 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button, Card, Input, RadioGroup, Textarea, Select } from '../../../components/common'
-import { topicOptions, durationOptions } from '../../../mocks'
+import { Button, Card, Input, RadioGroup, Textarea, Select, Switch } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
+
+const durationDaysOptions = [
+  { value: '1', label: '1 ngày (1 Day)' },
+  { value: '3', label: '3 ngày (3 Days)' },
+  { value: '7', label: '7 ngày (7 Days)' },
+  { value: '14', label: '14 ngày (14 Days)' },
+  { value: '30', label: '30 ngày (30 Days)' },
+]
 
 export default function CreateNewRoomStudy() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
-  const [topic, setTopic] = useState('math')
-  const [duration, setDuration] = useState('none')
   const [description, setDescription] = useState('')
-  const [isPublic, setIsPublic] = useState(true)
+  const [goalDescription, setGoalDescription] = useState('')
+  const [goalDurationDays, setGoalDurationDays] = useState(7)
   const [maxMembers, setMaxMembers] = useState(10)
+  const [isPremium, setIsPremium] = useState(false)
+  const [isPublic, setIsPublic] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -20,17 +28,29 @@ export default function CreateNewRoomStudy() {
       setError('Room name is required.')
       return
     }
+    if (!goalDescription.trim()) {
+      setError('Study Goal is required.')
+      return
+    }
     setError('')
     setLoading(true)
     try {
       const res = await workflowApi.createRoom(
         title.trim(),
         description.trim(),
+        goalDescription.trim(),
+        goalDurationDays,
         maxMembers,
-        isPublic
+        isPremium,
+        isPublic,
+        'SOCIAL' // roomType defaults to 'SOCIAL'
       )
       if (res.success) {
-        navigate('/study-rooms')
+        if (res.data?.roomId) {
+          navigate(`/study-room?roomId=${res.data.roomId}`)
+        } else {
+          navigate('/study-rooms')
+        }
       } else {
         setError(res.message || 'Failed to create room.')
       }
@@ -56,32 +76,32 @@ export default function CreateNewRoomStudy() {
         <Card>
           <div className="flex flex-col gap-6">
             <Input
-              label="Room Name"
+              label="Tên phòng (Room Name)"
               placeholder="e.g. Advanced Calculus Group Session"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Select
-                label="Topic Selection"
-                options={topicOptions}
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-              />
-              <Select
-                label="Duration (Optional)"
-                options={durationOptions}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-              />
-            </div>
             <Textarea
-              label="Main Study Goals"
-              placeholder="What are we focusing on today? (e.g., Reviewing Chapter 4 exercises, Mock Exam practice)"
-              rows={4}
+              label="Mô tả phòng học (Room Description)"
+              placeholder="Short description of your room..."
+              rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+            />
+            <Textarea
+              label="Mục tiêu học tập (Main Study Goals)"
+              placeholder="What are we focusing on today? (e.g., Reviewing Chapter 4 exercises, Mock Exam practice)"
+              rows={3}
+              value={goalDescription}
+              onChange={(e) => setGoalDescription(e.target.value)}
+              required
+            />
+            <Select
+              label="Thời gian hoạt động mục tiêu (Goal Duration)"
+              options={durationDaysOptions}
+              value={String(goalDurationDays)}
+              onChange={(e) => setGoalDurationDays(Number(e.target.value))}
             />
           </div>
         </Card>
@@ -111,6 +131,19 @@ export default function CreateNewRoomStudy() {
               min={2}
               max={100}
             />
+            <div className="p-4 border border-neutral-200 rounded-lg flex items-center justify-between">
+              <div>
+                <p className="font-bold text-sm text-neutral-900 flex items-center gap-1.5">
+                  <span>Phòng Premium (Premium Room)</span>
+                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">PRO</span>
+                </p>
+                <p className="text-xs text-neutral-500">High-quality workspace with premium features.</p>
+              </div>
+              <Switch
+                checked={isPremium}
+                onChange={setIsPremium}
+              />
+            </div>
           </div>
         </Card>
         <div className="flex gap-4">

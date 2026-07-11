@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, SegmentedControl, Modal, Input } from '../../../components/common'
 import { TaskEditSidebar, type TaskForEdit } from '../../../components/TaskEditSidebar'
 import {
   TEAM_TABS,
   TEAM_MEMBERS,
   SCRUM_COLUMNS_INIT,
-  SPRINT_COLUMNS_INIT,
   type TabId,
-  type SprintTask,
 } from '../../../mocks'
-import { workflowApi } from '../../../api/client'
+import { workflowApi, authApi } from '../../../api/client'
 
 function getAssigneeDisplay(assigneeCode: string, members: any[]): { name: string; skills: string[] } | undefined {
   const m = members.find((mem) => mem.code === assigneeCode || mem.id === assigneeCode)
@@ -44,19 +42,37 @@ export default function BoardPage() {
     
     // Get team detail
     workflowApi.getTeamDetail(teamId)
-      .then((res) => {
+      .then(async (res) => {
         if (res.success && res.data) {
           const detail = res.data
           setTeamName(detail.team.name)
           setInviteCode(detail.team.inviteCode)
-          if (detail.members) {
-            setMembers(detail.members.map((m: any) => ({
-              id: m.userSso,
-              name: m.nickname || m.userSso,
-              role: m.role,
-              skills: m.role === 'OWNER' ? ['Product', 'Strategy'] : ['Contributor'],
-              code: (m.nickname || m.userSso).slice(0, 2).toUpperCase()
-            })))
+          if (detail.members && detail.members.length > 0) {
+            // Batch lookup user info from auth service
+            const ssoList = detail.members.map((m: any) => m.userSso)
+            let userMap: Record<string, { fullName?: string; email?: string }> = {}
+            try {
+              const lookupRes = await authApi.lookupUsers(ssoList)
+              if (lookupRes.success && lookupRes.data) {
+                lookupRes.data.forEach((u: any) => {
+                  userMap[u.userSso] = { fullName: u.fullName, email: u.email }
+                })
+              }
+            } catch (err) {
+              console.warn('User lookup failed, falling back to nickname/userSso', err)
+            }
+
+            setMembers(detail.members.map((m: any) => {
+              const userInfo = userMap[m.userSso]
+              const displayName = m.nickname || userInfo?.fullName || userInfo?.email || m.userSso
+              return {
+                id: m.userSso,
+                name: displayName,
+                role: m.role,
+                skills: m.role === 'OWNER' ? ['Product', 'Strategy'] : ['Contributor'],
+                code: displayName.slice(0, 2).toUpperCase()
+              }
+            }))
           }
         }
       })
@@ -141,7 +157,7 @@ export default function BoardPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === 'management' && <TeamManagementContent members={members} inviteCode={inviteCode} />}
+        {tab === 'management' && <TeamManagementContent members={members} inviteCode={inviteCode} teamId={teamId} />}
         {tab === 'scrum' && (
           <ScrumBoardContent
             projectId={selectedProjectId}
@@ -149,7 +165,6 @@ export default function BoardPage() {
             projectName={projects.find(p => p.projectId === selectedProjectId)?.name || 'Project Board'}
           />
         )}
-        {tab === 'sprint' && <SprintBoardContent teamMembers={members} />}
       </div>
 
       {/* Create Project Modal */}
@@ -181,8 +196,27 @@ export default function BoardPage() {
   )
 }
 
-function TeamManagementContent({ members, inviteCode }: { members: any[]; inviteCode?: string }) {
+function TeamManagementContent({ members, inviteCode, teamId }: { members: any[]; inviteCode?: string; teamId: number | null }) {
+  const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
+  const [createMeetingOpen, setCreateMeetingOpen] = useState(false)
+  const [meetingTitle, setMeetingTitle] = useState('')
+  const [meetingAgenda, setMeetingAgenda] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [activeMeeting, setActiveMeeting] = useState<any>(null)
+
+  useEffect(() => {
+    if (teamId) {
+      workflowApi.getActiveMeeting(teamId).then(res => {
+        if (res.success && res.data) {
+          setActiveMeeting(res.data)
+        } else {
+          setActiveMeeting(null)
+        }
+      }).catch(console.error)
+    }
+  }, [teamId])
 
   const handleCopy = () => {
     if (inviteCode) {
@@ -192,9 +226,52 @@ function TeamManagementContent({ members, inviteCode }: { members: any[]; invite
     }
   }
 
+  const handleCreateMeeting = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!teamId) return
+    if (!meetingTitle.trim()) {
+      setError('Vui lòng nhập tiêu đề cuộc họp.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const res = await workflowApi.createMeeting(
+        teamId,
+        meetingTitle.trim(),
+        undefined,
+        meetingAgenda.trim() || undefined
+      )
+      if (res.success && res.data) {
+        await workflowApi.joinMeeting(res.data.meetingId)
+        navigate(`/meetings/room?meetingId=${res.data.meetingId}`)
+      } else {
+        setError(res.message || 'Không thể tạo cuộc họp.')
+      }
+    } catch (err) {
+      console.error(err)
+      setError('Lỗi kết nối máy chủ.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold text-neutral-900">Team management</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-neutral-900">Team management</h1>
+        {teamId && (
+          activeMeeting ? (
+            <Button variant="primary" size="sm" onClick={() => navigate(`/meetings/room?meetingId=${activeMeeting.meetingId}`)} className="flex items-center gap-1.5 font-bold shadow-none !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600">
+              🟢 Tham gia ngay
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" onClick={() => setCreateMeetingOpen(true)} className="flex items-center gap-1.5 font-bold shadow-none">
+              🎥 Tạo cuộc họp mới
+            </Button>
+          )
+        )}
+      </div>
       
       {inviteCode && (
         <Card heading="Invite Members" className="border border-[var(--color-border)] shadow-none">
@@ -210,6 +287,28 @@ function TeamManagementContent({ members, inviteCode }: { members: any[]; invite
               {copied ? 'Copied!' : 'Copy Code'}
             </Button>
           </div>
+        </Card>
+      )}
+
+      {teamId && (
+        <Card heading="Meetings" className="border border-[var(--color-border)] shadow-none">
+          {activeMeeting ? (
+            <>
+              <p className="text-xs text-neutral-500 mb-3">
+                Cuộc họp đang diễn ra: <strong className="text-neutral-900">{activeMeeting.title}</strong>
+              </p>
+              <Button variant="primary" size="sm" onClick={() => navigate(`/meetings/room?meetingId=${activeMeeting.meetingId}`)} className="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600">
+                🟢 Tham gia cuộc họp
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-neutral-500 mb-3">Tạo cuộc họp trực tuyến cho nhóm học tập của bạn.</p>
+              <Button variant="secondary" size="sm" onClick={() => setCreateMeetingOpen(true)}>
+                🎥 Lên lịch/Bắt đầu cuộc họp nhóm
+              </Button>
+            </>
+          )}
         </Card>
       )}
 
@@ -242,6 +341,34 @@ function TeamManagementContent({ members, inviteCode }: { members: any[]; invite
           ))}
         </ul>
       </Card>
+
+      <Modal open={createMeetingOpen} onClose={() => setCreateMeetingOpen(false)} size="max-w-md" title="Tạo cuộc họp mới">
+        <Card className="p-5 w-full border-0 bg-transparent shadow-none">
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">Tạo cuộc họp nhóm</h3>
+          {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+          <form onSubmit={handleCreateMeeting} className="flex flex-col gap-4">
+            <Input
+              label="Tiêu đề cuộc họp"
+              placeholder="e.g. Họp thảo luận nhóm"
+              value={meetingTitle}
+              onChange={(e) => setMeetingTitle(e.target.value)}
+              required
+            />
+            <Input
+              label="Chương trình họp (Agenda)"
+              placeholder="e.g. Báo cáo tiến trình, phân chia task"
+              value={meetingAgenda}
+              onChange={(e) => setMeetingAgenda(e.target.value)}
+            />
+            <div className="flex gap-3 mt-2">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCreateMeetingOpen(false)}>Hủy</Button>
+              <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
+                {loading ? 'Đang tạo...' : 'Bắt đầu ngay'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </Modal>
     </div>
   )
 }
@@ -412,10 +539,25 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
                     {task.description && (
                       <p className="text-[10px] text-neutral-500 mt-0.5 line-clamp-2">{task.description}</p>
                     )}
-                    <div className="mt-1 flex items-center gap-1">
-                      <span className="w-5 h-5 rounded bg-neutral-300 text-[9px] font-bold flex items-center justify-center text-neutral-700">
-                        {task.assignee || 'UN'}
-                      </span>
+                    <div className="mt-1 flex items-center gap-1.5 min-w-0">
+                      {(() => {
+                        const m = teamMembers.find((mem) => mem.id === task.assignee)
+                        const name = m ? m.name : (task.assignee || 'Unassigned')
+                        const code = m ? m.code : (task.assignee ? task.assignee.slice(0, 2).toUpperCase() : 'UN')
+                        return (
+                          <>
+                            <span 
+                              className="w-5 h-5 rounded bg-neutral-300 text-[9px] font-bold flex items-center justify-center text-neutral-700 shrink-0"
+                              title={name}
+                            >
+                              {code}
+                            </span>
+                            <span className="text-[10.5px] text-neutral-600 truncate max-w-[120px]" title={name}>
+                              {name}
+                            </span>
+                          </>
+                        )
+                      })()}
                     </div>
                   </Button>
                 ))}
@@ -513,98 +655,4 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
   )
 }
 
-function SprintBoardContent({ teamMembers }: { teamMembers: any[] }) {
-  const [columns, setColumns] = useState(SPRINT_COLUMNS_INIT)
-  const [selected, setSelected] = useState<{ task: SprintTask; columnId: string; taskIndex: number } | null>(null)
 
-  const handleSaveTask = (updated: TaskForEdit) => {
-    if (!selected) return
-    const { columnId, taskIndex } = selected
-    setColumns((prev) =>
-      prev.map((col) =>
-        col.id === columnId
-          ? {
-              ...col,
-              tasks: col.tasks.map((t, i) =>
-                i === taskIndex
-                  ? {
-                      ...t,
-                      title: updated.title,
-                      assignee: updated.assignee,
-                      tag: updated.tag ?? t.tag,
-                      desc: updated.desc ?? t.desc,
-                      startDate: updated.startDate,
-                      endDate: updated.endDate,
-                      due: updated.due,
-                      status: updated.status,
-                      progress: updated.progress ?? t.progress,
-                      priority: updated.priority,
-                      estimate: updated.estimate,
-                      reporter: updated.reporter,
-                      completed: updated.completed,
-                    }
-                  : t
-              ),
-            }
-          : col
-      )
-    )
-    setSelected(null)
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-3 min-h-0">
-      <div className="min-h-0 flex flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base font-bold text-neutral-900">Sprint Board</h2>
-            <Badge variant="default" className="px-1.5 py-0.5 text-[10px] normal-case tracking-normal">Active</Badge>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 overflow-x-auto pb-1 min-h-0">
-          {columns.map((col) => (
-            <div key={col.id} className="flex flex-col min-w-[220px] bg-[var(--color-accent-muted)] rounded-2xl border border-[var(--color-border)] p-2.5 shadow-none">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-neutral-900">{col.title}</span>
-              </div>
-              <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto">
-                {col.tasks.map((task, i) => (
-                  <Button
-                    key={i}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelected({ task, columnId: col.id, taskIndex: i })}
-                    className="w-full !justify-start text-left p-2 bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] shadow-none hover:border-primary/40 transition-colors"
-                  >
-                    {task.tag && <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] mb-1">{task.tag}</Badge>}
-                    <p className="text-xs font-medium text-neutral-900 leading-tight">{task.title}</p>
-                    {task.desc && <p className="text-xs text-neutral-600 mt-0.5 line-clamp-2">{task.desc}</p>}
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="w-5 h-5 rounded-full bg-neutral-300 text-[10px] font-bold flex items-center justify-center text-neutral-700">{task.assignee}</span>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <aside className="flex flex-col min-h-[240px] lg:max-h-[calc(100vh-10rem)] overflow-hidden">
-        {selected ? (
-          <TaskEditSidebar
-            task={selected.task}
-            onSave={handleSaveTask}
-            onClose={() => setSelected(null)}
-            statusOptions={['TO DO', 'IN PROGRESS', 'REVIEW', 'DONE']}
-            assigneeDisplay={getAssigneeDisplay(selected.task.assignee, teamMembers)}
-          />
-        ) : (
-          <div className="flex flex-col bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)] p-3 h-full overflow-y-auto space-y-3 shadow-none">
-            <p className="text-[10px] text-neutral-500">Click a task to edit.</p>
-          </div>
-        )}
-      </aside>
-    </div>
-  )
-}

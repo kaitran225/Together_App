@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 /** Entity DTO with audit fields (flat JSON, same as former {@code BaseAuditDTO} subclasses). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -21,6 +22,8 @@ public record CoinPackageDto(
         Boolean isPopular,
         Boolean isActive,
         Integer displayOrder,
-        String description
+        String description,
+        List<String> features
 ) {
 }
+

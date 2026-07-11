@@ -7,65 +7,61 @@ import {
   toggleUserStatus,
   updateUser,
   verifyUserPassword,
-  type PublicUser,
-  type UserPreferences,
   type UserRole,
 } from '../mocks/auth'
 import { authApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/client'
+import type { UserDto } from '../types/dto'
 
 const useMock = import.meta.env.VITE_USE_MOCK === 'true'
 
-const mapToPublicUser = (dto: any): PublicUser => {
+const mapToUserDto = (dto: any): UserDto => {
   return {
-    id: String(dto.userId || dto.userSso),
-    username: dto.userSso,
+    ...dto,
+    userId: dto.userId ?? null,
+    userSso: dto.userSso ?? String(dto.id || dto.username || ''),
     email: dto.email,
-    fullName: dto.fullName || dto.email.split('@')[0],
-    role: dto.systemRole === 'ADMIN' ? 'ADMIN' : 'USER',
-    active: dto.status !== 'DISABLED',
+    fullName: dto.fullName || dto.email?.split('@')[0],
+    systemRole: dto.systemRole || (dto.role === 'ADMIN' ? 'ADMIN' : 'USER'),
+    status: dto.status || (dto.active === false ? 'DISABLED' : 'ACTIVE'),
     avatarUrl: dto.avatarUrl || '',
-    preferences: {
-      theme: 'system',
-      notifications: { email: true, push: true, inApp: true },
-    },
-    ...dto // Spread all backend attributes so exp, level, streak, planType, etc., are accessible via (user as any)
-  } as any
+  }
 }
 
 // Temporary debug switch: bypass login gates while UI debugging.
 const DEBUG_AUTH_BYPASS = false
 
 type LoginInput = { identifier: string; password: string }
-type ProfileInput = { fullName: string; email: string; avatarUrl?: string }
+type ProfileInput = { fullName: string; email: string; avatarUrl?: string; skills?: string[]; learningGoals?: string[] }
 type CreateUserInput = { username: string; email: string; fullName: string; role: UserRole; password: string; avatarUrl?: string }
 
 type AuthContextValue = {
-  user: PublicUser | null
-  users: PublicUser[]
+  user: UserDto | null
+  users: any[] // Mock users array kept for legacy fallback
   isAuthenticated: boolean
   isAdmin: boolean
-  login: (input: LoginInput) => Promise<{ ok: boolean; error?: string; user?: PublicUser }>
-  loginWithGoogle: (idToken: string) => Promise<{ ok: boolean; error?: string; user?: PublicUser }>
+  login: (input: LoginInput) => Promise<{ ok: boolean; error?: string; user?: UserDto }>
+  loginWithGoogle: (idToken: string) => Promise<{ ok: boolean; error?: string; user?: UserDto }>
   logout: () => void
   refreshUsers: () => void
   refreshProfile: () => Promise<void>
   createMockUser: (input: CreateUserInput) => { ok: boolean; error?: string }
-  updateMockUser: (id: string, updates: Partial<PublicUser>) => { ok: boolean; error?: string }
+  updateMockUser: (id: string, updates: Partial<any>) => { ok: boolean; error?: string }
   toggleMockUserStatus: (id: string) => { ok: boolean; error?: string }
-  updateOwnProfile: (input: ProfileInput) => { ok: boolean; error?: string }
+  updateOwnProfile: (input: ProfileInput) => Promise<{ ok: boolean; error?: string }>
   changeOwnPassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<{ ok: boolean; error?: string }>
-  updateOwnPreferences: (preferences: UserPreferences) => { ok: boolean; error?: string }
+  updateOwnPreferences: (preferences: any) => { ok: boolean; error?: string }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<PublicUser | null>(null)
-  const [users, setUsers] = useState<PublicUser[]>(() => listUsers())
-  const bypassUser = useMemo<PublicUser | null>(() => {
+  const [user, setUser] = useState<UserDto | null>(null)
+  const [users, setUsers] = useState<any[]>(() => listUsers())
+  const bypassUser = useMemo<UserDto | null>(() => {
     if (!DEBUG_AUTH_BYPASS) return null
     const all = listUsers()
-    return all.find((u) => u.role === 'ADMIN') ?? all[0] ?? null
+    const found = all.find((u) => u.role === 'ADMIN') ?? all[0] ?? null
+    return found ? mapToUserDto(found) : null
   }, [])
   const effectiveUser = DEBUG_AUTH_BYPASS ? bypassUser : user
 
@@ -78,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authApi.me(token)
         .then((res) => {
           if (res.success && res.data) {
-            setUser(mapToPublicUser(res.data))
+            setUser(mapToUserDto(res.data))
           } else {
             clearStoredToken()
             setUser(null)
@@ -95,9 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (useMock) {
       const result = authenticate(input)
       if (!result.user) return { ok: false, error: result.error ?? 'Login failed.' }
-      setUser(result.user)
+      const mapped = mapToUserDto(result.user)
+      setUser(mapped)
       refreshUsers()
-      return { ok: true, user: result.user }
+      return { ok: true, user: mapped }
     }
 
     try {
@@ -108,9 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('refresh_token', refreshToken)
         const profileRes = await authApi.me(accessToken)
         if (profileRes.success && profileRes.data) {
-          const publicUser = mapToPublicUser(profileRes.data)
-          setUser(publicUser)
-          return { ok: true, user: publicUser }
+          const mappedUser = mapToUserDto(profileRes.data)
+          setUser(mappedUser)
+          return { ok: true, user: mappedUser }
         }
       }
       return { ok: false, error: res.message || 'Login failed.' }
@@ -122,8 +119,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = useCallback(async (idToken: string) => {
     if (useMock) {
       const mockUser = listUsers().find((u) => u.role === 'USER') || listUsers()[0]
-      setUser(mockUser)
-      return { ok: true, user: mockUser }
+      const mapped = mapToUserDto(mockUser)
+      setUser(mapped)
+      return { ok: true, user: mapped }
     }
 
     try {
@@ -134,9 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('refresh_token', refreshToken)
         const profileRes = await authApi.me(accessToken)
         if (profileRes.success && profileRes.data) {
-          const publicUser = mapToPublicUser(profileRes.data)
-          setUser(publicUser)
-          return { ok: true, user: publicUser }
+          const mappedUser = mapToUserDto(profileRes.data)
+          setUser(mappedUser)
+          return { ok: true, user: mappedUser }
         }
       }
       return { ok: false, error: res.message || 'Google Login failed.' }
@@ -169,34 +167,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true }
   }, [refreshUsers])
 
-  const updateMockUser = useCallback((id: string, updates: Partial<PublicUser>) => {
+  const updateMockUser = useCallback((id: string, updates: Partial<any>) => {
     const updated = updateUser(id, updates)
     if (!updated) return { ok: false, error: 'User not found.' }
-    if (user?.id === updated.id) setUser(updated)
+    if (user?.userSso === updated.id) setUser(mapToUserDto(updated))
     refreshUsers()
     return { ok: true }
-  }, [refreshUsers, user?.id])
+  }, [refreshUsers, user?.userSso])
 
   const toggleMockUserStatus = useCallback((id: string) => {
     const updated = toggleUserStatus(id)
     if (!updated) return { ok: false, error: 'User not found.' }
-    if (user?.id === updated.id && !updated.active) setUser(null)
-    if (user?.id === updated.id && updated.active) setUser(updated)
+    if (user?.userSso === updated.id && !updated.active) setUser(null)
+    if (user?.userSso === updated.id && updated.active) setUser(mapToUserDto(updated))
     refreshUsers()
     return { ok: true }
-  }, [refreshUsers, user?.id])
+  }, [refreshUsers, user?.userSso])
 
-  const updateOwnProfile = useCallback((input: ProfileInput) => {
+  const updateOwnProfile = useCallback(async (input: ProfileInput) => {
     if (!user) return { ok: false, error: 'Not authenticated.' }
-    const updated = updateUser(user.id, {
-      fullName: input.fullName.trim(),
-      email: input.email.trim(),
-      avatarUrl: input.avatarUrl?.trim() ?? '',
-    })
-    if (!updated) return { ok: false, error: 'Unable to update profile.' }
-    setUser(updated)
-    refreshUsers()
-    return { ok: true }
+    if (useMock) {
+      const updated = updateUser(user.userSso, {
+        fullName: input.fullName.trim(),
+        email: input.email.trim(),
+        avatarUrl: input.avatarUrl?.trim() ?? '',
+        skills: input.skills ?? user.skills,
+        learningGoals: input.learningGoals ?? user.learningGoals
+      })
+      if (!updated) return { ok: false, error: 'Unable to update profile.' }
+      setUser(mapToUserDto(updated))
+      refreshUsers()
+      return { ok: true }
+    } else {
+      const token = getStoredToken()
+      if (!token) return { ok: false, error: 'No token' }
+      try {
+        const res = await authApi.updateProfile(token, input.fullName.trim(), input.avatarUrl?.trim(), input.skills, input.learningGoals)
+        if (res.success && res.data) {
+          setUser(mapToUserDto(res.data))
+          return { ok: true }
+        }
+        return { ok: false, error: res.message || 'Update failed' }
+      } catch (e: any) {
+        return { ok: false, error: e.message }
+      }
+    }
   }, [refreshUsers, user])
 
   const changeOwnPassword = useCallback(async (currentPassword: string, newPassword: string, confirmPassword: string) => {
@@ -205,8 +220,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (newPassword !== confirmPassword) return { ok: false, error: 'Password confirmation does not match.' }
 
     if (useMock) {
-      if (!verifyUserPassword(user.id, currentPassword)) return { ok: false, error: 'Current password is incorrect.' }
-      const changed = changeUserPassword(user.id, newPassword)
+      if (!verifyUserPassword(user.userSso, currentPassword)) return { ok: false, error: 'Current password is incorrect.' }
+      const changed = changeUserPassword(user.userSso, newPassword)
       if (!changed) return { ok: false, error: 'Unable to update password.' }
       return { ok: true }
     }
@@ -224,11 +239,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user])
 
-  const updateOwnPreferences = useCallback((preferences: UserPreferences) => {
+  const updateOwnPreferences = useCallback((preferences: any) => {
     if (!user) return { ok: false, error: 'Not authenticated.' }
-    const updated = updateUser(user.id, { preferences })
+    const updated = updateUser(user.userSso, { preferences })
     if (!updated) return { ok: false, error: 'Unable to update preferences.' }
-    setUser(updated)
+    setUser(mapToUserDto(updated))
     refreshUsers()
     return { ok: true }
   }, [refreshUsers, user])
@@ -240,7 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await authApi.me(token)
         if (res.success && res.data) {
-          setUser(mapToPublicUser(res.data))
+          setUser(mapToUserDto(res.data))
         }
       } catch (e) {
         console.error('Failed to refresh profile:', e)
@@ -252,7 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: effectiveUser,
     users,
     isAuthenticated: DEBUG_AUTH_BYPASS ? true : !!effectiveUser,
-    isAdmin: effectiveUser?.role === 'ADMIN',
+    isAdmin: effectiveUser?.systemRole === 'ADMIN',
     login,
     loginWithGoogle,
     logout,

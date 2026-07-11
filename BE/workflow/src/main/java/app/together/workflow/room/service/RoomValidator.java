@@ -4,6 +4,7 @@ import app.together.common.shared.constant.MessageConstants;
 import app.together.common.shared.exception.BadRequestException;
 import app.together.common.shared.exception.ForbiddenException;
 import app.together.common.workflow.enums.RoomType;
+import app.together.common.workflow.repository.RoomRepository;
 import app.together.common.workflow.repository.UserRoomSlotRepository;
 import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
@@ -19,6 +20,7 @@ import java.util.Locale;
 public class RoomValidator {
 
     private final UserRoomSlotRepository userRoomSlotRepository;
+    private final RoomRepository roomRepository;
 
     @Value("${app.room.media.social.default-members:10}")
     private int minimumSlots;
@@ -67,12 +69,18 @@ public class RoomValidator {
     }
 
     public void validateAndReserveSlot(String userSso) {
+        // Recalculate actual active rooms to prevent out-of-sync/stale slot counts
+        int actualActiveRooms = (int) roomRepository.countActiveRoomsByCreatedBy(userSso);
+
         app.together.common.workflow.entity.UserRoomSlot slot = userRoomSlotRepository.findById(userSso)
-                .orElseGet(() -> userRoomSlotRepository.save(app.together.common.workflow.entity.UserRoomSlot.builder()
+                .orElseGet(() -> app.together.common.workflow.entity.UserRoomSlot.builder()
                         .userSso(userSso)
                         .totalSlots(userSlotsLimit)
                         .usedSlots(0)
-                        .build()));
+                        .build());
+
+        slot.setTotalSlots(userSlotsLimit);
+        slot.setUsedSlots(actualActiveRooms);
 
         if (slot.getUsedSlots() >= slot.getTotalSlots()) {
             throw new BadRequestException(MessageConstants.MESSAGE_USER_ROOM_SLOT_INVALID);

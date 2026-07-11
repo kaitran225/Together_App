@@ -10,6 +10,8 @@ import app.together.common.workflow.entity.*;
 import app.together.common.workflow.enums.MeetingParticipantStatus;
 import app.together.common.workflow.enums.MeetingStatus;
 import app.together.common.workflow.repository.*;
+import app.together.common.auth.repository.UserRepository;
+import app.together.common.auth.entity.User;
 import app.together.workflow.team.dto.MeetingDtos.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ public class MeetingService {
     private final MeetingSummaryRepository meetingSummaryRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
     private final PermissionCheckService permissionCheckService;
     private final GenerateAiSummary generateAiSummary;
 
@@ -48,6 +51,10 @@ public class MeetingService {
 
         if (request.title() == null || request.title().isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_MEETING_TITLE_REQUIRED);
+        }
+
+        if (meetingRepository.findFirstByTeamIdAndActualEndIsNullOrderByCreatedAtDesc(teamId).isPresent()) {
+            throw new BadRequestException("Đang có một cuộc họp diễn ra trong nhóm, không thể tạo mới.");
         }
 
         Meeting meeting = Meeting.builder()
@@ -153,10 +160,36 @@ public class MeetingService {
         Meeting saved = meetingRepository.save(meeting);
 
         List<MeetingParticipant> participants = meetingParticipantRepository.findByMeetingId(meetingId);
+        long durationSeconds = 0;
+        if (meeting.getActualStart() != null) {
+            durationSeconds = java.time.Duration.between(meeting.getActualStart(), now).getSeconds();
+        }
+        int expEarned = (int) (durationSeconds / 60) * 10 + 50;
+
         for (MeetingParticipant p : participants) {
             if (MeetingParticipantStatus.PRESENT.name().equals(p.getAttendanceStatus()) && p.getLeftAt() == null) {
                 p.setLeftAt(now);
                 meetingParticipantRepository.save(p);
+                
+                // Add EXP and Level to user
+                userRepository.findByUserSso(p.getUserSso()).ifPresent(user -> {
+                    int totalExp = (user.getExp() != null ? user.getExp() : 0) + expEarned;
+                    user.setExp(totalExp);
+                    
+                    int tempLevel = 1;
+                    int remainingExp = totalExp;
+                    while (true) {
+                        int nextLevelExp = ((tempLevel - 1) / 10 + 1) * 100;
+                        if (remainingExp >= nextLevelExp) {
+                            remainingExp -= nextLevelExp;
+                            tempLevel++;
+                        } else {
+                            break;
+                        }
+                    }
+                    user.setLevel(tempLevel);
+                    userRepository.save(user);
+                });
             }
         }
         generateAiSummary.generateAndProcessAiSummary(saved);
@@ -248,6 +281,13 @@ public class MeetingService {
         generateAiSummary.generateAndProcessAiSummary(saved);
 
         return toMeetingResponse(saved);
+    }
+
+    public MeetingResponse getActiveMeeting(Long teamId, String userSso) {
+        getActiveTeamMember(teamId, userSso);
+        return meetingRepository.findFirstByTeamIdAndActualEndIsNullOrderByCreatedAtDesc(teamId)
+                .map(this::toMeetingResponse)
+                .orElse(null);
     }
 
     private MeetingResponse toMeetingResponse(Meeting m) {

@@ -7,6 +7,7 @@ import app.together.common.shared.exception.ForbiddenException;
 import app.together.common.shared.exception.ResourceNotFoundException;
 import app.together.common.shared.security.Permission;
 import app.together.common.shared.security.PermissionCheckService;
+import app.together.common.auth.repository.UserRepository;
 import app.together.common.workflow.entity.Team;
 import app.together.common.workflow.entity.TeamMember;
 import app.together.common.workflow.entity.TeamMemberId;
@@ -31,6 +32,7 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final PermissionCheckService permissionCheckService;
+    private final UserRepository userRepository;
 
     // ── Tạo Team mới ──
 
@@ -322,11 +324,22 @@ public class TeamService {
     }
 
     private TeamMemberResponse toMemberResponse(TeamMember member) {
+        String nickname = member.getNickname();
+        if (nickname == null || nickname.isBlank()) {
+            nickname = userRepository.findByUserSso(member.getUserSso())
+                    .map(user -> {
+                        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+                            return user.getFullName();
+                        }
+                        return user.getEmail();
+                    })
+                    .orElse(member.getUserSso());
+        }
         return new TeamMemberResponse(
                 member.getTeamId(),
                 member.getUserSso(),
                 member.getRole() != null ? member.getRole().name() : null,
-                member.getNickname(),
+                nickname,
                 member.getJoinedAt());
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Button, Card, Textarea, Progress, Toast } from '../../../components/common'
+import { Badge, Button, Card, Textarea, Progress, Toast, Modal } from '../../../components/common'
 import { cardCompact } from '../../../mocks'
 import { workflowApi, readApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -26,6 +26,33 @@ export default function Dashboard() {
   const [noteText, setNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [selectedNote, setSelectedNote] = useState<any | null>(null)
+
+  // Thêm task mới
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim()) return
+    setAddingTask(true)
+    try {
+      const res = await workflowApi.createFocusRoomTask(
+        newTaskTitle.trim(),
+        newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined
+      )
+      if (res.success) {
+        setNewTaskTitle('')
+        setNewTaskDueDate('')
+        setShowAddTaskModal(false)
+        await loadUpcomingTasks()
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAddingTask(false)
+    }
+  }
 
   // Chức năng tự học
   const [activeSessionId, setActiveSessionId] = useState<number | null>(() => {
@@ -71,44 +98,106 @@ export default function Dashboard() {
     }
   }
 
+  const loadUpcomingTasks = async () => {
+    const allTasks: any[] = []
+    try {
+      const teamsRes = await workflowApi.getMyTeams()
+      const myTeams = teamsRes.success && teamsRes.data ? teamsRes.data : []
+
+      // 1. Fetch team tasks
+      for (const team of myTeams) {
+        try {
+          const projRes = await workflowApi.getProjects(team.teamId)
+          if (projRes.success && projRes.data) {
+            for (const proj of projRes.data) {
+              const boardRes = await workflowApi.getBoard(proj.projectId)
+              if (boardRes.success && boardRes.data && boardRes.data.columns) {
+                for (const col of boardRes.data.columns) {
+                  if (col.name?.toLowerCase() !== 'done' && col.name?.toLowerCase() !== 'completed' && col.tasks) {
+                    for (const task of col.tasks) {
+                      allTasks.push({
+                        ...task,
+                        projectName: proj.name,
+                        teamName: team.name,
+                        isPersonal: false,
+                      })
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching team projects/tasks:', err)
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+
+    // 2. Fetch personal tasks from focus room
+    try {
+      const personalRes = await workflowApi.getFocusRoomTasks()
+      if (personalRes.success && personalRes.data) {
+        const personalUncompleted = personalRes.data.filter((t: any) => !t.isCompleted)
+        for (const t of personalUncompleted) {
+          allTasks.push({
+            id: t.id,
+            title: t.title,
+            priority: 'MEDIUM',
+            isPersonal: true,
+            dueDate: t.dueDate,
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching personal focus tasks:', err)
+    }
+
+    setTasks(allTasks)
+  }
+
+  const handleToggleTaskCompletion = async (item: any) => {
+    if (item.isPersonal) {
+      try {
+        const res = await workflowApi.updateFocusRoomTask(item.id, undefined, undefined, true)
+        if (res.success) {
+          await loadUpcomingTasks()
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      alert('Công việc nhóm cần được cập nhật trạng thái trên bảng Kanban của nhóm.')
+    }
+  }
+
+  const handleDeleteTask = async (item: any) => {
+    if (item.isPersonal) {
+      try {
+        const res = await workflowApi.deleteFocusRoomTask(item.id)
+        if (res.success) {
+          await loadUpcomingTasks()
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      alert('Không thể xóa công việc nhóm từ Dashboard. Vui lòng thực hiện trên bảng Kanban.')
+    }
+  }
+
   useEffect(() => {
+    loadUpcomingTasks()
+
     workflowApi.getMyTeams()
-      .then(async (res) => {
+      .then((res) => {
         if (res.success && res.data) {
           setTeams(res.data.slice(0, 4).map((t: any) => ({
             name: t.name,
             active: `${t.currentMemberCount || 1} members`,
             id: t.teamId,
           })))
-
-          // Fetch all upcoming tasks from projects of user's teams
-          const allTasks: any[] = []
-          for (const team of res.data) {
-            try {
-              const projRes = await workflowApi.getProjects(team.teamId)
-              if (projRes.success && projRes.data) {
-                for (const proj of projRes.data) {
-                  const boardRes = await workflowApi.getBoard(proj.projectId)
-                  if (boardRes.success && boardRes.data && boardRes.data.columns) {
-                    for (const col of boardRes.data.columns) {
-                      if (col.name?.toLowerCase() !== 'done' && col.name?.toLowerCase() !== 'completed' && col.tasks) {
-                        for (const task of col.tasks) {
-                          allTasks.push({
-                            ...task,
-                            projectName: proj.name,
-                            teamName: team.name,
-                          })
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (err) {
-              console.error('Error fetching team projects/tasks:', err)
-            }
-          }
-          setTasks(allTasks)
         }
       })
       .catch(() => {})
@@ -160,11 +249,27 @@ export default function Dashboard() {
       setSavingNote(false)
     }
   }
-  const levelMult = (user as any)?.level || 1
-  const streakMult = (user as any)?.streak || 0
-  const xpCurrent = (user as any)?.exp ?? 0
-  const userLevel = (user as any)?.level ?? 1
-  const xpTarget = userLevel * 100
+  const levelMult = user?.level || 1
+  const streakMult = user?.streak || 0
+  const totalExp = user?.exp ?? 0
+  
+  let tempLevel = 1
+  let remainingExp = totalExp
+  let nextLevelExp = 100
+  
+  while (true) {
+    nextLevelExp = (Math.floor((tempLevel - 1) / 10) + 1) * 100
+    if (remainingExp >= nextLevelExp) {
+      remainingExp -= nextLevelExp
+      tempLevel++
+    } else {
+      break
+    }
+  }
+  
+  const userLevel = tempLevel
+  const currentLevelXp = remainingExp
+  const xpTarget = nextLevelExp
   const studyBars = [
     { day: 'M', h: Math.min(30 + levelMult * 5, 90), label: `${((30 + levelMult * 5) * 0.1).toFixed(1)}h`, active: true },
     { day: 'T', h: Math.min(45 + streakMult * 10, 95), label: `${((45 + streakMult * 10) * 0.1).toFixed(1)}h`, active: true },
@@ -227,7 +332,7 @@ export default function Dashboard() {
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.currentStreak')}</p>
-            <p className="text-2xl font-extrabold text-neutral-900">{user ? `${(user as any).streak ?? 0} ${t('dashboard.days')}` : `-- ${t('dashboard.days')}`}</p>
+            <p className="text-2xl font-extrabold text-neutral-900">{user ? `${user.streak ?? 0} ${t('dashboard.days')}` : `-- ${t('dashboard.days')}`}</p>
             <Badge variant="streak" className="mt-1 normal-case tracking-normal">{t('dashboard.keepGoing')}</Badge>
           </div>
         </Card>
@@ -242,17 +347,17 @@ export default function Dashboard() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.experiencePoints')}</p>
               <div className="flex items-baseline justify-between gap-2 mt-1">
-                <p className="text-xl font-extrabold text-neutral-900 leading-none">{user ? `${(user as any).exp ?? 0} XP` : '-- XP'}</p>
+                <p className="text-xl font-extrabold text-neutral-900 leading-none">{user ? `${user.exp ?? 0} XP` : '-- XP'}</p>
                 <Badge variant="milestone" className="normal-case tracking-normal">Level {userLevel}</Badge>
               </div>
             </div>
           </div>
           <div className="w-full mt-1">
             <Progress 
-              value={xpCurrent} 
+              value={currentLevelXp} 
               max={xpTarget} 
               size="sm" 
-              label={<span className="text-[9px] text-neutral-500 font-semibold">{xpCurrent} / {xpTarget} XP to Lv.{userLevel + 1}</span>}
+              label={<span className="text-[9px] text-neutral-500 font-semibold">{currentLevelXp} / {xpTarget} XP to Lv.{userLevel + 1}</span>}
               showPercentage
             />
           </div>
@@ -260,8 +365,8 @@ export default function Dashboard() {
         <Card variant="interactive" className={`flex items-center gap-3 py-3 ${cardCompact}`}>
           <div className="min-w-0">
             <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.plan')}</p>
-            <p className="text-2xl font-extrabold text-neutral-900">{(user as any)?.planType ?? 'FREE'}</p>
-            <Badge variant="focus" className="mt-1 normal-case tracking-normal">{user?.role ?? 'USER'}</Badge>
+            <p className="text-2xl font-extrabold text-neutral-900">{user?.planType ?? 'FREE'}</p>
+            <Badge variant="focus" className="mt-1 normal-case tracking-normal">{user?.systemRole ?? 'USER'}</Badge>
           </div>
         </Card>
       </div>
@@ -406,13 +511,23 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[58fr_42fr] gap-3">
           <Card variant="interactive" className={`${cardCompact}`}>
             <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
               <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Upcoming tasks</h3>
-              <Link to="/teams">
-                <Button variant="tonal" size="sm" className="shrink-0">View boards</Button>
-              </Link>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  variant="tonal"
+                  size="sm"
+                  onClick={() => setShowAddTaskModal(true)}
+                  className="font-semibold"
+                >
+                  + Add task
+                </Button>
+                <Link to="/teams">
+                  <Button variant="tonal" size="sm">View boards</Button>
+                </Link>
+              </div>
             </div>
             {tasks.length === 0 ? (
               <div className="flex flex-col items-center py-6 text-neutral-500">
@@ -423,19 +538,59 @@ export default function Dashboard() {
                 {tasks.slice(0, 4).map((item, i) => (
                   <li
                     key={i}
-                    className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)]"
+                    className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/30 transition-all duration-200 group"
                   >
-                    <div className="flex justify-between items-start gap-2">
-                      <Badge variant={item.priority === 'HIGH' ? 'error' : item.priority === 'MEDIUM' ? 'warning' : 'focus'} className="normal-case tracking-normal">
-                        {item.priority}
-                      </Badge>
-                      {item.teamName && (
-                        <span className="text-[10px] font-bold text-neutral-500 truncate max-w-[80px]">
-                          {item.teamName}
-                        </span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTaskCompletion(item)}
+                      className={`w-5 h-5 rounded-full border shrink-0 flex items-center justify-center transition-all ${
+                        item.isCompleted
+                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                          : 'border-neutral-400 dark:border-neutral-600 hover:bg-primary/10 hover:border-primary'
+                      }`}
+                      title={item.isPersonal ? "Mark as completed" : "Team task (update on board)"}
+                    >
+                      {item.isCompleted ? (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                       )}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-center gap-2 mb-1">
+                        <div className="flex gap-1.5">
+                          <Badge 
+                            variant={item.isPersonal ? 'info' : (item.priority === 'HIGH' ? 'error' : item.priority === 'MEDIUM' ? 'warning' : 'focus')} 
+                            className="normal-case tracking-normal text-[9px]"
+                          >
+                            {item.isPersonal ? 'Cá nhân' : item.priority}
+                          </Badge>
+                          {!item.isPersonal && (
+                            <Badge variant="outline" className="normal-case tracking-normal text-[9px] border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.15)]">
+                              Team
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-neutral-500 truncate max-w-[100px]">
+                          {item.isPersonal ? 'Personal Task' : item.teamName}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
                     </div>
-                    <p className="text-sm font-semibold text-neutral-900 mt-1 truncate">{item.title}</p>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(item)}
+                      className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-error shrink-0 transition-all p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
+                      title={item.isPersonal ? "Delete task" : "Team task (delete on board)"}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -444,10 +599,11 @@ export default function Dashboard() {
           <Card variant="interactive" className={`${cardCompact}`} heading={t('dashboard.personalNotes')}>
             <Textarea
               placeholder={t('dashboard.notePlaceholder')}
-              className="min-h-[80px] resize-y text-sm py-2"
+              className="!min-h-[40px] !py-1.5 resize-y text-sm"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
             />
+            
             <Button
               variant="tonal"
               size="sm"
@@ -459,9 +615,9 @@ export default function Dashboard() {
             </Button>
 
             {notes.length > 0 && (
-              <div className="mt-3 border-t border-[var(--color-border)] pt-3 max-h-[120px] overflow-y-auto space-y-1.5">
+              <div className="mt-3 border-t border-[var(--color-border)] pt-3 max-h-[105px] overflow-y-auto space-y-1.5">
                 <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">{t('dashboard.savedNotesTitle')}</p>
-                {notes.slice(0, 3).map((n) => (
+                {notes.slice().sort((a, b) => b.noteId - a.noteId).slice(0, 3).map((n) => (
                   <div key={n.noteId} className="flex justify-between items-start gap-2 p-2 rounded bg-neutral-100 dark:bg-neutral-800 text-xs">
                     <p
                       onClick={() => setSelectedNote(n)}
@@ -535,6 +691,37 @@ export default function Dashboard() {
             </div>
           </Toast>
         </div>
+      )}
+      {showAddTaskModal && (
+        <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title="Tạo nhiệm vụ cá nhân">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Tên nhiệm vụ</label>
+              <input
+                type="text"
+                placeholder="Nhiệm vụ cần làm..."
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                className="w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl text-sm px-3 py-2 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Hạn chót (Không bắt buộc)</label>
+              <input
+                type="date"
+                value={newTaskDueDate}
+                onChange={(e) => setNewTaskDueDate(e.target.value)}
+                className="w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl text-sm px-3 py-2 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t border-[var(--color-border)]">
+              <Button variant="secondary" size="sm" onClick={() => setShowAddTaskModal(false)}>Hủy</Button>
+              <Button variant="primary" size="sm" onClick={handleCreateTask} disabled={addingTask || !newTaskTitle.trim()}>
+                {addingTask ? 'Đang tạo...' : 'Tạo nhiệm vụ'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

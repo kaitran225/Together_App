@@ -28,7 +28,11 @@ public class RoomRealtimeService {
     public void signal(SignalMessage message) {
         validateSignalMessage(message);
 
-        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        String currentUserSso = SecurityUtils.getCurrentUserSso()
+                .orElse(message.fromUser());
+        if (currentUserSso == null || currentUserSso.isBlank()) {
+            currentUserSso = "anonymous";
+        }
         Long roomId = parseRoomId(message.roomId());
         RoomEvent event = createEvent(
                 roomId,

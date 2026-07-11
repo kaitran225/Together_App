@@ -1,5 +1,5 @@
+import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
-import { FREE_FEATURES, PERSONAL_FEATURES, TEAMS_FEATURES, COMBO_FEATURES } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 
 function FeatureItem({
@@ -21,6 +21,14 @@ function FeatureItem({
 }
 
 export default function Subscription() {
+  const [packages, setPackages] = useState<any[]>([])
+
+  useEffect(() => {
+    workflowApi.getCoinPackages().then(res => {
+      if (res.success && res.data) setPackages(res.data)
+    })
+  }, [])
+
   const handleUpgrade = async (packageId: number) => {
     try {
       const res = await workflowApi.checkoutPayOs(packageId)
@@ -47,99 +55,47 @@ export default function Subscription() {
       </div>
 
       <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-4">
-        {/* FREE */}
-        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-white/10 bg-[var(--color-surface)] p-4 shadow-none sm:p-5 lg:min-h-[380px] lg:p-6">
-          <div className="flex flex-col">
-            <div className="flex flex-col gap-2 pb-3 sm:pb-4">
-              <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">Free</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">0VND</span>
-              </div>
-              <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">Gói miễn phí</p>
-            </div>
-            <ul className="flex flex-col gap-2 pb-6 sm:gap-3 sm:pb-8">
-              {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-3">
-                  <FeatureItem text={f} prefix="-" />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <Button variant="secondary" size="md" className="w-full uppercase" onClick={() => alert("You are already on the Free plan.")}>Active</Button>
-        </div>
+        {packages.map((pack) => {
+          const features: string[] = pack.features || []
+          const desc = pack.description || ''
+          const isFree = pack.priceVnd === 0
 
-        {/* PERSONAL */}
-        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-white/10 bg-[var(--color-surface)] p-4 shadow-none sm:p-5 lg:min-h-[380px] lg:p-6">
-          <div className="flex flex-col">
-            <div className="flex flex-col gap-2 pb-3 sm:pb-4">
-              <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">Personal</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">59.000VND</span>
+          return (
+            <div key={pack.packageId} className={`relative flex min-w-0 flex-col justify-between rounded-2xl border ${pack.isPopular ? 'border-primary/30' : 'border-white/10'} bg-[var(--color-surface)] p-4 shadow-none sm:p-5 lg:min-h-[380px] lg:p-6`}>
+              {pack.isPopular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded border border-primary bg-primary px-3 py-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Most Popular</span>
+                </div>
+              )}
+              <div className="flex flex-col">
+                <div className="flex flex-col gap-2 pb-3 sm:pb-4">
+                  <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">{pack.packageName}</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">{pack.priceVnd.toLocaleString()}VND</span>
+                  </div>
+                  <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">{desc}</p>
+                </div>
+                <ul className="flex flex-col gap-2 pb-6 sm:gap-3 sm:pb-8">
+                  {features.map((f: string) => (
+                    <li key={f} className="flex items-start gap-3">
+                      <FeatureItem text={f} prefix={pack.isPopular ? '+' : '-'} />
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">Dành cho cá nhân</p>
-            </div>
-            <ul className="flex flex-col gap-2 pb-6 sm:gap-3 sm:pb-8">
-              {PERSONAL_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-3">
-                  <FeatureItem text={f} prefix="-" />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(1)}>Start</Button>
-            <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(1)}>3 days trial</Button>
-          </div>
-        </div>
-
-        {/* TEAMS — Most Popular */}
-        <div className="relative flex min-w-0 flex-col justify-between rounded-2xl border border-primary/30 bg-[var(--color-surface)] p-4 shadow-none sm:p-5 lg:min-h-[380px] lg:p-6">
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded border border-primary bg-primary px-3 py-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Most Popular</span>
-          </div>
-          <div className="flex flex-col">
-            <div className="flex flex-col gap-2 pb-3 sm:pb-4">
-              <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">Teams</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">249.000VND</span>
+              <div className="flex gap-2">
+                {isFree ? (
+                  <Button variant="secondary" size="md" className="w-full uppercase" onClick={() => alert("You are already on the Free plan.")}>Active</Button>
+                ) : (
+                  <>
+                    <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(pack.packageId)}>Start</Button>
+                    {!pack.isPopular && <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(pack.packageId)}>3 days trial</Button>}
+                  </>
+                )}
               </div>
-              <p className="text-sm font-normal leading-6 text-neutral-900 sm:text-base">Dành cho nhóm học tập nghiêm túc</p>
             </div>
-            <ul className="flex flex-col gap-2 pb-6 sm:gap-3 sm:pb-8">
-              {TEAMS_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-3">
-                  <FeatureItem text={f} prefix="+"/>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(2)}>Start</Button>
-            <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(2)}>3 days trial</Button>
-          </div>
-        </div>
-
-        {/* COMBO (TEAMS + PERSONAL) Custom */}
-        <div className="flex min-w-0 flex-col justify-between rounded-2xl border border-white/10 bg-[var(--color-surface)] p-4 shadow-none sm:p-5 lg:min-h-[380px] lg:p-6">
-          <div className="flex flex-col">
-            <div className="flex flex-col gap-2 pb-3 sm:pb-4">
-              <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">Combo</h3>
-              <p className="text-base font-semibold leading-6 text-neutral-700 sm:text-lg">(Teams + Personal)</p>
-              <div className="text-4xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">299.000VND</div>
-              <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">Dành cho tổ chức và nhóm lớn</p>
-            </div>
-            <ul className="flex flex-col gap-2 pb-6 sm:gap-3 sm:pb-8">
-              {COMBO_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-3">
-                  <FeatureItem text={f} prefix="-" />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(3)}>Start</Button>
-          </div>
-        </div>
+          )
+        })}
       </div>
     </div>
   )

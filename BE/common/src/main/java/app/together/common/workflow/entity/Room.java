@@ -35,6 +35,15 @@ public class Room extends BaseAuditEntity {
     @Column(columnDefinition = "TEXT")
     String description;
 
+    @Column(name = "goal_description", columnDefinition = "TEXT")
+    String goalDescription;
+
+    @Column(name = "goal_duration_days")
+    Integer goalDurationDays;
+
+    @Column(name = "is_premium")
+    Boolean isPremium;
+
     @Column(name = "max_members")
     Integer maxMembers;
 

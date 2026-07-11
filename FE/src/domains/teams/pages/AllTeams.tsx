@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, IconButton, Input, SettingsIcon, Modal, Card } from '../../../components/common'
+import { Button, IconButton, Input, SettingsIcon, Modal, Card, Checkbox } from '../../../components/common'
 import { myTeamsData, archivedData } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 
@@ -68,6 +68,9 @@ export default function AllTeams() {
   const [joinOpen, setJoinOpen] = useState(false)
   const [newTeamName, setNewTeamName] = useState('')
   const [newTeamDesc, setNewTeamDesc] = useState('')
+  const [newTeamAvatar, setNewTeamAvatar] = useState('')
+  const [newTeamIsPrivate, setNewTeamIsPrivate] = useState(false)
+  const [newTeamMaxMembers, setNewTeamMaxMembers] = useState(20)
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -112,11 +115,20 @@ export default function AllTeams() {
     setError('')
     setLoading(true)
     try {
-      const res = await workflowApi.createTeam(newTeamName.trim(), newTeamDesc.trim())
+      const res = await workflowApi.createTeam(
+        newTeamName.trim(),
+        newTeamDesc.trim(),
+        newTeamAvatar.trim() || undefined,
+        newTeamIsPrivate,
+        newTeamMaxMembers
+      )
       if (res.success) {
         setCreateOpen(false)
         setNewTeamName('')
         setNewTeamDesc('')
+        setNewTeamAvatar('')
+        setNewTeamIsPrivate(false)
+        setNewTeamMaxMembers(20)
         loadTeams()
       } else {
         setError(res.message || 'Failed to create team.')
@@ -281,6 +293,26 @@ export default function AllTeams() {
               value={newTeamDesc}
               onChange={(e) => setNewTeamDesc(e.target.value)}
             />
+            <Input
+              label="Avatar URL"
+              placeholder="https://example.com/avatar.png"
+              value={newTeamAvatar}
+              onChange={(e) => setNewTeamAvatar(e.target.value)}
+            />
+            <Input
+              label="Max Members"
+              type="number"
+              min={1}
+              value={newTeamMaxMembers}
+              onChange={(e) => setNewTeamMaxMembers(parseInt(e.target.value) || 20)}
+            />
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                label="Private Team"
+                checked={newTeamIsPrivate}
+                onChange={(e) => setNewTeamIsPrivate(e.target.checked)}
+              />
+            </div>
           </div>
           <div className="flex gap-3">
             <Button variant="secondary" className="flex-1" onClick={() => setCreateOpen(false)}>Cancel</Button>

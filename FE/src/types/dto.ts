@@ -25,14 +25,18 @@ export interface UserDto {
   lastActiveDate?: string | null
   status?: string | null
   emailVerified?: boolean | null
+  systemRole?: string | null
+  isAdmin?: boolean | null
+  createdBy?: string | null
   createdAt?: string | null
+  updatedBy?: string | null
   updatedAt?: string | null
   skills?: string[] | null
   learningGoals?: string[] | null
 }
 
-/** Subset returned by auth /api/v1/users/me; compatible with UserDto. */
-export type MeResponse = Pick<UserDto, 'userSso' | 'email' | 'fullName' | 'skills' | 'learningGoals'>
+/** Full UserDto returned by auth /api/v1/users/me. */
+export type MeResponse = UserDto
 
 export interface PageResponse<T> {
   content: T[]

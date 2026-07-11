@@ -102,8 +102,81 @@ export const authApi = {
     })
     return r.json()
   },
-}
 
+  async lookupUsers(userSsoList: string[]): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/users/lookup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify(userSsoList),
+    })
+    return r.json()
+  },
+
+  async getPublicProfile(sso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { userSso: sso, fullName: 'Guest Mock', level: 5, exp: 1200, skills: ['Java'], learningGoals: [] } })
+    const r = await fetch(`/api/v1/public/users/${sso}/profile`, {
+      method: 'GET',
+    })
+    return r.json()
+  },
+
+  async refreshToken(refreshToken: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
+    if (useMock) {
+      return Promise.resolve({ success: true, data: { accessToken: 'mock-token', refreshToken: 'mock-refresh-token' } })
+    }
+    const r = await fetch('/api/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+    return r.json()
+  },
+
+  async resetPassword(email: string): Promise<ApiResponse<void>> {
+    if (useMock) {
+      return Promise.resolve({ success: true })
+    }
+    const r = await fetch('/api/v1/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    return r.json()
+  },
+
+  async confirmPasswordReset(token: string, newPassword: string): Promise<ApiResponse<string>> {
+    if (useMock) {
+      return Promise.resolve({ success: true, data: 'Password reset confirmed' })
+    }
+    const r = await fetch('/api/v1/auth/reset-password/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    })
+    return r.json()
+  },
+
+  async verifyEmail(rawToken: string): Promise<ApiResponse<string>> {
+    if (useMock) {
+      return Promise.resolve({ success: true, data: 'Email verified' })
+    }
+    const r = await fetch(`/api/v1/auth/verify-email?rawToken=${encodeURIComponent(rawToken)}`)
+    return r.json()
+  },
+
+  async toggleUserStatus(userId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/admin/users/${userId}/toggle-status`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+}
 export const readApi = {
   async health(): Promise<ApiResponse<{ service: string; status: string }>> {
     if (useMock) return Promise.resolve({ success: true, data: { service: 'read', status: 'UP' } })
@@ -113,6 +186,11 @@ export const readApi = {
   async getRooms(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch('/api/v1/read/rooms')
+    return r.json()
+  },
+  async getSuggestedRooms(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/read/rooms/suggested')
     return r.json()
   },
   async getRoomDetail(roomId: string | number): Promise<ApiResponse<any>> {
@@ -125,6 +203,18 @@ export const readApi = {
     const r = await fetch(`/api/v1/read/rooms/${roomId}/events`)
     return r.json()
   },
+  async getRoomParticipants(roomId: string | number): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/read/rooms/${roomId}/participants`)
+    return r.json()
+  },
+  async getMyRooms(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/read/rooms/my', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
 }
 
 export const workflowApi = {
@@ -133,7 +223,16 @@ export const workflowApi = {
     const r = await fetch('/api/v1/workflow/health')
     return r.json()
   },
-  async createRoom(title: string, description: string, maxMembers: number, isPublic: boolean, roomType = 'SOCIAL'): Promise<ApiResponse<any>> {
+  async createRoom(
+    title: string,
+    description: string,
+    goalDescription: string,
+    goalDurationDays: number,
+    maxMembers: number,
+    isPremium: boolean,
+    isPublic: boolean,
+    roomType = 'SOCIAL'
+  ): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/rooms', {
       method: 'POST',
@@ -144,7 +243,10 @@ export const workflowApi = {
       body: JSON.stringify({
         title,
         description,
+        goalDescription,
+        goalDurationDays,
         maxMembers,
+        isPremium,
         isPublic,
         roomType,
       }),
@@ -220,7 +322,13 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async createTeam(name: string, description: string): Promise<ApiResponse<any>> {
+  async createTeam(
+    name: string,
+    description: string,
+    avatarUrl?: string,
+    isPrivate?: boolean,
+    maxMembers?: number
+  ): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/teams', {
       method: 'POST',
@@ -228,7 +336,7 @@ export const workflowApi = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${getStoredToken()}`,
       },
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, avatarUrl, isPrivate, maxMembers }),
     })
     return r.json()
   },
@@ -254,6 +362,13 @@ export const workflowApi = {
   async getProjects(teamId: string | number): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch(`/api/v1/workflow/teams/${teamId}/projects`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getProject(projectId: string | number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/projects/${projectId}`, {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
@@ -466,6 +581,13 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async getCoinPackages(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/payment/coin-packages', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
   async upgradeSubscription(targetTier: string, durationDays: number): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/payment/subscription/upgrade', {
@@ -577,6 +699,13 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async getActiveMeeting(teamId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: null })
+    const r = await fetch(`/api/v1/workflow/teams/${teamId}/meetings/active`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
   async joinMeeting(meetingId: number): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/join`, {
@@ -585,12 +714,12 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async addMeetingNote(meetingId: number, content: string): Promise<ApiResponse<any>> {
+  async addMeetingNote(meetingId: number, content: string, isShared?: boolean): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/meetings/${meetingId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, isShared }),
     })
     return r.json()
   },
@@ -634,12 +763,12 @@ export const workflowApi = {
   },
 
   // ── Schedules / Calendar ──
-  async createScheduleCategory(name: string, colorCode?: string): Promise<ApiResponse<any>> {
+  async createScheduleCategory(name: string, color?: string, icon?: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/personal/schedules/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ name, colorCode }),
+      body: JSON.stringify({ name, color, icon }),
     })
     return r.json()
   },
@@ -841,29 +970,45 @@ export const workflowApi = {
   },
 
   // ── Flashcard Review ──
-  async reviewFlashcard(flashcardId: number, quality: number): Promise<ApiResponse<any>> {
+  async reviewFlashcard(quizId: number, quizQuestionId: number, quality: number): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/personal/flashcards/review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ flashcardId, quality }),
+      body: JSON.stringify({ quizId, quizQuestionId, quality }),
     })
     return r.json()
   },
 
   // ── Mindmaps ──
-  async createMindmap(documentId: number): Promise<ApiResponse<any>> {
+  async createMindmap(documentId: number, title: string, content: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/personal/mindmaps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ documentId }),
+      body: JSON.stringify({ documentId, title, content }),
     })
     return r.json()
   },
   async getMindmaps(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch('/api/v1/workflow/personal/mindmaps', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async summarizeDocument(documentId: number, summaryType?: string, prompt?: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { content: 'This is a mock summary.' } })
+    const r = await fetch(`/api/v1/workflow/personal/documents/${documentId}/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ summaryType, prompt }),
+    })
+    return r.json()
+  },
+  async getSummaryHistory(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/summaries/history', {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
@@ -929,12 +1074,12 @@ export const workflowApi = {
   },
 
   // ── Task Submissions ──
-  async submitTask(taskId: number, content: string, attachmentUrl?: string): Promise<ApiResponse<any>> {
+  async submitTask(taskId: number, content: string, attachments?: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/submissions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ content, attachmentUrl }),
+      body: JSON.stringify({ content, attachments }),
     })
     return r.json()
   },
@@ -945,23 +1090,23 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async evaluateSubmission(submissionId: number, grade: string, feedback: string): Promise<ApiResponse<any>> {
+  async evaluateSubmission(submissionId: number, grade: number, feedback: string, status?: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/submissions/${submissionId}/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ grade, feedback }),
+      body: JSON.stringify({ grade, feedback, status }),
     })
     return r.json()
   },
 
   // ── Task Extra ──
-  async assignTask(taskId: number, assigneeSso: string): Promise<ApiResponse<any>> {
+  async assignTask(taskId: number, targetUserSso: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/assign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ assigneeSso }),
+      body: JSON.stringify({ targetUserSso }),
     })
     return r.json()
   },
@@ -983,12 +1128,12 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async addTaskAttachment(taskId: number, fileName: string, fileUrl: string): Promise<ApiResponse<any>> {
+  async addTaskAttachment(taskId: number, title: string, url: string, attachmentType?: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/attachments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ fileName, fileUrl }),
+      body: JSON.stringify({ title, url, attachmentType }),
     })
     return r.json()
   },

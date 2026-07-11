@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Button, Card, Checkbox, Input, SegmentedControl } from '../../../components/common'
 import { useAuth } from '../../../contexts/AuthContext'
-import type { UserPreferences } from '../../../mocks/auth'
+
+type UserPreferences = {
+  theme: 'light' | 'dark' | 'system'
+  notifications: { email: boolean; push: boolean; inApp: boolean }
+}
 
 export default function AdminAccountSettings() {
   const { user, updateOwnProfile, changeOwnPassword, updateOwnPreferences } = useAuth()
@@ -12,12 +16,10 @@ export default function AdminAccountSettings() {
     avatarUrl: user?.avatarUrl ?? '',
   })
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
-  const initialPrefs = useMemo<UserPreferences>(() => (
-    user?.preferences ?? {
-      theme: 'system',
-      notifications: { email: true, push: true, inApp: true },
-    }
-  ), [user?.preferences])
+  const initialPrefs = useMemo<UserPreferences>(() => ({
+    theme: 'system',
+    notifications: { email: true, push: true, inApp: true },
+  }), [])
   const [preferences, setPreferences] = useState<UserPreferences>(initialPrefs)
   const [message, setMessage] = useState('')
 

@@ -19,6 +19,8 @@ import app.together.common.workflow.repository.PaymentTransactionRepository;
 import app.together.common.workflow.repository.TransactionRepository;
 import app.together.common.workflow.repository.UserMasterDataRepository;
 import app.together.workflow.payment.dto.PaymentDtos.*;
+import app.together.common.workflow.dto.CoinPackageDto;
+import app.together.common.workflow.mapper.CoinPackageMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +54,7 @@ public class PayOsService {
     private final TransactionRepository transactionRepository;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
+    private final CoinPackageMapper coinPackageMapper;
 
     @Value("${app.payment.payos.client-id}")
     private String payosClient;
@@ -67,6 +72,16 @@ public class PayOsService {
     private String cancelUrl;
 
     private String uriPayos = "https://api-merchant.payos.vn/v2/payment-requests";
+
+    /**
+     * Retrieves all active coin packages ordered by display order.
+     */
+    public List<CoinPackageDto> getActiveCoinPackages() {
+        return coinPackageRepository.findByIsActiveTrueOrderByDisplayOrderAsc()
+                .stream()
+                .map(coinPackageMapper::toDto)
+                .collect(Collectors.toList());
+    }
 
     /**
      * Tạo hóa đơn tạm và lấy link VietQR động của PayOS.
