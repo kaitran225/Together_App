@@ -14,6 +14,7 @@ public class DocumentAndMindmapDtos {
             Long fileSize,
             String fileType,
             String processingStatus,
+            String errorMessage,
             Integer pageCount,
             Integer wordCount,
             Instant lastAccessedAt) {
@@ -26,6 +27,11 @@ public class DocumentAndMindmapDtos {
             Long fileSize,
             String fileType,
             String mimeType
+    ) {
+    }
+
+    public record AskDocumentQuestionRequest(
+            String question
     ) {
     }
 

@@ -46,6 +46,16 @@ public class TaskService {
     private final TaskAttachmentRepository taskAttachmentRepository;
     private final TaskActivityRepository taskActivityRepository;
     private final PermissionCheckService permissionCheckService;
+    private final app.together.common.auth.repository.UserRepository userRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${app.email-service.base-url:http://localhost:8895}")
+    private String emailServiceBaseUrl;
+
+    @org.springframework.beans.factory.annotation.Value("${app.email-service.internal-api-key:dev-internal-email-key}")
+    private String internalApiKey;
+
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.public-base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
 
     /*
      * Tạo task mới
@@ -111,14 +121,17 @@ public class TaskService {
         TeamMember teamMember = getActiveTeamMember(task.getTeamId(), userSso);
         permissionCheckService.requireTeamRole(Permission.TASK_ASSIGN, teamMember.getRole());
 
-        // người được giao việc phải nằm tron danh sách thành viên
-        String targetUserSso = request.targetUserSso();
-        getActiveTeamMember(task.getTeamId(), targetUserSso);
+        // delete existing assignments
+        List<TaskAssignment> currentAssignments = taskAssignmentRepository.findByTaskId(taskId);
+        taskAssignmentRepository.deleteAll(currentAssignments);
 
-        TaskAssignmentId assignmentId = new TaskAssignmentId(taskId, targetUserSso);
-        if (taskAssignmentRepository.existsById(assignmentId)) {
-            throw new BadRequestException(MessageConstants.MESSAGE_TASK_ALREADY_ASSIGNED, targetUserSso);
+        String targetUserSso = request.targetUserSso();
+        if (targetUserSso == null || targetUserSso.isBlank()) {
+            return getTaskDetails(taskId, userSso);
         }
+
+        // người được giao việc phải nằm tron danh sách thành viên
+        getActiveTeamMember(task.getTeamId(), targetUserSso);
 
         TaskAssignment assignment = TaskAssignment.builder()
                 .taskId(taskId)
@@ -135,7 +148,40 @@ public class TaskService {
                 .newValue(targetUserSso)
                 .build());
 
+        // Send email notification to assignee
+        try {
+            userRepository.findByUserSso(targetUserSso).ifPresent(user -> {
+                if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                    sendAssignmentEmail(user.getEmail(), task.getTitle());
+                }
+            });
+        } catch (Exception e) {
+            // Log but don't fail transaction
+            System.err.println("Failed to send task assignment email: " + e.getMessage());
+        }
+
         return getTaskDetails(taskId, userSso);
+    }
+
+    private void sendAssignmentEmail(String toEmail, String taskTitle) {
+        try {
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            String json = String.format(
+                "{\"type\":\"TASK_ASSIGNED\",\"toEmail\":\"%s\",\"rawToken\":\"%s\",\"linkBaseUrl\":\"%s\"}",
+                toEmail,
+                taskTitle.replace("\"", "\\\""),
+                frontendBaseUrl
+            );
+            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(emailServiceBaseUrl + "/api/v1/internal/emails/transactional"))
+                .header("Content-Type", "application/json")
+                .header("X-Internal-Api-Key", internalApiKey)
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json))
+                .build();
+            client.sendAsync(req, java.net.http.HttpResponse.BodyHandlers.discarding());
+        } catch (Exception e) {
+            System.err.println("Failed to send task assignment email: " + e.getMessage());
+        }
     }
 
     /*
@@ -291,6 +337,48 @@ public class TaskService {
                 dependencies,
                 comments,
                 attachments);
+    }
+
+    // lấy team member hoạt động
+    @Transactional
+    public TaskDetailsResponse updateTask(Long taskId, String userSso, UpdateTaskRequest request) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, taskId));
+        TeamMember teamMember = getActiveTeamMember(task.getTeamId(), userSso);
+        permissionCheckService.requireTeamRole(Permission.TASK_UPDATE, teamMember.getRole());
+
+        if (request.title() != null && !request.title().isBlank()) {
+            task.setTitle(request.title());
+        }
+        if (request.description() != null) {
+            task.setDescription(request.description());
+        }
+        if (request.priority() != null) {
+            task.setPriority(request.priority());
+        }
+        if (request.startDate() != null) {
+            task.setStartDate(request.startDate());
+        }
+        if (request.dueDate() != null) {
+            task.setDueDate(request.dueDate());
+        }
+        if (request.completedAt() != null) {
+            task.setCompletedAt(request.completedAt());
+        }
+        if (request.status() != null) {
+            task.setStatus(request.status());
+        }
+
+        taskRepository.save(task);
+
+        taskActivityRepository.save(TaskActivity.builder()
+                .taskId(taskId)
+                .userSso(userSso)
+                .activityType(TaskActivityStatus.UPDATE_TASK.name())
+                .newValue("Updated task fields")
+                .build());
+
+        return getTaskDetails(taskId, userSso);
     }
 
     // lấy team member hoạt động

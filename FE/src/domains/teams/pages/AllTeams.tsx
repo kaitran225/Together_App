@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, IconButton, Input, SettingsIcon, Modal, Card, Checkbox } from '../../../components/common'
+import { Button, Input, Modal, Card, Checkbox } from '../../../components/common'
 import { myTeamsData, archivedData } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 
@@ -70,7 +70,7 @@ export default function AllTeams() {
   const [newTeamDesc, setNewTeamDesc] = useState('')
   const [newTeamAvatar, setNewTeamAvatar] = useState('')
   const [newTeamIsPrivate, setNewTeamIsPrivate] = useState(false)
-  const [newTeamMaxMembers, setNewTeamMaxMembers] = useState(20)
+  const [newTeamMaxMembers, setNewTeamMaxMembers] = useState(4)
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -128,7 +128,7 @@ export default function AllTeams() {
         setNewTeamDesc('')
         setNewTeamAvatar('')
         setNewTeamIsPrivate(false)
-        setNewTeamMaxMembers(20)
+        setNewTeamMaxMembers(4)
         loadTeams()
       } else {
         setError(res.message || 'Failed to create team.')
@@ -178,35 +178,6 @@ export default function AllTeams() {
             <h1 className="text-base md:text-lg font-bold text-neutral-900 truncate tracking-tight">MY TEAMS</h1>
             <p className="text-xs text-neutral-500 truncate hidden sm:block">Join the study room and focus together as much as you can.</p>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 justify-end min-w-0">
-        <span className="px-3 py-1.5 text-sm border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)] font-semibold text-neutral-900">Study entries 4/5</span>
-          <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)] font-semibold text-neutral-900">
-            <svg className="w-3.5 h-3.5 text-neutral-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <path d="M12 23c-4.97 0-9-2.58-9-7 0-2.9 1.5-5.2 3.8-6.5C5.5 8.5 4 6.1 4 3.5 4 1 7 0 9.5 0c2 0 3.5 1 4.2 2.5 1.5-1.5 3.5-2.5 5.8-2.5C21 0 24 1 24 3.5c0 2.6-1.5 5-2.8 6 2.3 1.3 3.8 3.6 3.8 6.5 0 4.42-4.03 7-9 7z" />
-            </svg>
-            Study streak 15 Days
-          </span>
-          <div className="relative w-full min-w-0 max-w-[14rem] sm:w-44">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" aria-hidden>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </span>
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="w-full h-9 min-h-0 pl-8 pr-2 py-1.5 text-sm"
-              aria-label="Search"
-            />
-          </div>
-          <IconButton type="button" className="w-9 h-9" icon={<SettingsIcon className="w-4 h-4" />} label="Settings" />
-          <Link to="/notifications" className="w-9 h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-neutral-600 flex items-center justify-center hover:bg-[var(--color-charcoal)] hover:border-primary/40 transition-colors" aria-label="Notifications">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-          </Link>
-          
         </div>
        </div>
 
@@ -293,19 +264,68 @@ export default function AllTeams() {
               value={newTeamDesc}
               onChange={(e) => setNewTeamDesc(e.target.value)}
             />
-            <Input
-              label="Avatar URL"
-              placeholder="https://example.com/avatar.png"
-              value={newTeamAvatar}
-              onChange={(e) => setNewTeamAvatar(e.target.value)}
-            />
-            <Input
-              label="Max Members"
-              type="number"
-              min={1}
-              value={newTeamMaxMembers}
-              onChange={(e) => setNewTeamMaxMembers(parseInt(e.target.value) || 20)}
-            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-neutral-700">Team Avatar</label>
+              <div className="flex items-center gap-3">
+                {newTeamAvatar ? (
+                  <img src={newTeamAvatar} alt="Team Preview" className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] flex items-center justify-center text-neutral-400 font-bold text-xs uppercase">
+                    No avt
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="team-avatar-upload"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.size > 2 * 1024 * 1024) {
+                          setError('Image size must be less than 2MB')
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onload = (event) => {
+                          setNewTeamAvatar(event.target?.result as string)
+                          setError('')
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="team-avatar-upload"
+                    className="inline-flex items-center justify-center px-3 py-1.5 border border-[var(--color-border)] rounded-md text-xs font-semibold text-neutral-800 bg-[var(--color-charcoal)] hover:bg-[var(--color-border)] cursor-pointer transition-colors"
+                  >
+                    Upload Image
+                  </label>
+                  {newTeamAvatar && (
+                    <button
+                      type="button"
+                      onClick={() => setNewTeamAvatar('')}
+                      className="ml-2 text-xs text-red-600 hover:text-red-700 font-semibold"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-neutral-700">Số lượng thành viên tối đa (4 - 6)</label>
+              <select
+                value={newTeamMaxMembers}
+                onChange={(e) => setNewTeamMaxMembers(parseInt(e.target.value))}
+                className="w-full px-3 py-1.5 border border-[var(--color-border)] bg-[var(--color-surface)] rounded-md text-sm focus:outline-none"
+              >
+                <option value={4}>4 slots</option>
+                <option value={5}>5 slots</option>
+                <option value={6}>6 slots</option>
+              </select>
+            </div>
             <div className="flex items-center gap-2 py-1">
               <Checkbox
                 label="Private Team"
@@ -348,3 +368,4 @@ export default function AllTeams() {
     </div>
   )
 }
+

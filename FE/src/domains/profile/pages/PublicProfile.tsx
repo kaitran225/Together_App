@@ -1,23 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { authApi } from '../../../api/client'
-import { Card } from '../../../components/common'
+import { authApi, workflowApi } from '../../../api/client'
+import { Card, Modal } from '../../../components/common'
 import type { UserDto } from '../../../types/dto'
 
 export default function PublicProfile() {
   const { sso } = useParams<{ sso: string }>()
   const [profile, setProfile] = useState<UserDto | null>(null)
+  const [achievements, setAchievements] = useState<any[]>([])
+  const [selectedAchievement, setSelectedAchievement] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!sso) return
-    authApi.getPublicProfile(sso)
-      .then(res => {
-        if (res.success && res.data) {
-          setProfile(res.data)
+    setLoading(true)
+    Promise.all([
+      authApi.getPublicProfile(sso),
+      workflowApi.getPublicAchievements(sso)
+    ])
+      .then(([profileRes, achievementsRes]) => {
+        if (profileRes.success && profileRes.data) {
+          setProfile(profileRes.data)
         } else {
           setError('User not found.')
+        }
+        if (achievementsRes.success && achievementsRes.data) {
+          setAchievements(achievementsRes.data)
         }
       })
       .catch(err => {
@@ -100,6 +109,55 @@ export default function PublicProfile() {
               )}
             </div>
 
+            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">Achievements</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {achievements && achievements.length > 0 ? (
+                achievements.map((ach) => {
+                  const unlocked = ach.isUnlocked
+                  return (
+                    <div
+                      key={ach.achievementId}
+                      onClick={() => setSelectedAchievement(ach)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+                        unlocked
+                          ? 'bg-amber-50/40 border-amber-200 shadow-sm hover:border-amber-300'
+                          : 'bg-neutral-50/50 border-neutral-200/60 opacity-60 hover:opacity-85'
+                      }`}
+                    >
+                      <div
+                        className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 overflow-hidden bg-white p-1 border ${
+                          unlocked ? 'border-amber-200' : 'border-neutral-200'
+                        }`}
+                      >
+                        <img
+                          src={ach.iconUrl || 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png'}
+                          alt={ach.displayName}
+                          className={`w-full h-full object-contain ${unlocked ? '' : 'grayscale'}`}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-sm font-bold text-neutral-800 truncate">{ach.displayName}</p>
+                          {unlocked ? (
+                            <span className="text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-md shrink-0">
+                              Unlocked
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold uppercase bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded-md shrink-0">
+                              Locked
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-neutral-500 line-clamp-2 mt-0.5">{ach.description}</p>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="text-sm text-neutral-500 italic col-span-2">No achievements found.</p>
+              )}
+            </div>
+
             <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">Learning Goals</h2>
             <ul className="space-y-3">
               {profile.learningGoals && profile.learningGoals.length > 0 ? (
@@ -121,6 +179,77 @@ export default function PublicProfile() {
         </div>
 
       </div>
+      {selectedAchievement && (
+        <Modal
+          open={!!selectedAchievement}
+          onClose={() => setSelectedAchievement(null)}
+          title="Chi Tiết Thành Tựu"
+          size="max-w-md"
+        >
+          <div className="flex flex-col items-center text-center gap-4">
+            <div
+              className={`w-20 h-20 rounded-full flex items-center justify-center p-2 border-2 ${
+                selectedAchievement.isUnlocked
+                  ? 'bg-amber-50 border-amber-300 shadow-md'
+                  : 'bg-neutral-50 border-dashed border-neutral-350 opacity-60'
+              }`}
+            >
+              <img
+                src={selectedAchievement.iconUrl || 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png'}
+                alt={selectedAchievement.displayName}
+                className={`w-full h-full object-contain ${
+                  selectedAchievement.isUnlocked ? '' : 'grayscale'
+                }`}
+              />
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-extrabold text-neutral-800">{selectedAchievement.displayName}</h3>
+              <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider mt-1">
+                Yêu cầu: {selectedAchievement.requirementType}
+              </p>
+            </div>
+
+            <p className="text-sm text-neutral-600 px-2 leading-relaxed">
+              {selectedAchievement.description}
+            </p>
+
+            <div className="w-full bg-neutral-50 rounded-xl p-3 border border-neutral-100 mt-2 flex flex-col gap-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-neutral-500 font-semibold">Mục tiêu</span>
+                <span className="text-neutral-800 font-bold">
+                  {selectedAchievement.requirementValue} {selectedAchievement.requirementType === 'STREAK' ? 'Ngày liên tiếp' : selectedAchievement.requirementType === 'LEVEL' ? 'Cấp độ' : 'EXP'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-2">
+                <span className="text-neutral-500 font-semibold">Phần thưởng</span>
+                <span className="text-amber-600 font-bold flex items-center gap-1">
+                  +{selectedAchievement.expReward} EXP · +{selectedAchievement.coinReward} xu
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-2">
+                <span className="text-neutral-500 font-semibold">Trạng thái</span>
+                {selectedAchievement.isUnlocked ? (
+                  <span className="text-green-600 font-bold uppercase tracking-wider text-[10px]">
+                    Đã mở khóa
+                  </span>
+                ) : (
+                  <span className="text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
+                    Chưa đạt được
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedAchievement(null)}
+              className="mt-4 w-full py-2 bg-primary text-white text-sm font-bold rounded-xl shadow-md hover:bg-primary-dark transition-all active:scale-[0.98]"
+            >
+              Đóng
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

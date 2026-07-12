@@ -6,7 +6,9 @@ import app.together.common.workflow.entity.ChatConversation;
 import app.together.common.workflow.entity.ChatMessage;
 import app.together.common.workflow.repository.ChatConversationRepository;
 import app.together.common.workflow.repository.ChatMessageRepository;
-import app.together.workflow.personal.client.AiServiceClient;
+import app.together.common.workflow.repository.DocumentRepository;
+import app.together.common.workflow.entity.Document;
+import app.together.workflow.personal.service.ai.OllamaAiService;
 import app.together.workflow.personal.dto.ChatDtos.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +25,8 @@ import java.util.List;
 public class PersonalChatService {
     private final ChatConversationRepository chatConversationRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final AiServiceClient aiServiceClient; // Feign Client kết nối sang AI Service (như trong sơ đồ)
+    private final DocumentRepository documentRepository;
+    private final OllamaAiService ollamaAiService;
 
     /**
      * Tạo một luồng hội thoại chat mới với Chatbot AI.
@@ -63,15 +66,24 @@ public class PersonalChatService {
                 .build();
         chatMessageRepository.save(userMessage);
 
-        // 2. Sử dụng Feign Client gọi sang AI Service (FastAPI AI Server) như đúng sơ đồ kiến trúc của bạn
-        // AI Service sẽ xử lý: Prompt Builder -> LLM Chatbot -> Tool Executioner -> Trả về JSON Type
+        // 2. Sử dụng Ollama (Qwen2.5:3b) để sinh câu trả lời
         AiServiceResponse aiResponse;
         try {
-            aiResponse = aiServiceClient.getMessage(request.messageText().trim());
+            if (request.documentId() != null) {
+                Document document = documentRepository.findById(request.documentId()).orElse(null);
+                if (document != null && document.getExtractedText() != null && !document.getExtractedText().isBlank()) {
+                    String answer = ollamaAiService.answerQuestionFromDocument(document.getExtractedText(), request.messageText().trim());
+                    aiResponse = new AiServiceResponse(answer, "CHAT", "{}");
+                } else {
+                    aiResponse = ollamaAiService.chat(request.messageText().trim());
+                }
+            } else {
+                aiResponse = ollamaAiService.chat(request.messageText().trim());
+            }
         } catch (Exception e) {
-            log.error("Failed to call AI Service, returning offline fallback response", e);
+            log.error("Failed to call Ollama, returning offline fallback response", e);
             aiResponse = new AiServiceResponse(
-                "Xin chào! Tôi là Together AI Chatbot. Hiện tại kết nối đến AI Service đang ngoại tuyến, tôi đang phản hồi ở chế độ offline. Tôi có thể giúp gì cho bạn?",
+                "Xin chào! Tôi là Together AI Chatbot (Qwen2.5). Hiện tại kết nối đến AI Service đang ngoại tuyến, tôi đang phản hồi ở chế độ offline. Tôi có thể giúp gì cho bạn?",
                 "CHAT",
                 "{}"
             );

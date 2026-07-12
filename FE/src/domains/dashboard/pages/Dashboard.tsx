@@ -26,6 +26,8 @@ export default function Dashboard() {
   const [noteText, setNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [selectedNote, setSelectedNote] = useState<any | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number>(0)
+  const [weeklyHours, setWeeklyHours] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
 
   // Thêm task mới
   const [showAddTaskModal, setShowAddTaskModal] = useState(false)
@@ -76,6 +78,14 @@ export default function Dashboard() {
           localStorage.removeItem('active_study_session_id')
           // Tự động tải lại profile để cập nhật EXP, Level, Streak mới nhất
           await refreshProfile()
+          try {
+            const weeklyRes = await workflowApi.getWeeklyStudyHours()
+            if (weeklyRes.success && weeklyRes.data) {
+              setWeeklyHours(weeklyRes.data)
+            }
+          } catch (err) {
+            console.error('Error reloading weekly hours:', err)
+          }
         } else {
           alert(res.message || 'Không thể kết thúc phiên học.')
         }
@@ -229,6 +239,22 @@ export default function Dashboard() {
         }
       })
       .catch(() => {})
+
+    workflowApi.getUserWallet()
+      .then((res) => {
+        if (res.success && res.data) {
+          setWalletBalance(res.data.balance || 0)
+        }
+      })
+      .catch(() => {})
+
+    workflowApi.getWeeklyStudyHours()
+      .then((res) => {
+        if (res.success && res.data) {
+          setWeeklyHours(res.data)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const handleSaveNote = async () => {
@@ -249,8 +275,6 @@ export default function Dashboard() {
       setSavingNote(false)
     }
   }
-  const levelMult = user?.level || 1
-  const streakMult = user?.streak || 0
   const totalExp = user?.exp ?? 0
   
   let tempLevel = 1
@@ -270,15 +294,15 @@ export default function Dashboard() {
   const userLevel = tempLevel
   const currentLevelXp = remainingExp
   const xpTarget = nextLevelExp
-  const studyBars = [
-    { day: 'M', h: Math.min(30 + levelMult * 5, 90), label: `${((30 + levelMult * 5) * 0.1).toFixed(1)}h`, active: true },
-    { day: 'T', h: Math.min(45 + streakMult * 10, 95), label: `${((45 + streakMult * 10) * 0.1).toFixed(1)}h`, active: true },
-    { day: 'W', h: Math.min(20 + levelMult * 3, 85), label: `${((20 + levelMult * 3) * 0.1).toFixed(1)}h`, active: false },
-    { day: 'T', h: Math.min(60 + streakMult * 8, 100), label: `${((60 + streakMult * 8) * 0.1).toFixed(1)}h`, active: true },
-    { day: 'F', h: Math.min(15 + levelMult * 4, 80), label: `${((15 + levelMult * 4) * 0.1).toFixed(1)}h`, active: false },
-    { day: 'S', h: Math.min(70 + streakMult * 5, 95), label: `${((70 + streakMult * 5) * 0.1).toFixed(1)}h`, active: true },
-    { day: 'S', h: Math.min(10 + levelMult * 10, 90), label: `${((10 + levelMult * 10) * 0.1).toFixed(1)}h`, active: false },
-  ]
+
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const maxHours = Math.max(...weeklyHours, 2)
+  const studyBars = weeklyHours.map((hours, i) => ({
+    day: days[i],
+    h: Math.max((hours / maxHours) * 100, 10),
+    label: `${hours.toFixed(1)}h`,
+    active: hours > 0
+  }))
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -362,11 +386,18 @@ export default function Dashboard() {
             />
           </div>
         </Card>
-        <Card variant="interactive" className={`flex items-center gap-3 py-3 ${cardCompact}`}>
+        <Card variant="interactive" className={`flex items-center justify-between gap-3 py-3 ${cardCompact}`}>
           <div className="min-w-0">
             <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.plan')}</p>
             <p className="text-2xl font-extrabold text-neutral-900">{user?.planType ?? 'FREE'}</p>
             <Badge variant="focus" className="mt-1 normal-case tracking-normal">{user?.systemRole ?? 'USER'}</Badge>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.walletBalance')}</p>
+            <p className="text-2xl font-extrabold text-primary">{walletBalance.toLocaleString()} Xu</p>
+            <Link to="/shop">
+              <Badge variant="streak" className="mt-1 normal-case tracking-normal cursor-pointer hover:brightness-95 transition-all">{t('dashboard.topUp')}</Badge>
+            </Link>
           </div>
         </Card>
       </div>
@@ -430,10 +461,9 @@ export default function Dashboard() {
           )}
         </Card>
 
-        <Card variant="featured" className={`${cardCompact}`} heading="Study time today">
+        <Card variant="featured" className={`${cardCompact}`} heading="Study time Weekly">
           <div className="flex justify-between items-center mb-2">
             <Badge variant="primary" className="normal-case tracking-normal">Weekly pace</Badge>
-            <Button variant="ghost" size="sm" className="text-xs">View analytics</Button>
           </div>
           <div className="flex items-end gap-1.5 h-[180px]">
             {studyBars.map((b, i) => (
@@ -513,19 +543,17 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-[58fr_42fr] gap-3">
           <Card variant="interactive" className={`${cardCompact}`}>
-            <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
-              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Upcoming tasks</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
+              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500 break-words">
+                Upcoming tasks
+              </h3>
+              
               <div className="flex items-center gap-1.5 shrink-0">
-                <Button
-                  variant="tonal"
-                  size="sm"
-                  onClick={() => setShowAddTaskModal(true)}
-                  className="font-semibold"
-                >
-                  + Add task
+                <Button variant="tonal" size="sm" onClick={() => setShowAddTaskModal(true)} className="font-semibold text-xs px-2">
+                  + Add
                 </Button>
                 <Link to="/teams">
-                  <Button variant="tonal" size="sm">View boards</Button>
+                  <Button variant="tonal" size="sm" className="text-xs px-2">Boards</Button>
                 </Link>
               </div>
             </div>

@@ -9,7 +9,10 @@ import app.together.common.workflow.enums.ProcessingStatus;
 import app.together.common.workflow.repository.DocumentRepository;
 import app.together.common.workflow.repository.MindmapRepository;
 import app.together.workflow.personal.dto.DocumentAndMindmapDtos.*;
+import app.together.workflow.personal.service.ai.DocumentProcessingWorker;
+import app.together.workflow.personal.service.ai.OllamaAiService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,27 +22,52 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class DocumentAndMindmapService {
 
     private final DocumentRepository documentRepository;
     private final MindmapRepository mindmapRepository;
+    private final DocumentProcessingWorker documentProcessingWorker;
+    private final OllamaAiService ollamaAiService;
 
-    // Quản lý tài liệu
-    public DocumentResponse uploadDocument(String userSso, UploadDocumentRequest request) {
+    // Quản lý tài liệu
+    public DocumentResponse uploadDocumentFile(String userSso, org.springframework.web.multipart.MultipartFile file, String title) throws java.io.IOException {
         requireUserSso(userSso);
+        
+        long fileSize = file.getSize();
+        String originalFilename = file.getOriginalFilename();
+        String contentType = file.getContentType();
+        
+        // Save file locally to a temp directory
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("upload_", "_" + originalFilename);
+        file.transferTo(tempFile.toFile());
+        
+        String actualTitle = title != null && !title.isEmpty() ? title : originalFilename;
+        
         Document document = Document.builder()
                 .userSso(userSso)
-                .title(request.title().trim())
-                .filePath(request.filePath().trim())
-                .fileName(request.fileName().trim())
-                .fileSize(request.fileSize())
-                .fileType(request.fileType())
-                .mimeType(request.mimeType())
+                .title(actualTitle)
+                .filePath(tempFile.toAbsolutePath().toString())
+                .fileName(originalFilename)
+                .fileSize(fileSize)
+                .fileType("PDF")
+                .mimeType(contentType != null ? contentType : "application/pdf")
                 .processingStatus(ProcessingStatus.PROCESSING.toString())
                 .lastAccessedAt(Instant.now())
                 .build();
 
         Document saved = documentRepository.save(document);
+
+        // Kích hoạt xử lý bất đồng bộ: trích xuất text PDF + tạo Mindmap bằng AI
+        if (isPdfFile(document.getMimeType()) || (originalFilename != null && originalFilename.toLowerCase().endsWith(".pdf"))) {
+            log.info("File PDF detected, kích hoạt xử lý AI bất đồng bộ cho document ID: {}", saved.getDocumentId());
+            documentProcessingWorker.processDocumentAsync(saved.getDocumentId());
+        } else {
+            log.info("File không phải PDF ({}), bỏ qua xử lý AI tự động.", document.getMimeType());
+            saved.setProcessingStatus(ProcessingStatus.COMPLETED.toString());
+            documentRepository.save(saved);
+        }
+
         return toDocumentResponse(saved);
     }
 
@@ -64,7 +92,7 @@ public class DocumentAndMindmapService {
         documentRepository.save(document);
     }
 
-    // Quản lý Mindmap
+    // Quản lý Mindmap
     public MindmapResponse saveMindmap(String userSso, SaveMindmapRequest request) {
         requireUserSso(userSso);
         if (request.documentId() != null) {
@@ -94,10 +122,35 @@ public class DocumentAndMindmapService {
                 .toList();
     }
 
+    /**
+     * Hỏi đáp dựa trên nội dung tài liệu đã trích xuất.
+     * Sử dụng Ollama (Qwen2.5) để trả lời câu hỏi dựa trên extractedText.
+     */
+    @Transactional(readOnly = true)
+    public String askDocumentQuestion(Long documentId, String userSso, AskDocumentQuestionRequest request) {
+        requireUserSso(userSso);
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_DOCUMENT_NOT_FOUND, documentId));
+
+        if (!document.getUserSso().equals(userSso)) {
+            throw new BadRequestException(MessageConstants.MESSAGE_PERMISSION_DENIED);
+        }
+
+        if (document.getExtractedText() == null || document.getExtractedText().isBlank()) {
+            throw new BadRequestException("Tài liệu chưa được trích xuất nội dung hoặc đang trong quá trình xử lý.");
+        }
+
+        return ollamaAiService.answerQuestionFromDocument(document.getExtractedText(), request.question());
+    }
+
     private void requireUserSso(String userSso) {
         if (userSso == null || userSso.isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
         }
+    }
+
+    private boolean isPdfFile(String mimeType) {
+        return mimeType != null && mimeType.equalsIgnoreCase("application/pdf");
     }
 
     private DocumentResponse toDocumentResponse(Document document) {
@@ -109,6 +162,7 @@ public class DocumentAndMindmapService {
                 document.getFileSize(),
                 document.getFileType(),
                 document.getProcessingStatus(),
+                document.getErrorMessage(),
                 document.getPageCount(),
                 document.getWordCount(),
                 document.getLastAccessedAt()
@@ -119,7 +173,7 @@ public class DocumentAndMindmapService {
         return new MindmapResponse(
                 mindmap.getMindmapId(),
                 mindmap.getDocumentId(),
-                mindmap.getUserSso(),
+                mindmap.getTitle(),
                 mindmap.getContent(),
                 mindmap.getThumbnailUrl()
         );

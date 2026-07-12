@@ -4,6 +4,7 @@ import { IconButton } from '../common'
 import { ThemeSwitch } from '../ThemeSwitch'
 import { LanguageSwitch } from '../LanguageSwitch'
 import { useState } from 'react'
+import { useTranslation } from '../../contexts/LanguageContext'
 
 type BreadcrumbItem = { label: string; href?: string }
 
@@ -112,6 +113,7 @@ const Chevron = () => (
 
 export function DashboardHeader() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
   const location = useLocation()
   const pathname = location.pathname
   const isAdminView = pathname.startsWith('/admin')
@@ -223,14 +225,20 @@ export function DashboardHeader() {
           <>
             <LanguageSwitch />
             <ThemeSwitch />
-        <IconButton
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-neutral-500 dark:text-neutral-500 flex-shrink-0"
-          label="Settings"
-          icon={<svg className="w-4 h-4" viewBox="0 0 21 20" fill="none" aria-hidden><path d="M7.3 20L6.9 16.8C6.68 16.72 6.48 16.62 6.29 16.5 6.1 16.38 5.91 16.26 5.73 16.13L2.75 17.38 0 12.63l2.58-2.95c-.02-.12-.03-.23-.03-.34 0-.11 0-.22.03-.33L0 7.38 2.75 2.63l5.73 1.25c.18-.13.37-.26.56-.37.2-.12.4-.22.6-.3L9.05 0h3.8l.4 3.2c.22.08.42.18.62.3.2.12.39.25.56.38l5.73-1.25L20.1 7.38l-2.58 2.95c.02.12.03.23.03.34 0 .11 0 .22-.03.33L20.08 12.63 17.33 17.37l-4.95-1.25c-.18.13-.36.26-.56.38-.2.12-.4.22-.6.3L12.8 20H7.3z" fill="currentColor" fillOpacity="0.5" /></svg>}
-        />
+        <Link to="/transaction" title={t('shop.history')}>
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-neutral-500 dark:text-neutral-500 flex-shrink-0"
+            label={t('shop.history')}
+            icon={
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            }
+          />
+        </Link>
         <Link
           to="/notifications"
           className="w-8 h-8 inline-flex items-center justify-center rounded-full text-neutral-500 hover:bg-white/10 hover:text-neutral-900 flex-shrink-0 transition-colors duration-150"

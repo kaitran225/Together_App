@@ -5,5 +5,6 @@ package app.together.common.email.api;
  */
 public enum EmailDispatchType {
     VERIFY_ACCOUNT,
-    PASSWORD_RESET
+    PASSWORD_RESET,
+    TASK_ASSIGNED
 }

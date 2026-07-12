@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.DayOfWeek;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -125,6 +129,35 @@ public class NoteAndSessionService {
         if (userSso == null || userSso.isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Double> getWeeklyStudyHours(String userSso) {
+        requireUserSso(userSso);
+        UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
+                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
+
+        List<StudySession> sessions = studySessionRepository.findByUserMasterDataId(masterData.getMasterDataId());
+        
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(DayOfWeek.MONDAY);
+        
+        double[] hoursPerDay = new double[7]; // 0: Mon, 1: Tue, ... 6: Sun
+        
+        for (StudySession session : sessions) {
+            if (session.getStartTime() == null) continue;
+            Instant end = session.getEndTime() != null ? session.getEndTime() : Instant.now();
+            LocalDate sessionDate = session.getStartTime().atZone(ZoneId.systemDefault()).toLocalDate();
+            
+            if (!sessionDate.isBefore(monday) && !sessionDate.isAfter(monday.plusDays(6))) {
+                int dayIndex = sessionDate.getDayOfWeek().getValue() - 1;
+                long durationSeconds = Duration.between(session.getStartTime(), end).toSeconds();
+                double durationHours = (double) durationSeconds / 3600.0;
+                hoursPerDay[dayIndex] += durationHours;
+            }
+        }
+        
+        return Arrays.stream(hoursPerDay).boxed().toList();
     }
 
     public QuickNoteResponse toQuickNoteResponse(QuickNote q) {

@@ -16,10 +16,12 @@ public class DocumentAndMindmapController {
 
     private final DocumentAndMindmapService documentAndMindmapService;
 
-    @PostMapping("/documents")
-    public ApiResponse<DocumentResponse> uploadDocument(@RequestBody UploadDocumentRequest request) {
+    @PostMapping(value = "/documents", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<DocumentResponse> uploadDocument(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "title", required = false) String title) throws java.io.IOException {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
-        return ApiResponse.ok(documentAndMindmapService.uploadDocument(currentUserSso, request));
+        return ApiResponse.ok(documentAndMindmapService.uploadDocumentFile(currentUserSso, file, title));
     }
 
     @GetMapping("/documents")
@@ -33,6 +35,20 @@ public class DocumentAndMindmapController {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         documentAndMindmapService.deleteDocument(documentId, currentUserSso);
         return ApiResponse.ok(null);
+    }
+
+    /**
+     * Hỏi đáp dựa trên nội dung tài liệu.
+     * Gửi câu hỏi kèm documentId, hệ thống sẽ dùng nội dung đã trích xuất
+     * để trả lời thông qua model Qwen2.5 (Ollama).
+     */
+    @PostMapping("/documents/{documentId}/ask")
+    public ApiResponse<String> askDocumentQuestion(
+            @PathVariable Long documentId,
+            @RequestBody AskDocumentQuestionRequest request) {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        String answer = documentAndMindmapService.askDocumentQuestion(documentId, currentUserSso, request);
+        return ApiResponse.ok(answer);
     }
 
     @PostMapping("/mindmaps")

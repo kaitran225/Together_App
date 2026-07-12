@@ -32,4 +32,10 @@ public class PayOsController {
     public ApiResponse<List<CoinPackageDto>> getCoinPackages() {
         return ApiResponse.ok(payOsService.getActiveCoinPackages());
     }
+
+    @GetMapping("/wallet")
+    public ApiResponse<app.together.common.auth.dto.UserWalletDto> getWallet() {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(payOsService.getUserWallet(currentUserSso));
+    }
 }

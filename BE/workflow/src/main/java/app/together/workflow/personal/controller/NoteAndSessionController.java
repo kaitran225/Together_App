@@ -46,4 +46,10 @@ public class NoteAndSessionController {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(noteAndSessionService.endStudySession(sessionId, currentUserSso));
     }
+
+    @GetMapping("/sessions/weekly")
+    public ApiResponse<List<Double>> getWeeklyStudyHours(){
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(noteAndSessionService.getWeeklyStudyHours(currentUserSso));
+    }
 }

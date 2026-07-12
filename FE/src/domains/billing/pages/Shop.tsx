@@ -13,12 +13,15 @@ const PACK_ICONS = [
 ]
 
 export default function Shop() {
-  const balance = 0
+  const [balance, setBalance] = useState<number>(0)
   const [packages, setPackages] = useState<any[]>([])
 
   useEffect(() => {
     workflowApi.getCoinPackages().then(res => {
       if (res.success && res.data) setPackages(res.data)
+    })
+    workflowApi.getUserWallet().then(res => {
+      if (res.success && res.data) setBalance(res.data.balance || 0)
     })
   }, [])
 

@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * Workflow service baseline: room management + WebSocket signaling.
  */
 @SpringBootApplication(scanBasePackages = { "app.together.workflow", "app.together.common.shared",
-        "app.together.common.workflow" })
+        "app.together.common.workflow", "app.together.common.auth.mapper" })
 @EnableJpaRepositories(basePackages = { "app.together" })
 @EntityScan(basePackages = { "app.together" })
 @ConfigurationPropertiesScan(basePackageClasses = RoomMediaProperties.class)

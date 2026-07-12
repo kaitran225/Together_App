@@ -54,6 +54,7 @@ public class ResourceServerConfig {
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payos/webhook")).permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payment/payos/webhook")).permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payment/coin-packages")).permitAll()
+                                                .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/public/**")).permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/error")).permitAll()
                                                 .anyRequest().authenticated())
                                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));

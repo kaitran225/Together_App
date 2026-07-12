@@ -21,6 +21,8 @@ import app.together.common.workflow.repository.UserMasterDataRepository;
 import app.together.workflow.payment.dto.PaymentDtos.*;
 import app.together.common.workflow.dto.CoinPackageDto;
 import app.together.common.workflow.mapper.CoinPackageMapper;
+import app.together.common.auth.dto.UserWalletDto;
+import app.together.common.auth.mapper.UserWalletMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +57,7 @@ public class PayOsService {
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final CoinPackageMapper coinPackageMapper;
+    private final UserWalletMapper userWalletMapper;
 
     @Value("${app.payment.payos.client-id}")
     private String payosClient;
@@ -265,6 +268,23 @@ public class PayOsService {
         if (userSso == null || userSso.isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_NOT_AUTHENTICATED);
         }
+    }
+
+    public UserWalletDto getUserWallet(String userSso) {
+        requireUserSso(userSso);
+        User user = userRepository.findByUserSso(userSso)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_USER_NOT_FOUND, userSso));
+        UserWallet wallet = userWalletRepository.findByUserId(user.getUserId())
+                .orElseGet(() -> userWalletRepository.save(UserWallet.builder()
+                        .userId(user.getUserId())
+                        .balance(0)
+                        .bonusBalance(0)
+                        .pendingBalance(0)
+                        .lifetimeEarned(0)
+                        .lifetimeSpent(0)
+                        .status(WalletStatus.ACTIVE)
+                        .build()));
+        return userWalletMapper.toDto(wallet);
     }
 
 }

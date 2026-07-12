@@ -60,4 +60,12 @@ public class TaskController {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(taskService.addAttachment(taskId, currentUserSso, request));
     }
+
+    @PutMapping("/tasks/{taskId}")
+    public ApiResponse<TaskDetailsResponse> updateTask(
+            @PathVariable Long taskId,
+            @RequestBody UpdateTaskRequest request) {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(taskService.updateTask(taskId, currentUserSso, request));
+    }
 }

@@ -87,11 +87,9 @@ public class PersonalQuizService {
                     .build();
             Quiz savedQuiz = quizRepository.save(quiz);
 
-            // 2. Phân rã mảng questions và lưu danh sách Câu hỏi (QuizQuestion)
             if (aiQuiz.questions() != null) {
                 int position = 1;
                 for (var aiQuestion : aiQuiz.questions()) {
-                    // Chuyển đổi mảng Options sang chuỗi định dạng JSONB để lưu trữ
                     String optionJson = objectMapper.writeValueAsString(aiQuestion.options());
 
                     QuizQuestion question = QuizQuestion.builder()
@@ -99,9 +97,9 @@ public class PersonalQuizService {
                             .questionType(
                                     aiQuestion.questionType() != null ? aiQuestion.questionType().trim().toUpperCase()
                                             : QuestionType.SINGLE_CHOICE.name())
-                            .questionText(aiQuestion.questionText().trim())
+                            .questionText(aiQuestion.questionText() != null ? aiQuestion.questionText().trim() : "Câu hỏi bị trống")
                             .options(optionJson)
-                            .correctAnswer(aiQuestion.correctAnswer().trim())
+                            .correctAnswer(aiQuestion.correctAnswer() != null ? aiQuestion.correctAnswer().trim() : "")
                             .explanation(aiQuestion.explanation())
                             .points(aiQuestion.points() != null ? aiQuestion.points() : 0)
                             .position(position++)

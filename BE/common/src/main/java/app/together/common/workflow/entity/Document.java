@@ -71,6 +71,9 @@ public class Document extends BaseAuditEntity {
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 
+    @Column(name = "extracted_text", columnDefinition = "TEXT")
+    String extractedText;
+
     @Column(name = "last_accessed_at")
     Instant lastAccessedAt;
 

@@ -2,9 +2,52 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, Modal, QuizletQuizModal, Textarea } from '../../../components/common'
 import { ThemeSwitch } from '../../../components/ThemeSwitch'
-import { MOCK_QUIZLET_CARDS, ACCEPT_FILES, MAX_FILE_SIZE_MB } from '../../../mocks'
+import { FlashcardModal } from '../../../components/FlashcardModal'
+import { ACCEPT_FILES, MAX_FILE_SIZE_MB } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
+
+const MessageRenderer = ({ text }: { text: string }) => {
+  try {
+    let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    const firstBrace = cleanText.indexOf('{');
+    const lastBrace = cleanText.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonStr = cleanText.substring(firstBrace, lastBrace + 1);
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.nodes && Array.isArray(parsed.nodes)) {
+        return (
+          <>
+            {firstBrace > 0 && <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{cleanText.substring(0, firstBrace).trim()}</p>}
+            <div className="mt-2 text-xs bg-white/50 p-3 rounded-lg border border-primary/20 shadow-sm">
+              <p className="font-bold mb-3 text-primary text-sm">{parsed.title || 'Mindmap'}</p>
+            <ul className="pl-2 space-y-2 border-l-2 border-primary/30 ml-1">
+              {parsed.nodes.map((node: any) => (
+                <li key={node.id} className="relative before:absolute before:-left-[9px] before:top-2 before:w-2 before:h-0.5 before:bg-primary/30">
+                  <span className="font-semibold text-neutral-800 bg-white px-1.5 py-0.5 rounded border border-neutral-200">{node.label}</span>
+                  {node.children && node.children.length > 0 && (
+                    <ul className="pl-4 mt-2 space-y-2 border-l-2 border-primary/20 ml-2">
+                      {node.children.map((child: any) => (
+                        <li key={child.id} className="relative before:absolute before:-left-[9px] before:top-2 before:w-2 before:h-0.5 before:bg-primary/20">
+                          <span className="text-neutral-600">{child.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+            </div>
+            {lastBrace < cleanText.length - 1 && <p className="text-sm leading-relaxed whitespace-pre-wrap mt-2">{cleanText.substring(lastBrace + 1).trim()}</p>}
+          </>
+        )
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
+}
 
 export default function FocusRoom() {
   const navigate = useNavigate()
@@ -12,8 +55,69 @@ export default function FocusRoom() {
   const [showEndModal, setShowEndModal] = useState(false)
   const [notes, setNotes] = useState('')
   const [savedNotes, setSavedNotes] = useState<any[]>([])
-  const [quizletCards, setQuizletCards] = useState<typeof MOCK_QUIZLET_CARDS | null>(null)
+  const [quizletCards, setQuizletCards] = useState<any[] | null>(null)
+  const [selectedFlashcardQuizId, setSelectedFlashcardQuizId] = useState<number | null>(null)
   const [showQuizModal, setShowQuizModal] = useState(false)
+  const [selectedQuizId, setSelectedQuizId] = useState<number | undefined>(undefined)
+  const [showQuizSection, setShowQuizSection] = useState(true)
+
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
+  const [summaries, setSummaries] = useState<any[]>([])
+  
+  const [showMindmapModal, setShowMindmapModal] = useState(false)
+  const [mindmaps, setMindmaps] = useState<any[]>([])
+
+  const fetchQuizSets = async () => {
+    try {
+      const res = await workflowApi.getQuizSets()
+      if (res.success && res.data) {
+        setQuizletCards(res.data.map((q: any) => ({
+          id: q.quizId,
+          title: q.title,
+          subtitle: q.description || `${q.questionCount || 0} questions`,
+          source: q.source || 'AI_GENERATED',
+          questionCount: q.questionCount || 0,
+        })))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const loadSummaries = async () => {
+    try {
+      const res = await workflowApi.getSummaries()
+      if (res.success && res.data) {
+        setSummaries(res.data)
+        setShowSummaryModal(true)
+      }
+    } catch (e) { console.error(e) }
+  }
+
+  const loadMindmaps = async () => {
+    try {
+      const res = await workflowApi.getMindmaps()
+      if (res.success && res.data) {
+        setMindmaps(res.data)
+        setShowMindmapModal(true)
+      }
+    } catch (e) { console.error(e) }
+  }
+
+  const renderMindmapNodes = (nodes: any[]): any => {
+    if (!nodes || !nodes.length) return null
+    return (
+      <ul className="pl-6 list-disc space-y-2 mt-2">
+        {nodes.map((node: any, idx: number) => (
+          <li key={idx} className="text-sm text-neutral-800 dark:text-neutral-200">
+            <span className="font-semibold">{node.label}</span>
+            {node.children && renderMindmapNodes(node.children)}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file: File }[]>([])
   const [summarizeOpen, setSummarizeOpen] = useState(false)
@@ -30,6 +134,11 @@ export default function FocusRoom() {
   // Real Chat states
   const [conversationId, setConversationId] = useState<number | null>(null)
   const [messages, setMessages] = useState<any[]>([])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   // Real Tasks states
   const [tasks, setTasks] = useState<any[]>([])
@@ -37,6 +146,41 @@ export default function FocusRoom() {
   const [showAddTaskModal, setShowAddTaskModal] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
+
+  const [lastUploadedDocumentId, setLastUploadedDocumentId] = useState<number | undefined>(undefined)
+  const [sessionDocuments, setSessionDocuments] = useState<{ id: number; name: string; status?: string }[]>([])
+
+  useEffect(() => {
+    const hasActiveProcessing = sessionDocuments.some(
+      doc => !doc.status || doc.status === 'PROCESSING' || doc.status === 'PENDING'
+    )
+    if (!hasActiveProcessing) return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await workflowApi.getDocuments()
+        if (res.success && res.data) {
+          const documents = res.data
+          setSessionDocuments(prev => {
+            let changed = false
+            const next = prev.map(doc => {
+              const matched = documents.find((d: any) => d.documentId === doc.id)
+              if (matched && matched.processingStatus !== doc.status) {
+                changed = true
+                return { ...doc, status: matched.processingStatus }
+              }
+              return doc
+            })
+            return changed ? next : prev
+          })
+        }
+      } catch (err) {
+        console.error('Error polling document statuses:', err)
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [sessionDocuments])
 
   useEffect(() => {
     // Start study session if not already in one
@@ -72,6 +216,7 @@ export default function FocusRoom() {
     loadNotes()
     loadTasks()
     initChat()
+    fetchQuizSets()
 
     return () => clearInterval(interval)
   }, [])
@@ -207,23 +352,69 @@ export default function FocusRoom() {
   }
 
   const handleSendMessage = async (text: string) => {
-    if (!text.trim() || !conversationId) return
+    const currentAttachments = [...attachments]
+    if (!text.trim() && currentAttachments.length === 0) return
+    if (!conversationId) return
+
+    setInput('')
+    setAttachments([])
+
     const tempUserMsg = {
-      messageId: Date.now(),
+      messageId: Date.now() + Math.random(),
       sender: 'USER',
-      messageText: text,
+      messageText: text.trim() || `[Đã gửi ${currentAttachments.length} tệp]`,
       sentAt: new Date().toISOString()
     }
     setMessages(prev => [...prev, tempUserMsg])
-    setInput('')
 
     try {
-      const res = await workflowApi.sendChatMessage(conversationId, text.trim())
-      if (res.success) {
-        await loadChatMessages(conversationId)
+      if (currentAttachments.length > 0) {
+        setMessages(prev => [...prev, {
+          messageId: Date.now() + Math.random(),
+          sender: 'ASSISTANT',
+          messageText: `Đã tải lên ${currentAttachments.length} file. Hệ thống đang tiến hành xử lý ngầm (trích xuất văn bản, tạo Mindmap, tạo 10 câu hỏi Flashcard). Quá trình này có thể mất vài phút. Bạn có thể nhấn 'Refresh Quizzes' sau đó để tải lại danh sách.`,
+          sentAt: new Date().toISOString()
+        }])
+        for (const att of currentAttachments) {
+          const res = await workflowApi.uploadDocument(att.file)
+          if (res.success && res.data && res.data.documentId) {
+            const docId = res.data.documentId
+            setLastUploadedDocumentId(docId)
+            setSessionDocuments(prev => {
+              // Avoid duplicates
+              if (prev.some(d => d.id === docId)) return prev
+              return [...prev, { id: docId, name: att.file.name, status: res.data.processingStatus || 'PROCESSING' }]
+            })
+          }
+        }
       }
+      if (text.trim()) {
+        await workflowApi.sendChatMessage(conversationId, text.trim(), lastUploadedDocumentId)
+      }
+      await loadChatMessages(conversationId)
+      setTimeout(fetchQuizSets, 5000)
     } catch (e) {
       console.error('Error sending message:', e)
+    }
+  }
+
+  const handleDeleteDocument = async (e: React.MouseEvent, docId: number) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this document?')) return
+    
+    try {
+      const res = await workflowApi.deleteDocument(docId)
+      if (res.success) {
+        setSessionDocuments(prev => prev.filter(d => d.id !== docId))
+        if (lastUploadedDocumentId === docId) {
+          setLastUploadedDocumentId(undefined)
+        }
+      } else {
+        alert('Failed to delete document.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error deleting document.')
     }
   }
 
@@ -246,6 +437,18 @@ export default function FocusRoom() {
       }
     } else {
       setIsEnded(true)
+    }
+  }
+
+  const handleNewChatSession = async () => {
+    try {
+      const createRes = await workflowApi.createConversation('Focus Study Session', 'SOLO')
+      if (createRes.success && createRes.data) {
+        setConversationId(createRes.data.conversationId)
+        setMessages([])
+      }
+    } catch (e) {
+      console.error('Error starting new chat session:', e)
     }
   }
 
@@ -400,51 +603,171 @@ export default function FocusRoom() {
               <h2 className="text-xs font-extrabold uppercase tracking-widest text-neutral-800 dark:text-neutral-400">AI Study Assistant</h2>
               <div className="flex gap-2">
                 <Button
-                  variant={quizletCards ? "tonal" : "secondary"}
+                  variant={showQuizSection ? "secondary" : "primary"}
                   size="sm"
-                  onClick={() => setQuizletCards(quizletCards ? null : MOCK_QUIZLET_CARDS)}
+                  onClick={() => {
+                    setShowQuizSection(!showQuizSection)
+                    if (!showQuizSection) fetchQuizSets()
+                  }}
                 >
-                  {quizletCards ? 'Hide Quizlet' : 'Generate Quizlet'}
+                 {showQuizSection ? 'Hide Quizzes' : 'Show Quizzes'}
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => alert('Flashcards generation coming soon...')}>Flashcards</Button>
-                <Button variant="secondary" size="sm" onClick={() => alert('Mindmaps generation coming soon...')}>Mindmaps</Button>
+                <Button variant="secondary" size="sm" onClick={loadSummaries}>Summary</Button>
+                <Button variant="secondary" size="sm" onClick={loadMindmaps}>Mindmaps</Button>
               </div>
             </div>
+            
+            {/* Session Documents List (Context Selection) */}
+            {sessionDocuments.length > 0 && (
+              <div className="mb-2 shrink-0">
+                <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
+                  Select Context for Chat Q&A
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {sessionDocuments.map(doc => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setLastUploadedDocumentId(doc.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-medium border flex items-center gap-1.5 transition-all ${
+                        lastUploadedDocumentId === doc.id
+                          ? 'bg-primary text-white border-primary shadow-sm hover:opacity-90'
+                          : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                      }`}
+                      title={`${doc.name} (Trạng thái: ${doc.status || 'PROCESSING'})`}
+                    >
+                      <span className="truncate max-w-[120px]">{doc.name}</span>
+                      
+                      {/* Show spinner when processing */}
+                      {(!doc.status || doc.status === 'PROCESSING' || doc.status === 'PENDING') && (
+                        <svg className="animate-spin h-3 w-3 text-current shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      )}
+
+                      {doc.status === 'FAILED' && (
+                        <span className="text-red-500 shrink-0" title="Xử lý lỗi ⚠️">⚠️</span>
+                      )}
+
+                      {doc.status === 'COMPLETED' && lastUploadedDocumentId === doc.id && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+                      )}
+
+                      {doc.status === 'COMPLETED' && lastUploadedDocumentId !== doc.id && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      )}
+
+                      <div 
+                        onClick={(e) => handleDeleteDocument(e, doc.id)} 
+                        className="ml-1 p-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors flex items-center justify-center shrink-0"
+                        title="Delete document"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    </button>
+                  ))}
+                  {lastUploadedDocumentId && (
+                     <button
+                       onClick={() => setLastUploadedDocumentId(undefined)}
+                       className="px-2 py-1.5 rounded-xl text-[10px] font-medium border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                     >
+                       Clear Context
+                     </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Generated Quizlets */}
-            {quizletCards ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 animate-scale-in">
-                {quizletCards.map((card) => (
-                  <Card key={card.id} className="p-3 border border-[var(--color-border)] flex flex-col justify-between bg-[var(--color-background)] min-h-[110px] rounded-2xl shadow-sm">
-                    <div>
-                      <p className="text-xs font-bold text-neutral-900 leading-tight">{card.title}</p>
-                      <p className="text-[10px] text-neutral-500 mt-1 line-clamp-2">{card.subtitle}</p>
+            {showQuizSection && (
+              quizletCards && quizletCards.length > 0 ? (
+                <div className="flex gap-3 overflow-x-auto pb-2 animate-scale-in snap-x shrink-0">
+              {quizletCards.map((card) => {
+                const isFlashcardSet = card.source === 'FLASHCARD'
+                return (
+                <Card 
+                  key={card.id} 
+                  className={`p-3 border flex flex-col justify-between min-h-[110px] w-[200px] shrink-0 rounded-2xl shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md snap-start group ${
+                    isFlashcardSet 
+                      ? 'border-amber-300/80 dark:border-amber-700 bg-amber-50 dark:bg-amber-950' 
+                      : 'border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-900'
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
+                        isFlashcardSet
+                          ? 'bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-200'
+                          : 'bg-primary/10 text-primary'
+                      }`}>
+                        {isFlashcardSet ? '🃏 Flashcard' : '📝 Quiz'}
+                      </span>
                     </div>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="w-full mt-2 text-[10px]"
-                      onClick={() => setShowQuizModal(true)}
-                    >
-                      Start Quiz
-                    </Button>
-                  </Card>
-                ))}
-              </div>
+                    <p className="text-[9px] font-bold text-neutral-800 dark:text-neutral-100 leading-tight line-clamp-2 min-h-[26px]">
+                      {card.title}
+                    </p>
+                    <p className="text-[8px] text-neutral-500">{card.questionCount} câu</p>
+                  </div>
+                  <div className="flex gap-1.5 mt-1.5 w-full">
+                    {isFlashcardSet ? (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1 text-[9px] font-semibold py-1 rounded-xl transition-all duration-200 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-sm whitespace-nowrap px-0 !bg-amber-500 !border-amber-500 hover:!bg-amber-600"
+                        onClick={() => setSelectedFlashcardQuizId(card.id)}
+                      >
+                        Open Flashcards
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="flex-1 text-[9px] font-semibold py-1 rounded-xl transition-all duration-200 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-sm whitespace-nowrap px-0"
+                          onClick={() => {
+                            setSelectedQuizId(card.id)
+                            setShowQuizModal(true)
+                          }}
+                        >
+                          Start Quiz
+                        </Button>
+                        
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="flex-1 text-[9px] font-semibold py-1 rounded-xl transition-all duration-200 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:bg-neutral-100 dark:hover:bg-neutral-800 whitespace-nowrap px-0"
+                          onClick={() => setSelectedFlashcardQuizId(card.id)}
+                        >
+                          Flashcards
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </Card>
+                )
+              })}
+            </div>
             ) : (
               <Card className="p-3 border border-[var(--color-border)] bg-[var(--color-accent-muted)] rounded-2xl flex items-center justify-center text-center">
                 <div className="text-xs text-neutral-600 dark:text-neutral-450 font-medium">
                   ⚡ Use the AI tools above to generate interactive study sets, flashcards, or mindmaps!
                 </div>
               </Card>
-            )}
+            ))}
           </div>
 
           {/* Bottom section: Chat box (takes remaining height) */}
-          <div className="flex-1 min-h-0 flex flex-col border border-[var(--color-border)] rounded-3xl bg-[var(--color-background)] overflow-hidden">
-            <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-charcoal)] flex items-center gap-2 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-300">AI Chat Help</span>
+          <div className="flex-1 min-h-0 flex flex-col border border-[var(--color-border)] rounded-3xl bg-[var(--color-background)] overflow-hidden mt-4">
+            <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-charcoal)] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-bold text-neutral-800 dark:text-neutral-300">AI Chat Help</span>
+              </div>
+              <Button variant="ghost" size="sm" className="text-[10px] h-6 py-0 px-2" onClick={handleNewChatSession}>
+                New Session
+              </Button>
             </div>
             
             {/* Messages */}
@@ -478,13 +801,14 @@ export default function FocusRoom() {
                               You
                             </p>
                           )}
-                          <p className="whitespace-pre-wrap">{m.messageText || m.text}</p>
+                          <MessageRenderer text={m.messageText || m.text} />
                         </div>
                       </div>
                     </div>
                   )
                 })
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Input Bar */}
@@ -497,12 +821,6 @@ export default function FocusRoom() {
                 acceptFiles={ACCEPT_FILES}
                 placeholder="Ask your AI assistant..."
                 attachmentCount={attachments.length}
-                secondaryActions={
-                  <>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setSummarizeOpen(true)} className="!px-0 !py-0 min-h-0 text-[10px] font-bold text-neutral-500 hover:text-neutral-800">Summarize</Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setDialogOpen(true)} className="!px-0 !py-0 min-h-0 text-[10px] font-bold text-neutral-500 hover:text-neutral-800">Open Popup</Button>
-                  </>
-                }
               />
             </div>
           </div>
@@ -557,8 +875,52 @@ export default function FocusRoom() {
       </Modal>
 
       {showQuizModal && (
-        <QuizletQuizModal onClose={() => setShowQuizModal(false)} />
+        <QuizletQuizModal quizId={selectedQuizId} onClose={() => setShowQuizModal(false)} />
       )}
+
+      {/* Summary Modal */}
+      <Modal open={showSummaryModal} onClose={() => setShowSummaryModal(false)} title="Document Summaries">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          {summaries.length === 0 ? (
+            <p className="text-sm text-neutral-500">No summaries found.</p>
+          ) : (
+            summaries.map((s, idx) => (
+              <div key={idx} className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+                <p className="text-xs font-bold text-neutral-500 mb-3">{new Date(s.generatedAt).toLocaleString()}</p>
+                <div className="text-sm text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap leading-relaxed">{s.content}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
+
+      {/* Mindmaps Modal */}
+      <Modal open={showMindmapModal} onClose={() => setShowMindmapModal(false)} title="Document Mindmaps">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          {mindmaps.length === 0 ? (
+            <p className="text-sm text-neutral-500">No mindmaps found.</p>
+          ) : (
+            mindmaps.map((m, idx) => (
+              <div key={idx} className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+                <h3 className="text-md font-extrabold text-primary mb-4">{m.title}</h3>
+                {(() => {
+                  try {
+                    const data = JSON.parse(m.content)
+                    return (
+                      <div className="mt-2 bg-[var(--color-background)] p-4 rounded-lg border border-[var(--color-border)] overflow-x-auto">
+                        {data.title && <p className="font-bold text-base mb-3 text-neutral-900 dark:text-neutral-100">{data.title}</p>}
+                        {renderMindmapNodes(data.nodes)}
+                      </div>
+                    )
+                  } catch (e) {
+                    return <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                  }
+                })()}
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
 
       <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title="Create Personal Task">
         <div className="space-y-4">
@@ -650,6 +1012,13 @@ export default function FocusRoom() {
           )}
         </div>
       </Modal>
+
+      {selectedFlashcardQuizId && (
+        <FlashcardModal
+          quizId={selectedFlashcardQuizId}
+          onClose={() => setSelectedFlashcardQuizId(null)}
+        />
+      )}
     </div>
   )
 }

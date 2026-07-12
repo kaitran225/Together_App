@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, SegmentedControl, Modal, Input } from '../../../components/common'
+import { Badge, Button, Card, SegmentedControl, Modal, Input, Checkbox } from '../../../components/common'
 import { TaskEditSidebar, type TaskForEdit } from '../../../components/TaskEditSidebar'
 import {
   TEAM_TABS,
@@ -9,11 +9,7 @@ import {
   type TabId,
 } from '../../../mocks'
 import { workflowApi, authApi } from '../../../api/client'
-
-function getAssigneeDisplay(assigneeCode: string, members: any[]): { name: string; skills: string[] } | undefined {
-  const m = members.find((mem) => mem.code === assigneeCode || mem.id === assigneeCode)
-  return m ? { name: m.name, skills: m.skills } : undefined
-}
+import { useAuth } from '../../../contexts/AuthContext'
 
 export default function BoardPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -29,6 +25,7 @@ export default function BoardPage() {
 
   const [teamName, setTeamName] = useState('Loading Team...')
   const [inviteCode, setInviteCode] = useState('')
+  const [teamObj, setTeamObj] = useState<any | null>(null)
   const [members, setMembers] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
@@ -40,11 +37,11 @@ export default function BoardPage() {
   const loadTeamData = () => {
     if (!teamId) return
     
-    // Get team detail
     workflowApi.getTeamDetail(teamId)
       .then(async (res) => {
         if (res.success && res.data) {
           const detail = res.data
+          setTeamObj(detail.team)
           setTeamName(detail.team.name)
           setInviteCode(detail.team.inviteCode)
           if (detail.members && detail.members.length > 0) {
@@ -123,24 +120,50 @@ export default function BoardPage() {
     <div className="flex flex-col h-full min-h-0">
       {teamId && (
         <div className="flex items-center justify-between gap-3 mb-4 bg-[var(--color-surface)] border border-[var(--color-border)] p-3 rounded-xl">
-          <div>
-            <h2 className="text-lg font-bold text-neutral-900">{teamName}</h2>
-            {selectedProjectId ? (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-neutral-500">Project:</span>
-                <select
-                  value={selectedProjectId || ''}
-                  onChange={(e) => setSelectedProjectId(Number(e.target.value))}
-                  className="px-2 py-1 text-xs border border-[var(--color-border)] rounded bg-white focus:outline-none"
-                >
-                  {projects.map(p => (
-                    <option key={p.projectId} value={p.projectId}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
+          <div className="flex items-center gap-3">
+            {teamObj?.avatarUrl ? (
+              <img src={teamObj.avatarUrl} alt={teamName} className="w-10 h-10 rounded-xl object-cover border border-[var(--color-border)]" />
             ) : (
-              <span className="text-xs text-neutral-500">No projects created yet.</span>
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg">
+                {teamName.slice(0, 1).toUpperCase()}
+              </div>
             )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-neutral-900">{teamName}</h2>
+                {inviteCode && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono font-semibold bg-[var(--color-charcoal)] border border-[var(--color-border)] rounded-md text-neutral-850">
+                    Code: {inviteCode}
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(inviteCode);
+                        alert('Copied invite code: ' + inviteCode);
+                      }}
+                      title="Copy Code"
+                      className="text-neutral-500 hover:text-neutral-950 font-sans ml-0.5 text-[10px]"
+                    >
+                      📋
+                    </button>
+                  </span>
+                )}
+              </div>
+              {selectedProjectId ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-neutral-500">Project:</span>
+                  <select
+                    value={selectedProjectId || ''}
+                    onChange={(e) => setSelectedProjectId(Number(e.target.value))}
+                    className="px-2 py-1 text-xs border border-[var(--color-border)] rounded bg-white focus:outline-none"
+                  >
+                    {projects.map(p => (
+                      <option key={p.projectId} value={p.projectId}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span className="text-xs text-neutral-500">No projects created yet.</span>
+              )}
+            </div>
           </div>
           <Button variant="primary" size="sm" onClick={() => setCreateProjectOpen(true)}>
             + New Project
@@ -157,7 +180,14 @@ export default function BoardPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        {tab === 'management' && <TeamManagementContent members={members} inviteCode={inviteCode} teamId={teamId} />}
+        {tab === 'management' && (
+          <TeamManagementContent
+            members={members}
+            teamId={teamId}
+            teamObj={teamObj}
+            onTeamUpdated={loadTeamData}
+          />
+        )}
         {tab === 'scrum' && (
           <ScrumBoardContent
             projectId={selectedProjectId}
@@ -196,15 +226,45 @@ export default function BoardPage() {
   )
 }
 
-function TeamManagementContent({ members, inviteCode, teamId }: { members: any[]; inviteCode?: string; teamId: number | null }) {
+function TeamManagementContent({
+  members,
+  teamId,
+  teamObj,
+  onTeamUpdated,
+}: {
+  members: any[]
+  teamId: number | null
+  teamObj: any | null
+  onTeamUpdated: () => void
+}) {
   const navigate = useNavigate()
-  const [copied, setCopied] = useState(false)
+  const { user } = useAuth()
+  const isOwner = members.some((m) => m.id === user?.userSso && m.role === 'OWNER')
+
   const [createMeetingOpen, setCreateMeetingOpen] = useState(false)
   const [meetingTitle, setMeetingTitle] = useState('')
   const [meetingAgenda, setMeetingAgenda] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [activeMeeting, setActiveMeeting] = useState<any>(null)
+
+  // Edit Team state
+  const [editOpen, setEditOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editAvatar, setEditAvatar] = useState('')
+  const [editIsPrivate, setEditIsPrivate] = useState(false)
+  const [editMaxMembers, setEditMaxMembers] = useState(20)
+
+  useEffect(() => {
+    if (teamObj) {
+      setEditName(teamObj.name || '')
+      setEditDesc(teamObj.description || '')
+      setEditAvatar(teamObj.avatarUrl || '')
+      setEditIsPrivate(teamObj.isPrivate || false)
+      setEditMaxMembers(teamObj.maxMembers || 20)
+    }
+  }, [teamObj, editOpen])
 
   useEffect(() => {
     if (teamId) {
@@ -217,14 +277,6 @@ function TeamManagementContent({ members, inviteCode, teamId }: { members: any[]
       }).catch(console.error)
     }
   }, [teamId])
-
-  const handleCopy = () => {
-    if (inviteCode) {
-      navigator.clipboard.writeText(inviteCode)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
 
   const handleCreateMeeting = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -256,68 +308,93 @@ function TeamManagementContent({ members, inviteCode, teamId }: { members: any[]
     }
   }
 
+  const handleUpdateTeam = async () => {
+    if (!teamId || !editName.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await workflowApi.updateTeam(teamId, {
+        name: editName.trim(),
+        description: editDesc.trim(),
+        avatarUrl: editAvatar.trim(),
+        isPrivate: editIsPrivate,
+        maxMembers: editMaxMembers
+      })
+      if (res.success) {
+        setEditOpen(false)
+        onTeamUpdated()
+      } else {
+        setError(res.message || 'Không thể cập nhật thông tin nhóm.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi kết nối máy chủ.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleKickMember = async (memberSso: string) => {
+    if (!teamId) return
+    if (!window.confirm('Bạn có chắc chắn muốn mời thành viên này rời khỏi nhóm?')) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await workflowApi.removeTeamMember(teamId, memberSso)
+      if (res.success) {
+        onTeamUpdated()
+      } else {
+        setError(res.message || 'Không thể xóa thành viên.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi kết nối máy chủ.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-neutral-900">Team management</h1>
-        {teamId && (
-          activeMeeting ? (
-            <Button variant="primary" size="sm" onClick={() => navigate(`/meetings/room?meetingId=${activeMeeting.meetingId}`)} className="flex items-center gap-1.5 font-bold shadow-none !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600">
-              🟢 Tham gia ngay
-            </Button>
+      <div className="flex items-center justify-between flex-wrap gap-4 bg-[var(--color-surface)] border border-[var(--color-border)] p-4 rounded-2xl">
+        <div className="flex items-center gap-3">
+          {teamObj?.avatarUrl ? (
+            <img src={teamObj.avatarUrl} alt={teamObj.name} className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
           ) : (
-            <Button variant="primary" size="sm" onClick={() => setCreateMeetingOpen(true)} className="flex items-center gap-1.5 font-bold shadow-none">
-              🎥 Tạo cuộc họp mới
+            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">
+              {teamObj?.name?.slice(0, 1).toUpperCase() || 'T'}
+            </div>
+          )}
+          <div>
+            <h1 className="text-xl font-bold text-neutral-900">Team management</h1>
+            {teamObj?.description && <p className="text-xs text-neutral-500 mt-0.5">{teamObj.description}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isOwner && (
+            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)} className="flex items-center gap-1 font-bold">
+              ⚙️ Chỉnh sửa nhóm
             </Button>
-          )
-        )}
+          )}
+          {teamId && (
+            activeMeeting ? (
+              <Button variant="primary" size="sm" onClick={() => navigate(`/meetings/room?meetingId=${activeMeeting.meetingId}`)} className="flex items-center gap-1.5 font-bold shadow-none !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600">
+                🟢 Tham gia ngay
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" onClick={() => setCreateMeetingOpen(true)} className="flex items-center gap-1.5 font-bold shadow-none">
+                🎥 Tạo cuộc họp mới
+              </Button>
+            )
+          )}
+        </div>
       </div>
       
-      {inviteCode && (
-        <Card heading="Invite Members" className="border border-[var(--color-border)] shadow-none">
-          <p className="text-xs text-neutral-500 mb-2">Share this invite code with your peers to let them join your team.</p>
-          <div className="flex items-center gap-2 max-w-sm">
-            <input
-              type="text"
-              readOnly
-              value={inviteCode}
-              className="flex-1 px-3 py-1.5 text-sm border border-[var(--color-border)] bg-[var(--color-charcoal)] rounded-md font-mono text-neutral-900 focus:outline-none"
-            />
-            <Button variant="primary" size="sm" onClick={handleCopy}>
-              {copied ? 'Copied!' : 'Copy Code'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {teamId && (
-        <Card heading="Meetings" className="border border-[var(--color-border)] shadow-none">
-          {activeMeeting ? (
-            <>
-              <p className="text-xs text-neutral-500 mb-3">
-                Cuộc họp đang diễn ra: <strong className="text-neutral-900">{activeMeeting.title}</strong>
-              </p>
-              <Button variant="primary" size="sm" onClick={() => navigate(`/meetings/room?meetingId=${activeMeeting.meetingId}`)} className="!bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600">
-                🟢 Tham gia cuộc họp
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-xs text-neutral-500 mb-3">Tạo cuộc họp trực tuyến cho nhóm học tập của bạn.</p>
-              <Button variant="secondary" size="sm" onClick={() => setCreateMeetingOpen(true)}>
-                🎥 Lên lịch/Bắt đầu cuộc họp nhóm
-              </Button>
-            </>
-          )}
-        </Card>
-      )}
-
       <Card heading="Members" className="border border-[var(--color-border)] shadow-none">
+        {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
         <ul className="space-y-0">
           {members.map((m, i) => (
             <li
               key={m.id || i}
-              className={`flex justify-between items-start gap-4 py-3 ${i < members.length - 1 ? 'border-b border-[var(--color-border)]' : ''}`}
+              className={`flex justify-between items-center gap-4 py-3 ${i < members.length - 1 ? 'border-b border-[var(--color-border)]' : ''}`}
             >
               <div className="min-w-0 flex-1">
                 <span className="text-neutral-900 font-medium">
@@ -337,6 +414,17 @@ function TeamManagementContent({ members, inviteCode, teamId }: { members: any[]
                   </div>
                 )}
               </div>
+              {isOwner && m.id !== user?.userSso && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleKickMember(m.id)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 font-bold"
+                  disabled={loading}
+                >
+                  Kick
+                </Button>
+              )}
             </li>
           ))}
         </ul>
@@ -369,6 +457,99 @@ function TeamManagementContent({ members, inviteCode, teamId }: { members: any[]
           </form>
         </Card>
       </Modal>
+
+      {/* Edit Team Modal */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} size="max-w-md" title="Chỉnh Sửa Thông Tin Nhóm">
+        <Card className="p-5 w-full border-0 bg-transparent shadow-none">
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">Chỉnh sửa thông tin nhóm</h3>
+          {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
+          <div className="flex flex-col gap-4 mb-4">
+            <Input
+              label="Tên nhóm"
+              placeholder="e.g. Science Study Group"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+            />
+            <Input
+              label="Mô tả"
+              placeholder="Mô tả nhóm học tập này..."
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-neutral-700">Ảnh đại diện nhóm</label>
+              <div className="flex items-center gap-3">
+                {editAvatar ? (
+                  <img src={editAvatar} alt="Team Preview" className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] flex items-center justify-center text-neutral-400 font-bold text-xs uppercase">
+                    No avt
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="team-edit-avatar-upload"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.size > 2 * 1024 * 1024) {
+                          setError('Kích thước ảnh phải nhỏ hơn 2MB')
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onload = (event) => {
+                          setEditAvatar(event.target?.result as string)
+                          setError('')
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="team-edit-avatar-upload"
+                    className="inline-flex items-center justify-center px-3 py-1.5 border border-[var(--color-border)] rounded-md text-xs font-semibold text-neutral-800 bg-[var(--color-charcoal)] hover:bg-[var(--color-border)] cursor-pointer transition-colors"
+                  >
+                    Tải ảnh lên
+                  </label>
+                  {editAvatar && (
+                    <button
+                      type="button"
+                      onClick={() => setEditAvatar('')}
+                      className="ml-2 text-xs text-red-600 hover:text-red-700 font-semibold"
+                    >
+                      Xóa ảnh
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <Input
+              label="Số lượng thành viên tối đa"
+              type="number"
+              min={1}
+              value={editMaxMembers}
+              onChange={(e) => setEditMaxMembers(parseInt(e.target.value) || 20)}
+            />
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                label="Nhóm riêng tư (Private Team)"
+                checked={editIsPrivate}
+                onChange={(e) => setEditIsPrivate(e.target.checked)}
+              />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={() => setEditOpen(false)}>Hủy</Button>
+            <Button variant="primary" className="flex-1" onClick={handleUpdateTeam} disabled={loading}>
+              {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </Button>
+          </div>
+        </Card>
+      </Modal>
     </div>
   )
 }
@@ -377,8 +558,28 @@ function scrumTaskToForEdit(t: any): TaskForEdit {
   return {
     ...t,
     desc: t.description || undefined,
-    assignee: t.assignee || ''
+    assignee: t.assignee || '',
+    due: t.dueDate || t.due || t.duDate || '',
+    completed: t.completeAt ? new Date(t.completeAt).toISOString().split('T')[0] : (t.completedAt ? new Date(t.completedAt).toISOString().split('T')[0] : '')
   }
+}
+
+function getDueDateBadgeClass(dueDateStr: string, isDone: boolean) {
+  if (!dueDateStr || isDone) return 'bg-neutral-100 text-neutral-600 border-neutral-200'
+  const dueDate = new Date(dueDateStr)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  dueDate.setHours(0, 0, 0, 0)
+  
+  const diffTime = dueDate.getTime() - today.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (diffDays < 0) {
+    return 'bg-red-50 text-red-600 border-red-200 font-semibold'
+  } else if (diffDays <= 2) {
+    return 'bg-orange-50 text-orange-600 border-orange-200 font-semibold'
+  }
+  return 'bg-neutral-100 text-neutral-600 border-neutral-200'
 }
 
 function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId: number | null; teamMembers: any[]; projectName: string }) {
@@ -391,6 +592,10 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
   const [targetColumnId, setTargetColumnId] = useState<number | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDesc, setNewTaskDesc] = useState('')
+  const [newTaskPriority, setNewTaskPriority] = useState('Medium')
+  const [newTaskEstHours, setNewTaskEstHours] = useState('0')
+  const [newTaskStartDate, setNewTaskStartDate] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
 
   // Add Column dialog state
   const [addColumnOpen, setAddColumnOpen] = useState(false)
@@ -441,6 +646,31 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
         console.error(err)
       }
     }
+
+    // Handle assignee update
+    if (updated.assignee !== task.assignee) {
+      try {
+        await workflowApi.assignTask(task.taskId, updated.assignee || '')
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    // Handle general task update (dates, title, description, priority)
+    try {
+      await workflowApi.updateTask(task.taskId, {
+        title: updated.title,
+        description: updated.desc,
+        priority: updated.priority || 'Medium',
+        startDate: updated.startDate || null,
+        dueDate: updated.due || updated.endDate || null,
+        completedAt: updated.completed ? new Date(updated.completed).toISOString() : null,
+        status: updated.status
+      })
+    } catch (err) {
+      console.error(err)
+    }
+
     setSelected(null)
     loadBoard()
   }
@@ -448,16 +678,23 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
   const handleAddTask = async () => {
     if (!projectId || !newTaskTitle.trim()) return
     try {
-      const res = await workflowApi.createTask(
-        projectId,
-        newTaskTitle.trim(),
-        newTaskDesc.trim(),
-        targetColumnId || undefined
-      )
+      const res = await workflowApi.createTask(projectId, {
+        title: newTaskTitle.trim(),
+        description: newTaskDesc.trim() || undefined,
+        priority: newTaskPriority,
+        estimatedHours: newTaskEstHours ? Number(newTaskEstHours) : 0,
+        startDate: newTaskStartDate || null,
+        dueDate: newTaskDueDate || null,
+        columnId: targetColumnId || null
+      })
       if (res.success) {
         setAddTaskOpen(false)
         setNewTaskTitle('')
         setNewTaskDesc('')
+        setNewTaskPriority('Medium')
+        setNewTaskEstHours('0')
+        setNewTaskStartDate('')
+        setNewTaskDueDate('')
         loadBoard()
       }
     } catch (err) {
@@ -501,116 +738,116 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-3 min-h-0">
-      <div className="min-h-0 flex flex-col">
-        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-neutral-900">{projectName}</h2>
-            {loading && <span className="text-xs text-neutral-500">Loading...</span>}
-            <Button variant="secondary" size="sm" onClick={() => setAddColumnOpen(true)}>
-              + Add Column
+    <div className="min-h-0 flex flex-col">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-bold text-neutral-900">{projectName}</h2>
+          {loading && <span className="text-xs text-neutral-500">Loading...</span>}
+          <Button variant="secondary" size="sm" onClick={() => setAddColumnOpen(true)}>
+            + Add Column
+          </Button>
+          {projectId && (
+            <Button variant="tonal" size="sm" onClick={handleExportReport} className="text-xs font-bold gap-1">
+              📥 Export Report
             </Button>
-            {projectId && (
-              <Button variant="tonal" size="sm" onClick={handleExportReport} className="text-xs font-bold gap-1">
-                📥 Export Report
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 overflow-x-auto pb-1 min-h-0">
-          {columns.map((col) => (
-            <div key={col.columnId || col.id} className="flex flex-col min-w-[220px] bg-[var(--color-accent-muted)] rounded-2xl border border-[var(--color-border)] p-2.5 shadow-none">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-neutral-900">{col.name} ({col.tasks?.length || 0})</span>
-              </div>
-              <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto">
-                {col.tasks && col.tasks.map((task: any, i: number) => (
-                  <Button
-                    key={task.taskId || i}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelected({ task, columnId: String(col.columnId) })}
-                    className="w-full !justify-start text-left p-2 bg-white rounded-md border border-[var(--color-border)] shadow-none relative hover:border-primary/40 transition-colors"
-                  >
-                    <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] mb-1">{task.priority || 'MEDIUM'}</Badge>
-                    <p className="text-xs font-medium text-neutral-900 leading-tight">{task.title}</p>
-                    {task.description && (
-                      <p className="text-[10px] text-neutral-500 mt-0.5 line-clamp-2">{task.description}</p>
-                    )}
-                    <div className="mt-1 flex items-center gap-1.5 min-w-0">
-                      {(() => {
-                        const m = teamMembers.find((mem) => mem.id === task.assignee)
-                        const name = m ? m.name : (task.assignee || 'Unassigned')
-                        const code = m ? m.code : (task.assignee ? task.assignee.slice(0, 2).toUpperCase() : 'UN')
-                        return (
-                          <>
-                            <span 
-                              className="w-5 h-5 rounded bg-neutral-300 text-[9px] font-bold flex items-center justify-center text-neutral-700 shrink-0"
-                              title={name}
-                            >
-                              {code}
-                            </span>
-                            <span className="text-[10.5px] text-neutral-600 truncate max-w-[120px]" title={name}>
-                              {name}
-                            </span>
-                          </>
-                        )
-                      })()}
-                    </div>
-                  </Button>
-                ))}
-              </div>
-              {projectId && (
-                <Button
-                  variant="tonal"
-                  size="sm"
-                  className="w-full mt-2 text-xs"
-                  onClick={() => {
-                    setTargetColumnId(col.columnId)
-                    setAddTaskOpen(true)
-                  }}
-                >
-                  + Add Task
-                </Button>
-              )}
-            </div>
-          ))}
+          )}
         </div>
       </div>
 
-      <aside className="flex flex-col min-h-[240px] lg:max-h-[calc(100vh-10rem)] overflow-hidden">
-        {selected ? (
-          <TaskEditSidebar
-            task={scrumTaskToForEdit(selected.task)}
-            onSave={handleSaveTask}
-            onClose={() => setSelected(null)}
-            statusOptions={columns.map((c) => c.name)}
-            assigneeDisplay={getAssigneeDisplay(selected.task.assignee, teamMembers)}
-          />
-        ) : (
-          <div className="flex flex-col bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)] p-3 h-full overflow-y-auto shadow-none">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs font-bold uppercase tracking-wide text-neutral-900">AI Task Insights</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 overflow-x-auto pb-1 min-h-0">
+        {columns.map((col) => (
+          <div key={col.columnId || col.id} className="flex flex-col min-w-[220px] bg-[var(--color-accent-muted)] rounded-2xl border border-[var(--color-border)] p-2.5 shadow-none">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-neutral-900">{col.name} ({col.tasks?.length || 0})</span>
             </div>
-            <p className="text-xs text-neutral-500 mb-2">Click a task to edit.</p>
-            <section className="mb-2">
-              <h3 className="text-[10px] font-bold uppercase text-neutral-600 mb-1">Priority Alerts</h3>
-              <div className="flex gap-1.5 p-2 rounded-md bg-highlight/10 border border-highlight/30">
-                <span className="text-[10px]">▲</span>
-                <p className="text-[10px] text-neutral-800">Scrum Board is ready for action.</p>
-              </div>
-            </section>
+            <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto">
+              {col.tasks && col.tasks.map((task: any, i: number) => (
+                <Button
+                  key={task.taskId || i}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelected({ task, columnId: String(col.columnId) })}
+                  className="w-full !justify-start text-left p-2 bg-white rounded-md border border-[var(--color-border)] shadow-none relative hover:border-primary/40 transition-colors"
+                >
+                  <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] mb-1">{task.priority || 'MEDIUM'}</Badge>
+                  <p className="text-xs font-medium text-neutral-900 leading-tight">{task.title}</p>
+                  {task.description && (
+                    <p className="text-[10px] text-neutral-500 mt-0.5 line-clamp-2">{task.description}</p>
+                  )}
+                  {/* Due Date & Completed Date Display */}
+                  <div className="mt-1 flex flex-wrap gap-1 items-center">
+                    {(task.dueDate || task.duDate) && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] border ${getDueDateBadgeClass(task.dueDate || task.duDate, col.name.toUpperCase() === 'DONE')}`}>
+                        📅 Due: {task.dueDate || task.duDate}
+                      </span>
+                    )}
+                    {(task.completedAt || task.completeAt) && col.name.toUpperCase() === 'DONE' && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-green-50 text-green-600 border border-green-200 font-semibold">
+                        ✅ Completed: {new Date(task.completedAt || task.completeAt).toLocaleDateString('vi-VN')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 min-w-0">
+                    {(() => {
+                      const m = teamMembers.find((mem) => mem.id === task.assignee)
+                      const name = m ? m.name : (task.assignee || 'Unassigned')
+                      const code = m ? m.code : (task.assignee ? task.assignee.slice(0, 2).toUpperCase() : 'UN')
+                      return (
+                        <>
+                          <span 
+                            className="w-5 h-5 rounded bg-neutral-300 text-[9px] font-bold flex items-center justify-center text-neutral-700 shrink-0"
+                            title={name}
+                          >
+                            {code}
+                          </span>
+                          <span className="text-[10.5px] text-neutral-600 truncate max-w-[120px]" title={name}>
+                            {name}
+                          </span>
+                        </>
+                      )
+                    })()}
+                  </div>
+                </Button>
+              ))}
+            </div>
+            {projectId && (
+              <Button
+                variant="tonal"
+                size="sm"
+                className="w-full mt-2 text-xs"
+                onClick={() => {
+                  setTargetColumnId(col.columnId)
+                  setAddTaskOpen(true)
+                }}
+              >
+                + Add Task
+              </Button>
+            )}
           </div>
+        ))}
+      </div>
+
+      {/* Task Details Popup Modal */}
+      <Modal open={!!selected} onClose={() => setSelected(null)} size="max-w-lg" title="Chi tiết Task">
+        {selected && (
+          <Card className="p-5 w-full border-0 bg-transparent shadow-none">
+            <TaskEditSidebar
+              task={scrumTaskToForEdit(selected.task)}
+              onSave={handleSaveTask}
+              onClose={() => setSelected(null)}
+              statusOptions={columns.map((c) => c.name)}
+              members={teamMembers}
+            />
+          </Card>
         )}
-      </aside>
+      </Modal>
 
       {/* Add Task Modal */}
       <Modal open={addTaskOpen} onClose={() => setAddTaskOpen(false)} size="max-w-md" title="Add New Task">
-        <Card className="p-5 w-full">
+        <Card className="p-5 w-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-xl rounded-2xl">
           <h3 className="text-lg font-bold text-neutral-900 mb-4">Add New Task</h3>
-          <div className="flex flex-col gap-4 mb-4">
+          <div className="flex flex-col gap-4 mb-5">
             <Input
               label="Task Title"
               placeholder="e.g. Design UI components"
@@ -624,6 +861,45 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
               value={newTaskDesc}
               onChange={(e) => setNewTaskDesc(e.target.value)}
             />
+            
+            {/* Priority Selector */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-neutral-500">Priority</label>
+              <select
+                className="w-full h-10 px-3 border border-[var(--color-border)] rounded-xl bg-white text-neutral-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                value={newTaskPriority}
+                onChange={(e) => setNewTaskPriority(e.target.value)}
+              >
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+
+            {/* Estimated Hours */}
+            <Input
+              label="Estimated Hours"
+              type="number"
+              placeholder="e.g. 5"
+              value={newTaskEstHours}
+              onChange={(e) => setNewTaskEstHours(e.target.value)}
+            />
+
+            {/* Start Date and Due Date */}
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Start Date"
+                type="date"
+                value={newTaskStartDate}
+                onChange={(e) => setNewTaskStartDate(e.target.value)}
+              />
+              <Input
+                label="Due Date"
+                type="date"
+                value={newTaskDueDate}
+                onChange={(e) => setNewTaskDueDate(e.target.value)}
+              />
+            </div>
           </div>
           <div className="flex gap-3">
             <Button variant="secondary" className="flex-1" onClick={() => setAddTaskOpen(false)}>Cancel</Button>

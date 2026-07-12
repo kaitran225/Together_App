@@ -44,6 +44,7 @@ public class ScrumBoardService {
         private final TaskActivityRepository taskActivityRepository;
         private final TeamMemberRepository teamMemberRepository;
         private final PermissionCheckService permissionCheckService;
+        private final app.together.common.workflow.repository.TaskAssignmentRepository taskAssignmentRepository;
 
         public void initializeScrumBoard(Long projectId) {
                 List<BoardColumn> boardColums = List.of(
@@ -72,6 +73,10 @@ public class ScrumBoardService {
                 List<BoardColumn> columns = boardColumnRepository.findByProjectId(projectId);
                 List<Task> tasks = taskRepository.findByProjectId(projectId);
 
+                List<Long> taskIds = tasks.stream().map(Task::getTaskId).toList();
+                List<app.together.common.workflow.entity.TaskAssignment> assignments = taskIds.isEmpty() ? List.of() :
+                        taskAssignmentRepository.findByTaskIdIn(taskIds);
+
                 List<BoardColumnResponse> columnResponses = columns.stream()
                                 .sorted((c1, c2) -> Integer.compare(
                                                 c1.getPosition() != null ? c1.getPosition() : 0,
@@ -80,7 +85,13 @@ public class ScrumBoardService {
                                         List<TaskSummaryResponse> taskSummaries = tasks.stream()
                                                         .filter(task -> Objects.equals(task.getColumnId(),
                                                                         column.getColumnId()))
-                                                        .map(task -> new TaskSummaryResponse(
+                                                        .map(task -> {
+                                                                String assignee = assignments.stream()
+                                                                        .filter(a -> Objects.equals(a.getTaskId(), task.getTaskId()))
+                                                                        .map(app.together.common.workflow.entity.TaskAssignment::getUserSso)
+                                                                        .findFirst()
+                                                                        .orElse(null);
+                                                                return new TaskSummaryResponse(
                                                                         task.getTaskId(),
                                                                         task.getTitle(),
                                                                         task.getDescription(),
@@ -89,7 +100,11 @@ public class ScrumBoardService {
                                                                         task.getEstimatedHours(),
                                                                         task.getActualHours(),
                                                                         task.getDueDate(),
-                                                                        task.getSprintId()))
+                                                                        task.getSprintId(),
+                                                                        assignee,
+                                                                        task.getStartDate(),
+                                                                        task.getCompletedAt());
+                                                        })
                                                         .toList();
                                         return new BoardColumnResponse(
                                                         column.getColumnId(),

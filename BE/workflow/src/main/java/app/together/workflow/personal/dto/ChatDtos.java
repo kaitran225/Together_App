@@ -25,7 +25,8 @@ public final class ChatDtos {
     }
 
     public record SendMessageRequest(
-            String messageText
+            String messageText,
+            Long documentId
     ) {
     }
 

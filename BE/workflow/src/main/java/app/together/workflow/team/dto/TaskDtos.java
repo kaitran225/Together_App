@@ -96,4 +96,15 @@ public final class TaskDtos {
         String attachmentType
     ) {
     }
+
+    public record UpdateTaskRequest(
+        String title,
+        String description,
+        String priority,
+        LocalDate startDate,
+        LocalDate dueDate,
+        Instant completedAt,
+        String status
+    ) {
+    }
 }

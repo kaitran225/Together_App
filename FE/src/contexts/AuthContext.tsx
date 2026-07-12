@@ -191,8 +191,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fullName: input.fullName.trim(),
         email: input.email.trim(),
         avatarUrl: input.avatarUrl?.trim() ?? '',
-        skills: input.skills ?? user.skills,
-        learningGoals: input.learningGoals ?? user.learningGoals
+        skills: input.skills ?? user.skills ?? undefined,
+        learningGoals: input.learningGoals ?? user.learningGoals ?? undefined
       })
       if (!updated) return { ok: false, error: 'Unable to update profile.' }
       setUser(mapToUserDto(updated))

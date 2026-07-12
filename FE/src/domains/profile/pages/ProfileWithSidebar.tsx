@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { MeResponse } from '../../../types/dto'
 import { authApi, workflowApi, getStoredToken } from '../../../api/client'
-import { getFakeMeResponse, MONTHLY_HOURS, HIGHLIGHT_MONTH, QUIZZES } from '../../../mocks'
+import { getFakeMeResponse, MONTHLY_HOURS, HIGHLIGHT_MONTH } from '../../../mocks'
 import { Button, Card, Progress, IconButton, Input, Modal } from '../../../components/common'
 import { useAuth } from '../../../contexts/AuthContext'
 import html2canvas from 'html2canvas'
@@ -15,6 +15,8 @@ export default function ProfileWithSidebar() {
   const [tasksList, setTasksList] = useState<any[]>([])
   const [quizzesList, setQuizzesList] = useState<any[]>([])
   const [schedulesList, setSchedulesList] = useState<any[]>([])
+  const [achievements, setAchievements] = useState<any[]>([])
+  const [selectedAchievement, setSelectedAchievement] = useState<any | null>(null)
 
   const getWeekDates = () => {
     const now = new Date()
@@ -39,11 +41,25 @@ export default function ProfileWithSidebar() {
     const token = getStoredToken()
     if (token) {
       authApi.me(token).then((res) => {
-        if (res.success && res.data) setUser(res.data)
+        if (res.success && res.data) {
+          setUser(res.data)
+          workflowApi.getPublicAchievements(res.data.userSso).then((achRes) => {
+            if (achRes.success && achRes.data) {
+              setAchievements(achRes.data)
+            }
+          }).catch(() => {})
+        }
       })
     } else {
       const fake = getFakeMeResponse()
-      if (fake.success && fake.data) setUser(fake.data)
+      if (fake.success && fake.data) {
+        setUser(fake.data)
+        workflowApi.getPublicAchievements(fake.data.userSso).then((achRes) => {
+          if (achRes.success && achRes.data) {
+            setAchievements(achRes.data)
+          }
+        }).catch(() => {})
+      }
     }
 
     workflowApi.getNotes().then((res) => {
@@ -289,17 +305,7 @@ export default function ProfileWithSidebar() {
   const completedTasks = tasksList.filter(t => t.isCompleted)
   const levelProgressPercent = levelProgress
 
-  const achievementsList = [
-    { id: 'level_5', name: 'Học giả khởi bước', desc: 'Đạt cấp độ 5+', icon: '🌱', unlocked: userLevel >= 5 },
-    { id: 'level_20', name: 'Học giả tinh anh', desc: 'Đạt cấp độ 20+', icon: '🎓', unlocked: userLevel >= 20 },
-    { id: 'streak_3', name: 'Kiên trì không ngừng', desc: 'Đạt chuỗi học tập 3 ngày', icon: '🔥', unlocked: (user?.streak ?? 0) >= 3 },
-    { id: 'streak_7', name: 'Thói quen vàng', desc: 'Đạt chuỗi học tập 7 ngày', icon: '⚡', unlocked: (user?.streak ?? 0) >= 7 },
-    { id: 'longest_14', name: 'Huyền thoại kỷ luật', desc: 'Kỷ lục chuỗi 14 ngày', icon: '🏆', unlocked: (user?.longestStreak ?? 0) >= 14 },
-    { id: 'task_10', name: 'Kẻ huỷ diệt Deadline', desc: 'Hoàn thành 10 nhiệm vụ', icon: '🎯', unlocked: completedTasks.length >= 10 },
-    { id: 'note_5', name: 'Não bộ thứ hai', desc: 'Tạo 5 ghi chú', icon: '📝', unlocked: notesList.length >= 5 },
-    { id: 'quiz_3', name: 'Chuyên gia giải đố', desc: 'Sở hữu 3 bộ Quiz', icon: '🧩', unlocked: quizzesList.length >= 3 },
-    { id: 'exp_1000', name: 'Thợ săn kinh nghiệm', desc: 'Tổng 1000+ EXP', icon: '💎', unlocked: totalExp >= 1000 },
-  ]
+  const achievementsList: any[] = []
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -365,25 +371,33 @@ export default function ProfileWithSidebar() {
           </Card>
           <Card className="p-5 border-2 border-neutral-200" heading="Achievements">
             <div className="flex flex-wrap gap-3">
-              {achievementsList.map((ach) => (
-                <div 
-                  key={ach.id} 
-                  title={`${ach.name}: ${ach.desc} (${ach.unlocked ? 'Đã mở khóa' : 'Chưa mở khóa'})`}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-lg relative cursor-default transition-all ${ach.unlocked ? 'bg-primary text-[var(--color-cream-300)]' : 'bg-neutral-100 text-neutral-400 border-2 border-dashed border-neutral-300'}`}
-                >
-                  <span>{ach.icon}</span>
-                  {!ach.unlocked && (
-                    <div className="absolute inset-0 bg-neutral-900/5 rounded-full flex items-center justify-center">
-                      <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {achievements.map((ach) => {
+                const unlocked = ach.isUnlocked;
+                return (
+                  <div 
+                    key={ach.achievementId} 
+                    onClick={() => setSelectedAchievement(ach)}
+                    title={`${ach.displayName}: ${ach.description} (${unlocked ? 'Đã mở khóa' : 'Chưa mở khóa'})`}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center relative cursor-pointer hover:scale-110 active:scale-95 transition-all p-1.5 border-2 ${unlocked ? 'bg-amber-50 border-amber-300 shadow-sm' : 'bg-neutral-50 border-dashed border-neutral-300 opacity-50'}`}
+                  >
+                    <img 
+                      src={ach.iconUrl || 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png'} 
+                      alt={ach.displayName} 
+                      className={`w-full h-full object-contain ${unlocked ? '' : 'grayscale'}`}
+                    />
+                    {!unlocked && (
+                      <div className="absolute inset-0 bg-neutral-900/10 rounded-full flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <p className="text-xs text-neutral-500 mt-2">
-              Đã mở khóa: {achievementsList.filter(a => a.unlocked).length} / {achievementsList.length} thành tựu
+              Đã mở khóa: {achievements.filter(a => a.isUnlocked).length} / {achievements.length} thành tựu
             </p>
           </Card>
 
@@ -767,6 +781,77 @@ export default function ProfileWithSidebar() {
           </div>
         </div>
       </div>
+      {selectedAchievement && (
+        <Modal
+          open={!!selectedAchievement}
+          onClose={() => setSelectedAchievement(null)}
+          title="Chi Tiết Thành Tựu"
+          size="max-w-md"
+        >
+          <div className="flex flex-col items-center text-center gap-4">
+            <div
+              className={`w-20 h-20 rounded-full flex items-center justify-center p-2 border-2 ${
+                selectedAchievement.isUnlocked
+                  ? 'bg-amber-50 border-amber-300 shadow-md'
+                  : 'bg-neutral-50 border-dashed border-neutral-350 opacity-60'
+              }`}
+            >
+              <img
+                src={selectedAchievement.iconUrl || 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png'}
+                alt={selectedAchievement.displayName}
+                className={`w-full h-full object-contain ${
+                  selectedAchievement.isUnlocked ? '' : 'grayscale'
+                }`}
+              />
+            </div>
+            
+            <div>
+              <h3 className="text-xl font-extrabold text-neutral-800">{selectedAchievement.displayName}</h3>
+              <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider mt-1">
+                Yêu cầu: {selectedAchievement.requirementType}
+              </p>
+            </div>
+
+            <p className="text-sm text-neutral-600 px-2 leading-relaxed">
+              {selectedAchievement.description}
+            </p>
+
+            <div className="w-full bg-neutral-50 rounded-xl p-3 border border-neutral-100 mt-2 flex flex-col gap-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-neutral-500 font-semibold">Mục tiêu</span>
+                <span className="text-neutral-800 font-bold">
+                  {selectedAchievement.requirementValue} {selectedAchievement.requirementType === 'STREAK' ? 'Ngày liên tiếp' : selectedAchievement.requirementType === 'LEVEL' ? 'Cấp độ' : 'EXP'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-2">
+                <span className="text-neutral-500 font-semibold">Phần thưởng</span>
+                <span className="text-amber-600 font-bold flex items-center gap-1">
+                  +{selectedAchievement.expReward} EXP · +{selectedAchievement.coinReward} xu
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-2">
+                <span className="text-neutral-500 font-semibold">Trạng thái</span>
+                {selectedAchievement.isUnlocked ? (
+                  <span className="text-green-600 font-bold uppercase tracking-wider text-[10px]">
+                    Đã mở khóa
+                  </span>
+                ) : (
+                  <span className="text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
+                    Chưa đạt được
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedAchievement(null)}
+              className="mt-4 w-full py-2 bg-primary text-white text-sm font-bold rounded-xl shadow-md hover:bg-primary-dark transition-all active:scale-[0.98]"
+            >
+              Đóng
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

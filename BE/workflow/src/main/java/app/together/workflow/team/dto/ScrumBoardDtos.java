@@ -33,7 +33,10 @@ public final class ScrumBoardDtos {
             BigDecimal estimatedHours,
             BigDecimal actualHours,
             LocalDate duDate,
-            Long sprintId) {
+            Long sprintId,
+            String assignee,
+            LocalDate startDate,
+            java.time.Instant completedAt) {
     }
 
     public record MoveTaskRequest(

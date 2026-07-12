@@ -3,7 +3,7 @@ import { getFakeMeResponse } from '../mocks/user'
 
 export type { ApiResponse, MeResponse } from '../types/dto'
 
-const AUTH_ISSUER = 'http://localhost:8880'
+const AUTH_ISSUER = 'http://192.168.1.31:8880'
 
 /** Set VITE_USE_MOCK=true in .env to use fake user and health responses without backend. */
 export const useMock = import.meta.env.VITE_USE_MOCK === 'true'
@@ -416,7 +416,17 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async createTask(projectId: string | number, title: string, description: string, columnId?: string | number, priority = 'MEDIUM', estimatedHours = 0): Promise<ApiResponse<any>> {
+  async createTask(projectId: string | number, data: {
+    title: string
+    description?: string
+    priority?: string
+    estimatedHours?: number
+    startDate?: string | null
+    dueDate?: string | null
+    parentTaskId?: number | null
+    sprintId?: number | null
+    columnId?: number | null
+  }): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/projects/${projectId}/tasks`, {
       method: 'POST',
@@ -424,7 +434,7 @@ export const workflowApi = {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${getStoredToken()}`,
       },
-      body: JSON.stringify({ title, description, columnId, priority, estimatedHours }),
+      body: JSON.stringify(data),
     })
     return r.json()
   },
@@ -493,6 +503,13 @@ export const workflowApi = {
       headers: {
         Authorization: `Bearer ${getStoredToken()}`,
       },
+    })
+    return r.json()
+  },
+  async getWeeklyStudyHours(): Promise<ApiResponse<number[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [1.2, 2.5, 0.8, 3.0, 0.5, 4.2, 1.0] })
+    const r = await fetch('/api/v1/workflow/personal/tracking/sessions/weekly', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
   },
@@ -588,6 +605,13 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async getUserWallet(): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { balance: 100 } })
+    const r = await fetch('/api/v1/workflow/payment/wallet', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
   async upgradeSubscription(targetTier: string, durationDays: number): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/payment/subscription/upgrade', {
@@ -607,6 +631,13 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async getSummaries(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/summaries/history', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
   async getQuizSets(q?: string, difficulty?: string): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const params = new URLSearchParams()
@@ -616,7 +647,11 @@ export const workflowApi = {
     const r = await fetch(url, {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
-    return r.json()
+    const res = await r.json()
+    if (res.success && Array.isArray(res.data)) {
+      res.data = [...res.data].sort((a: any, b: any) => b.quizId - a.quizId)
+    }
+    return res
   },
   async updateQuizSetSharing(quizId: number, visibility: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
@@ -630,15 +665,18 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async uploadDocument(title: string, filePath: string, fileName: string, fileSize: number, fileType: string, mimeType: string): Promise<ApiResponse<any>> {
+  async uploadDocument(file: File, title?: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true, data: { documentId: 789 } })
+    const formData = new FormData()
+    formData.append('file', file)
+    if (title) formData.append('title', title)
+
     const r = await fetch('/api/v1/workflow/personal/documents', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         Authorization: `Bearer ${getStoredToken()}`,
       },
-      body: JSON.stringify({ title, filePath, fileName, fileSize, fileType, mimeType }),
+      body: formData,
     })
     return r.json()
   },
@@ -646,6 +684,18 @@ export const workflowApi = {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch('/api/v1/workflow/personal/documents', {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async askDocumentQuestion(documentId: number, question: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: "Mock answer" })
+    const r = await fetch(`/api/v1/workflow/personal/documents/${documentId}/ask`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ question }),
     })
     return r.json()
   },
@@ -839,7 +889,7 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async sendChatMessage(conversationId: number, content: string): Promise<ApiResponse<any>> {
+  async sendChatMessage(conversationId: number, content: string, documentId?: number): Promise<ApiResponse<any>> {
     if (useMock) {
       return Promise.resolve({
         success: true,
@@ -854,7 +904,7 @@ export const workflowApi = {
     const r = await fetch(`/api/v1/workflow/personal/chat/conversations/${conversationId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ messageText: content }),
+      body: JSON.stringify({ messageText: content, documentId }),
     })
     return r.json()
   },
@@ -1137,6 +1187,15 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async updateTask(taskId: number, data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
 
   // ── Admin Coin Packages ──
   async createCoinPackage(data: any): Promise<ApiResponse<any>> {
@@ -1181,6 +1240,21 @@ export const workflowApi = {
     const r = await fetch(`/api/v1/workflow/personal/documents/${documentId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getPublicAchievements(userSso: string): Promise<ApiResponse<any[]>> {
+    if (useMock) {
+      return Promise.resolve({
+        success: true,
+        data: [
+          { achievementId: 1, name: 'FIRST_STEP', displayName: 'Khởi Đầu Vững Chắc', description: 'Đạt chuỗi học tập liên tiếp 1 ngày', iconUrl: 'https://cdn-icons-png.flaticon.com/512/3112/3112946.png', requirementType: 'STREAK', requirementValue: 1, progress: 1, isUnlocked: true },
+          { achievementId: 2, name: 'THREE_DAY_STREAK', displayName: 'Nỗ Lực Không Ngừng', description: 'Duy trì chuỗi học tập 3 ngày liên tiếp', iconUrl: 'https://cdn-icons-png.flaticon.com/512/2583/2583272.png', requirementType: 'STREAK', requirementValue: 3, progress: 1, isUnlocked: false }
+        ]
+      })
+    }
+    const r = await fetch(`/api/v1/workflow/public/achievements/${userSso}`, {
+      method: 'GET'
     })
     return r.json()
   },

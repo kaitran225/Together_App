@@ -30,17 +30,21 @@ function computeResult(answers: (number | null)[], questions: any[], timeSpent: 
     wrongIndices.length > 0
       ? [{ topic: 'Compare Gradient Descent and Adam', questionNumbers: wrongIndices }]
       : []
+
+  const generatedTopics = wrongQuestions.length > 0
+    ? wrongQuestions.slice(0, 3).map((wq: any) => ({
+        title: wq.topic.length > 30 ? 'Ôn lại: ' + wq.topic.substring(0, 30) + '...' : 'Ôn lại: ' + wq.topic,
+        percent: Math.floor(Math.random() * 40) + 50
+      }))
+    : [{ title: 'Kiến thức chung (Tuyệt vời!)', percent: 100 }]
+
   return {
-    score: correctCount,
-    total: questions.length,
+    score: correctCount * 10,
+    total: questions.length * 10,
     correctCount,
     timeSpent,
     wrongQuestions,
-    suggestedTopics: [
-      { title: 'Optimization algorithms', percent: 45 },
-      { title: 'Optimization algorithms', percent: 62 },
-      { title: 'Optimization algorithms', percent: 78 },
-    ],
+    suggestedTopics: generatedTopics,
   }
 }
 
@@ -141,16 +145,21 @@ export function QuizletQuizModal({ onClose, questions: initialQuestions = MOCK_Q
                 topic: r.questionText,
                 questionNumbers: [idx + 1]
               }))
-            setResult({
-              score: resData.pointsEarned,
-              total: resData.pointsPossible,
-              correctCount: resData.results.filter((r: any) => r.isCorrect).length,
-              timeSpent: timeStr,
-              wrongQuestions,
-              suggestedTopics: [
-                { title: 'Based on your wrong answers', percent: 80 }
-              ]
-            })
+            const generatedTopics = wrongQuestions.length > 0 
+                ? wrongQuestions.slice(0, 3).map((wq: any) => ({
+                    title: wq.topic.length > 30 ? 'Ôn lại: ' + wq.topic.substring(0, 30) + '...' : 'Ôn lại: ' + wq.topic,
+                    percent: Math.floor(Math.random() * 40) + 50
+                  }))
+                : [{ title: 'Kiến thức chung (Tuyệt vời!)', percent: 100 }]
+
+              setResult({
+                score: resData.pointsEarned,
+                total: resData.pointsPossible,
+                correctCount: resData.results.filter((r: any) => r.isCorrect).length,
+                timeSpent: timeStr,
+                wrongQuestions,
+                suggestedTopics: generatedTopics
+              })
           }
         } catch (e) {
           console.error(e)

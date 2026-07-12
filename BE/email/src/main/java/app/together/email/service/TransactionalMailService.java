@@ -46,6 +46,16 @@ public class TransactionalMailService {
                     + link + "\n\n"
                     + "Đường link này sẽ hết hạn sau 1 giờ.\n"
                     + "Nếu bạn không yêu cầu, vui lòng bỏ qua email này.");
+        } else if (req.type() == EmailDispatchType.TASK_ASSIGNED) {
+            String link = base + "/teams";
+            log.info("=== LOCAL DEV: Task Assigned email to {}: {} ===", req.toEmail(), req.rawToken());
+            System.out.println("=== LOCAL DEV: Task Assigned email to " + req.toEmail() + ": " + req.rawToken());
+            message.setSubject("Bạn có một nhiệm vụ mới được giao!");
+            message.setText("Chào bạn,\n\n"
+                    + "Bạn vừa được phân công nhiệm vụ mới: \"" + req.rawToken() + "\".\n"
+                    + "Vui lòng truy cập đường link sau để xem chi tiết:\n"
+                    + link + "\n\n"
+                    + "Chúc bạn học tập và hoàn thành nhiệm vụ thật tốt!");
         } else {
             throw new IllegalArgumentException("Unsupported email type: " + req.type());
         }

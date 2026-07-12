@@ -23,9 +23,9 @@ export default function AdminAccountSettings() {
   const [preferences, setPreferences] = useState<UserPreferences>(initialPrefs)
   const [message, setMessage] = useState('')
 
-  const saveProfile = (e: React.FormEvent) => {
+  const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = updateOwnProfile(profile)
+    const result = await updateOwnProfile(profile)
     setMessage(result.ok ? 'Profile updated.' : result.error ?? 'Failed to update profile.')
   }
 

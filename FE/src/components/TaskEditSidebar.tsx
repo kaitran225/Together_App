@@ -30,11 +30,13 @@ type TaskEditSidebarProps = {
   onClose: () => void
   /** Optional column id for status dropdown context */
   statusOptions?: string[]
+  /** Optional list of team members for assignee dropdown selection */
+  members?: { id: string; name: string }[]
   /** When set, assignee is shown as a card with name and skill tags instead of an input */
   assigneeDisplay?: { name: string; skills: string[] }
 }
 
-export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT_STATUS_OPTIONS, assigneeDisplay }: TaskEditSidebarProps) {
+export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT_STATUS_OPTIONS, assigneeDisplay, members }: TaskEditSidebarProps) {
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.desc ?? '')
   const [assignee, setAssignee] = useState(task.assignee)
@@ -44,7 +46,7 @@ export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT
   const [due, setDue] = useState(task.due ?? '')
   const [tag, setTag] = useState(task.tag ?? '')
   const [progress, setProgress] = useState(task.progress ?? 0)
-  const [priority, setPriority] = useState(task.priority ?? '')
+  const [priority, setPriority] = useState(task.priority || 'Medium')
   const [estimate, setEstimate] = useState(task.estimate ?? '')
   const [reporter, setReporter] = useState(task.reporter ?? '')
   const [completed, setCompleted] = useState(task.completed ?? '')
@@ -59,7 +61,7 @@ export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT
     setDue(task.due ?? '')
     setTag(task.tag ?? '')
     setProgress(task.progress ?? 0)
-    setPriority(task.priority ?? '')
+    setPriority(task.priority || 'Medium')
     setEstimate(task.estimate ?? '')
     setReporter(task.reporter ?? '')
     setCompleted(task.completed ?? '')
@@ -78,7 +80,7 @@ export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT
       completed: completed || undefined,
       tag: tag || undefined,
       progress: progress,
-      priority: priority || undefined,
+      priority: priority || 'Medium',
       estimate: estimate || undefined,
       reporter: reporter || undefined,
     })
@@ -131,7 +133,20 @@ export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT
             </div>
             <div>
               <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Assignee</label>
-              {assigneeDisplay ? (
+              {members && members.length > 0 ? (
+                <select
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              ) : assigneeDisplay ? (
                 <div className="rounded-lg border-2 border-neutral-200 bg-neutral-50/80 p-2.5">
                   <p className="text-xs font-semibold text-neutral-900 mb-1.5">{assigneeDisplay.name}</p>
                   <div className="flex flex-wrap gap-1">
@@ -155,41 +170,45 @@ export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT
                 />
               )}
             </div>
-            <div>
-              <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Start date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Start date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">End date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">End date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Due date</label>
-              <input
-                type="date"
-                value={due}
-                onChange={(e) => setDue(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Completed date</label>
-              <input
-                type="date"
-                value={completed}
-                onChange={(e) => setCompleted(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Due date</label>
+                <input
+                  type="date"
+                  value={due}
+                  onChange={(e) => setDue(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Completed date</label>
+                <input
+                  type="date"
+                  value={completed}
+                  onChange={(e) => setCompleted(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-[10px] font-medium text-neutral-600 mb-0.5">Label / Tag</label>
@@ -208,7 +227,6 @@ export function TaskEditSidebar({ task, onSave, onClose, statusOptions = DEFAULT
                 onChange={(e) => setPriority(e.target.value)}
                 className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-neutral-300"
               >
-                <option value="">—</option>
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
                 <option value="High">High</option>
