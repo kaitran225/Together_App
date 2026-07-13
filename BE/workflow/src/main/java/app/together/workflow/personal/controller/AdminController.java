@@ -63,4 +63,44 @@ public class AdminController {
     public ApiResponse<List<AuditLog>> getAuditLogs() {
         return ApiResponse.ok(adminService.getAllAuditLogs());
     }
+
+    // --- ADMIN OVERVIEW STATS ---
+    @GetMapping("/overview")
+    public ApiResponse<java.util.Map<String, Object>> getOverviewStats() {
+        return ApiResponse.ok(adminService.getOverviewStats());
+    }
+
+    // --- ADMIN ALL ROOMS ---
+    @GetMapping("/rooms")
+    public ApiResponse<List<java.util.Map<String, Object>>> getAllRooms() {
+        return ApiResponse.ok(adminService.getAllRoomsForAdmin());
+    }
+
+    // --- ADMIN REVENUE KPIs ---
+    @GetMapping("/revenue/kpis")
+    public ApiResponse<java.util.Map<String, Object>> getRevenueKpis() {
+        return ApiResponse.ok(adminService.getRevenueKpis());
+    }
+
+    // --- ADMIN MODERATION & REPORTS ---
+    @GetMapping("/reported-users")
+    public ApiResponse<List<java.util.Map<String, Object>>> getReportedUsers() {
+        return ApiResponse.ok(adminService.getReportedUsers());
+    }
+
+    @PostMapping("/reported-users/{userSso}/ban")
+    public ApiResponse<Void> banReportedUser(@PathVariable String userSso) {
+        String adminSso = SecurityUtils.requireCurrentUserSso();
+        adminService.banReportedUser(userSso, adminSso);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/reported-users/report")
+    public ApiResponse<app.together.common.workflow.entity.UserReport> createReport(
+            @RequestParam("reportedUserSso") String reportedUserSso,
+            @RequestParam("reason") String reason,
+            @RequestParam(value = "roomId", required = false) Long roomId) {
+        String reporterSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(adminService.createReport(reporterSso, reportedUserSso, reason, roomId));
+    }
 }

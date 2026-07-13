@@ -18,6 +18,7 @@ import app.together.common.workflow.repository.CoinPackageRepository;
 import app.together.common.workflow.repository.PaymentTransactionRepository;
 import app.together.common.workflow.repository.TransactionRepository;
 import app.together.common.workflow.repository.UserMasterDataRepository;
+import app.together.workflow.payment.dto.PaymentDtos;
 import app.together.workflow.payment.dto.PaymentDtos.*;
 import app.together.common.workflow.dto.CoinPackageDto;
 import app.together.common.workflow.mapper.CoinPackageMapper;
@@ -285,6 +286,24 @@ public class PayOsService {
                         .status(WalletStatus.ACTIVE)
                         .build()));
         return userWalletMapper.toDto(wallet);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentDtos.TransactionResponse> getMyTransactions(String userSso) {
+        requireUserSso(userSso);
+        UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
+                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
+
+        return transactionRepository.findByUserMasterDataIdOrderByCreatedAtDesc(masterData.getMasterDataId())
+                .stream()
+                .map(t -> new PaymentDtos.TransactionResponse(
+                        t.getTransactionId(),
+                        t.getAmount(),
+                        t.getType(),
+                        t.getCategory(),
+                        t.getDescription(),
+                        t.getCreatedAt()))
+                .toList();
     }
 
 }

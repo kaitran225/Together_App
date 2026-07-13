@@ -2,6 +2,7 @@ package app.together.workflow.payment.controller;
 
 import app.together.common.shared.dto.ApiResponse;
 import app.together.common.shared.util.SecurityUtils;
+import app.together.workflow.payment.dto.PaymentDtos;
 import app.together.workflow.payment.dto.PaymentDtos.*;
 import app.together.common.workflow.dto.CoinPackageDto;
 import app.together.workflow.payment.service.PayOsService;
@@ -37,5 +38,11 @@ public class PayOsController {
     public ApiResponse<app.together.common.auth.dto.UserWalletDto> getWallet() {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(payOsService.getUserWallet(currentUserSso));
+    }
+
+    @GetMapping("/transactions")
+    public ApiResponse<List<PaymentDtos.TransactionResponse>> getTransactions() {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(payOsService.getMyTransactions(currentUserSso));
     }
 }

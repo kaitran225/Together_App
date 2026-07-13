@@ -18,6 +18,8 @@ import app.together.common.workflow.entity.CoinPackage;
 import app.together.common.workflow.repository.AppConfigRepository;
 import app.together.common.workflow.repository.AuditLogRepository;
 import app.together.common.workflow.repository.CoinPackageRepository;
+import app.together.common.workflow.repository.UserReportRepository;
+import app.together.common.workflow.entity.UserReport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,9 @@ public class AdminService {
     private final UserWalletRepository userWalletRepository;
     private final UserTransactionRepository userTransactionRepository;
     private final AppConfigRepository appConfigRepository;
+    private final app.together.common.workflow.repository.RoomRepository roomRepository;
+    private final app.together.common.workflow.repository.PaymentTransactionRepository paymentTransactionRepository;
+    private final UserReportRepository userReportRepository;
 
     // --- QUẢN LÝ GÓI COIN (CRUD COIN PACKAGES) ---
 
@@ -143,5 +148,105 @@ public class AdminService {
         return userRepository.save(user);
     }
 
+    // --- ADMIN OVERVIEW STATS ---
 
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getOverviewStats() {
+        permissionCheckService.requireSystemPermission(Permission.PLATFORM_AUDIT_READ);
+        long totalUsers = userRepository.count();
+        long activeUsers = userRepository.count(); // simplified — all users considered active
+        return java.util.Map.of(
+                "totalUsers", totalUsers,
+                "activeUsers", activeUsers
+        );
+    }
+
+    // --- ADMIN ALL ROOMS ---
+
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getAllRoomsForAdmin() {
+        permissionCheckService.requireSystemPermission(Permission.PLATFORM_AUDIT_READ);
+        List<app.together.common.workflow.entity.Room> rooms = roomRepository.findAll();
+        return rooms.stream().map(r -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("roomId", r.getRoomId());
+            map.put("name", r.getTitle());
+            map.put("status", r.getStatus());
+            map.put("roomType", r.getRoomType());
+            map.put("maxMembers", r.getMaxMembers());
+            map.put("createdBy", r.getCreatedBy());
+            map.put("createdAt", r.getCreatedAt());
+            map.put("inviteCode", r.getInviteCode());
+            return map;
+        }).toList();
+    }
+
+    // --- ADMIN REVENUE KPIs ---
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getRevenueKpis() {
+        permissionCheckService.requireSystemPermission(Permission.PLATFORM_AUDIT_READ);
+        List<app.together.common.workflow.entity.PaymentTransaction> allPayments = paymentTransactionRepository.findAll();
+        long totalRevenue = allPayments.stream()
+                .filter(p -> "PAID".equals(p.getStatus()))
+                .mapToLong(p -> p.getAmount() != null ? p.getAmount().longValue() : 0)
+                .sum();
+        long totalTransactions = allPayments.stream()
+                .filter(p -> "PAID".equals(p.getStatus()))
+                .count();
+        return java.util.Map.of(
+                "totalRevenue", totalRevenue,
+                "totalTransactions", totalTransactions,
+                "currency", "VND"
+        );
+    }
+
+    // --- ADMIN MODERATION & REPORTS ---
+
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getReportedUsers() {
+        permissionCheckService.requireSystemPermission(Permission.PLATFORM_AUDIT_READ);
+        List<UserReport> reports = userReportRepository.findByStatus("PENDING");
+        return reports.stream().map(r -> {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("reportId", r.getReportId());
+            map.put("reporterSso", r.getReporterSso());
+            map.put("reportedUserSso", r.getReportedUserSso());
+            map.put("reason", r.getReason());
+            map.put("roomId", r.getRoomId());
+            map.put("status", r.getStatus());
+            map.put("createdAt", r.getCreatedAt());
+
+            userRepository.findByUserSso(r.getReportedUserSso()).ifPresent(u -> {
+                map.put("username", u.getFullName() != null && !u.getFullName().isBlank() ? u.getFullName() : u.getUserSso());
+                map.put("email", u.getEmail());
+                map.put("userStatus", u.getStatus());
+            });
+
+            return map;
+        }).toList();
+    }
+
+    public void banReportedUser(String userSso, String adminSso) {
+        permissionCheckService.requireSystemPermission(Permission.ORG_ADMIN_ACTIONS);
+        changeUserStatus(userSso, "BANNED", adminSso);
+        List<UserReport> reports = userReportRepository.findByStatus("PENDING");
+        for (UserReport r : reports) {
+            if (r.getReportedUserSso().equals(userSso)) {
+                r.setStatus("RESOLVED");
+                userReportRepository.save(r);
+            }
+        }
+    }
+
+    public UserReport createReport(String reporterSso, String reportedUserSso, String reason, Long roomId) {
+        UserReport report = UserReport.builder()
+                .reporterSso(reporterSso)
+                .reportedUserSso(reportedUserSso)
+                .reason(reason)
+                .roomId(roomId)
+                .status("PENDING")
+                .build();
+        return userReportRepository.save(report);
+    }
 }

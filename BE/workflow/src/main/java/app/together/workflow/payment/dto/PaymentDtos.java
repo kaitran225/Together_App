@@ -1,6 +1,7 @@
 package app.together.workflow.payment.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 public final class PaymentDtos {
 
@@ -30,6 +31,16 @@ public final class PaymentDtos {
             String reference,
             String paymentLinkId,
             String status
+    ) {
+    }
+
+    public record TransactionResponse(
+            Long transactionId,
+            Integer amount,
+            String type,
+            String category,
+            String description,
+            Instant createdAt
     ) {
     }
 }

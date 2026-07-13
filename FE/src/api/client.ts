@@ -612,6 +612,13 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async getTransactions(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/payment/transactions', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
   async upgradeSubscription(targetTier: string, durationDays: number): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/payment/subscription/upgrade', {
@@ -727,6 +734,42 @@ export const workflowApi = {
   async getAuditLogs(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch('/api/v1/workflow/personal/admin/audit-logs', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminOverview(): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { totalUsers: 0, activeUsers: 0 } })
+    const r = await fetch('/api/v1/workflow/personal/admin/overview', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminRooms(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/rooms', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminRevenueKpis(): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { totalRevenue: 0, totalTransactions: 0, currency: 'VND' } })
+    const r = await fetch('/api/v1/workflow/personal/admin/revenue/kpis', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getReportedUsers(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/reported-users', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async banReportedUser(userSso: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/reported-users/${userSso}/ban`, {
+      method: 'POST',
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()

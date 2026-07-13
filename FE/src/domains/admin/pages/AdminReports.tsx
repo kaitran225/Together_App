@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { ChartContainer, BarChart, LineChart, useChartExport, usePdfExport } from '../charts'
 import { AdminKpiCard, AdminPageSection } from '../components'
-import { newUsersByMonth, reportsKpis, subscriptionsVsCancellation } from '../data/reportsData'
+import { newUsersByMonth, subscriptionsVsCancellation } from '../data/reportsData'
+import { workflowApi } from '../../../api/client'
 
 export default function AdminReports() {
   const [fromDate, setFromDate] = useState('2026-01-01')
@@ -10,6 +11,25 @@ export default function AdminReports() {
   const usersExport = useChartExport()
   const subExport = useChartExport()
   const { exportSingleChartPdf, exportPageChartsPdf } = usePdfExport()
+
+  const [kpis, setKpis] = useState([
+    { label: 'Total Users', value: '—', hint: 'Loading...' },
+    { label: 'Active Users', value: '—', hint: 'Loading...' },
+  ])
+
+  useEffect(() => {
+    workflowApi.getAdminOverview()
+      .then((res) => {
+        if (res.success && res.data) {
+          const d = res.data
+          setKpis([
+            { label: 'Total Users', value: String(d.totalUsers ?? 0), hint: 'Tổng số người dùng đăng ký' },
+            { label: 'Active Users', value: String(d.activeUsers ?? 0), hint: 'Người dùng hoạt động hệ thống' },
+          ])
+        }
+      })
+      .catch((err) => console.error('Failed to load reports kpis:', err))
+  }, [])
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,8 +55,8 @@ export default function AdminReports() {
           </div>
         }
       >
-        <div className="grid gap-3 md:grid-cols-3">
-          {reportsKpis.map((kpi) => (
+        <div className="grid gap-3 md:grid-cols-2">
+          {kpis.map((kpi) => (
             <AdminKpiCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
           ))}
         </div>
@@ -87,4 +107,3 @@ export default function AdminReports() {
     </div>
   )
 }
-
