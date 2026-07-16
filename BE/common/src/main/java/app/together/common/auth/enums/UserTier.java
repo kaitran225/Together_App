@@ -10,6 +10,7 @@ public enum UserTier {
     PRO,
     PLUS,
     TEAM,
+    COMBO,
     ENTERPRISE;
 
     /**
@@ -25,9 +26,9 @@ public enum UserTier {
             return UserTier.valueOf(s);
         } catch (IllegalArgumentException ignored) {
             return switch (s) {
-                case "PERSONAL" -> PRO;
+                case "PERSONAL" -> PLUS;
                 case "TEAMS" -> TEAM;
-                case "COMBO" -> PLUS;
+                case "COMBO" -> COMBO;
                 default -> FREE;
             };
         }

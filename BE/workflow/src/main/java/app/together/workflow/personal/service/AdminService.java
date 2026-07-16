@@ -565,9 +565,9 @@ public class AdminService {
             tier = UserTier.valueOf(normalized);
         } catch (IllegalArgumentException ex) {
             tier = switch (normalized) {
-                case "PERSONAL" -> UserTier.PRO;
+                case "PERSONAL" -> UserTier.PLUS;
                 case "TEAMS" -> UserTier.TEAM;
-                case "COMBO" -> UserTier.PLUS;
+                case "COMBO" -> UserTier.COMBO;
                 default -> throw new BadRequestException(MessageConstants.MESSAGE_PLAN_TYPE_INVALID);
             };
         }

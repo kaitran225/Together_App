@@ -57,7 +57,7 @@ public class TaskSubmissionService {
         String currentStatus = task.getStatus() != null ? task.getStatus() : TaskStatus.OPEN.name();
         if (!TaskStatus.IN_PROGRESS.name().equalsIgnoreCase(currentStatus)
                 && !TaskStatus.OPEN.name().equalsIgnoreCase(currentStatus)) {
-            throw new BadRequestException(MessageConstants.MESSAGE_TASK_SUBMISSION_CONTENT_REQUIRED);
+            throw new BadRequestException(MessageConstants.MESSAGE_TASK_ACTIVITY_INVALID);
         }
 
         TaskSubmission submission = TaskSubmission.builder()
