@@ -48,13 +48,13 @@ import java.util.UUID;
 @EnableWebSecurity
 public class AuthSecurityConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    @Value("${app.cors.allowed-origins:http://localhost:5174}")
     private String allowedOrigins;
 
     @Value("${app.oauth2.client-secret:{noop}secret}")
     private String clientSecret;
 
-    @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5173}")
+    @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5174}")
     private String redirectUris;
 
     @Bean
@@ -119,8 +119,13 @@ public class AuthSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        List<String> origins = List.of(allowedOrigins.split(",")).stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        // Patterns allow LAN IP changes (e.g. http://192.168.*.*:5173) without hardcoding every IP
+        configuration.setAllowedOriginPatterns(origins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

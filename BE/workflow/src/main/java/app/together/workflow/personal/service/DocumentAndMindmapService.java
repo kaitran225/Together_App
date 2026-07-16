@@ -8,6 +8,7 @@ import app.together.common.workflow.entity.Mindmap;
 import app.together.common.workflow.enums.ProcessingStatus;
 import app.together.common.workflow.repository.DocumentRepository;
 import app.together.common.workflow.repository.MindmapRepository;
+import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.personal.dto.DocumentAndMindmapDtos.*;
 import app.together.workflow.personal.service.ai.DocumentProcessingWorker;
 import app.together.workflow.personal.service.ai.OllamaAiService;
@@ -29,11 +30,13 @@ public class DocumentAndMindmapService {
     private final MindmapRepository mindmapRepository;
     private final DocumentProcessingWorker documentProcessingWorker;
     private final OllamaAiService ollamaAiService;
+    private final FeatureUsageService featureUsageService;
 
     // Quản lý tài liệu
     public DocumentResponse uploadDocumentFile(String userSso, org.springframework.web.multipart.MultipartFile file, String title) throws java.io.IOException {
         requireUserSso(userSso);
-        
+        featureUsageService.chargeIfFree(userSso, "PDF_UPLOAD", 0);
+
         long fileSize = file.getSize();
         String originalFilename = file.getOriginalFilename();
         String contentType = file.getContentType();
@@ -63,8 +66,8 @@ public class DocumentAndMindmapService {
             log.info("File PDF detected, kích hoạt xử lý AI bất đồng bộ cho document ID: {}", saved.getDocumentId());
             documentProcessingWorker.processDocumentAsync(saved.getDocumentId());
         } else {
-            log.info("File không phải PDF ({}), bỏ qua xử lý AI tự động.", document.getMimeType());
-            saved.setProcessingStatus(ProcessingStatus.COMPLETED.toString());
+            log.warn("File không phải PDF ({}), chưa hỗ trợ trích xuất nội dung nên đánh dấu FAILED thay vì COMPLETED giả.", document.getMimeType());
+            saved.setProcessingStatus(ProcessingStatus.FAILED.toString());
             documentRepository.save(saved);
         }
 

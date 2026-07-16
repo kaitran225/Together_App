@@ -47,7 +47,7 @@ const BREADCRUMBS: Record<string, BreadcrumbItem[]> = {
   '/admin/reports': [{ label: 'Admin' }, { label: 'Reports' }],
   '/admin/revenue': [{ label: 'Admin' }, { label: 'Revenue' }],
   '/admin/support': [{ label: 'Admin' }, { label: 'Support' }],
-  '/admin/users': [{ label: 'Admin', href: '/admin' }, { label: 'Users' }],
+  '/admin/billing': [{ label: 'Admin' }, { label: 'Billing' }],
   '/admin/account': [{ label: 'Admin', href: '/admin' }, { label: 'Account' }],
 }
 
@@ -71,7 +71,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/reports': 'Reports',
   '/admin/revenue': 'Revenue',
   '/admin/support': 'Support',
-  '/admin/users': 'Admin Users',
+  '/admin/billing': 'Billing',
   '/admin/account': 'Admin Account',
 }
 

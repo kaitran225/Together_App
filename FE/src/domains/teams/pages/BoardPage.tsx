@@ -12,6 +12,7 @@ import { workflowApi, authApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
 
 export default function BoardPage() {
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = (searchParams.get('tab') as TabId) || 'management'
   const setTab = (id: TabId) => {
@@ -34,6 +35,8 @@ export default function BoardPage() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDesc, setNewProjectDesc] = useState('')
 
+  const isOwner = members.some((m) => m.id === user?.userSso && m.role === 'OWNER')
+
   const loadTeamData = () => {
     if (!teamId) return
     
@@ -47,12 +50,12 @@ export default function BoardPage() {
           if (detail.members && detail.members.length > 0) {
             // Batch lookup user info from auth service
             const ssoList = detail.members.map((m: any) => m.userSso)
-            let userMap: Record<string, { fullName?: string; email?: string }> = {}
+            let userMap: Record<string, { fullName?: string; email?: string; avatarUrl?: string }> = {}
             try {
               const lookupRes = await authApi.lookupUsers(ssoList)
               if (lookupRes.success && lookupRes.data) {
                 lookupRes.data.forEach((u: any) => {
-                  userMap[u.userSso] = { fullName: u.fullName, email: u.email }
+                  userMap[u.userSso] = { fullName: u.fullName, email: u.email, avatarUrl: u.avatarUrl }
                 })
               }
             } catch (err) {
@@ -66,6 +69,7 @@ export default function BoardPage() {
                 id: m.userSso,
                 name: displayName,
                 role: m.role,
+                avatarUrl: m.avatarUrl || userInfo?.avatarUrl,
                 skills: m.role === 'OWNER' ? ['Product', 'Strategy'] : ['Contributor'],
                 code: displayName.slice(0, 2).toUpperCase()
               }
@@ -193,6 +197,8 @@ export default function BoardPage() {
             projectId={selectedProjectId}
             teamMembers={members}
             projectName={projects.find(p => p.projectId === selectedProjectId)?.name || 'Project Board'}
+            isOwner={isOwner}
+            currentUserSso={user?.userSso}
           />
         )}
       </div>
@@ -582,7 +588,19 @@ function getDueDateBadgeClass(dueDateStr: string, isDone: boolean) {
   return 'bg-neutral-100 text-neutral-600 border-neutral-200'
 }
 
-function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId: number | null; teamMembers: any[]; projectName: string }) {
+function ScrumBoardContent({
+  projectId,
+  teamMembers,
+  projectName,
+  isOwner = false,
+  currentUserSso,
+}: {
+  projectId: number | null
+  teamMembers: any[]
+  projectName: string
+  isOwner?: boolean
+  currentUserSso?: string
+}) {
   const [columns, setColumns] = useState<any[]>([])
   const [selected, setSelected] = useState<{ task: any; columnId: string } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -838,6 +856,13 @@ function ScrumBoardContent({ projectId, teamMembers, projectName }: { projectId:
               onClose={() => setSelected(null)}
               statusOptions={columns.map((c) => c.name)}
               members={teamMembers}
+              taskId={selected.task.taskId}
+              currentUserSso={currentUserSso}
+              isOwner={isOwner}
+              onWorkflowChange={() => {
+                loadBoard()
+                setSelected(null)
+              }}
             />
           </Card>
         )}

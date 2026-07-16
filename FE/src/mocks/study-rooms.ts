@@ -5,12 +5,13 @@ export const FILTERS = [
   { key: 'math', label: 'Mathematics' },
   { key: 'science', label: 'Science' },
   { key: 'lang', label: 'Languages' },
+  { key: 'other', label: 'Other' },
 ] as const
 
 export type Room = {
   id: string
   title: string
-  topic: 'math' | 'science' | 'lang'
+  topic: 'math' | 'science' | 'lang' | 'other'
   tags: string[]
   description: string
   membersCurrent: number

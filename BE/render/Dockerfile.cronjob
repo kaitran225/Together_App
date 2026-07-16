@@ -1,4 +1,4 @@
-# Render Web Service — Cronjob (no common dependency)
+# Render Web Service — Cronjob
 # Root Directory: BE | Dockerfile Path: render/Dockerfile.cronjob
 # Health: /actuator/health or /api/v1/cronjob/health | Swagger: /swagger-ui/index.html
 
@@ -9,11 +9,14 @@ RUN apk add --no-cache bash
 COPY mvnw mvnw
 COPY .mvn .mvn
 COPY parent/pom.xml parent/
+COPY common/pom.xml common/
+COPY common/src common/src
 COPY cronjob/pom.xml cronjob/
 COPY cronjob/src cronjob/src
 RUN chmod +x mvnw
 
 RUN ./mvnw -B -q -f parent/pom.xml install -DskipTests \
+    && ./mvnw -B -q -f common/pom.xml install -DskipTests \
     && ./mvnw -B -q -f cronjob/pom.xml package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine

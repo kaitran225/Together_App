@@ -13,6 +13,7 @@ import app.together.common.workflow.entity.TeamMember;
 import app.together.common.workflow.entity.TeamMemberId;
 import app.together.common.workflow.repository.TeamMemberRepository;
 import app.together.common.workflow.repository.TeamRepository;
+import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.team.dto.TeamDtos.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class TeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final PermissionCheckService permissionCheckService;
     private final UserRepository userRepository;
+    private final FeatureUsageService featureUsageService;
 
     // ── Tạo Team mới ──
 
@@ -40,6 +42,7 @@ public class TeamService {
         if (request.name() == null || request.name().isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_TEAM_NAME_REQUIRED);
         }
+        featureUsageService.chargeIfFree(userSso, "TEAM_CREATE", 0);
 
         Team team = Team.builder()
                 .name(request.name().trim())
@@ -100,10 +103,10 @@ public class TeamService {
                     if (team == null || team.getDeletedAt() != null) {
                         return null;
                     }
-                    int memberCount = (int) teamMemberRepository.findByTeamId(team.getTeamId()).stream()
+                    List<TeamMember> activeMembers = teamMemberRepository.findByTeamId(team.getTeamId()).stream()
                             .filter(tm -> tm.getLeftAt() == null)
-                            .count();
-                    return toTeamResponse(team, memberCount);
+                            .toList();
+                    return toTeamResponse(team, activeMembers.size(), toMemberPreviews(activeMembers));
                 })
                 .filter(java.util.Objects::nonNull)
                 .toList();
@@ -311,6 +314,10 @@ public class TeamService {
     }
 
     private TeamResponse toTeamResponse(Team team, int memberCount) {
+        return toTeamResponse(team, memberCount, List.of());
+    }
+
+    private TeamResponse toTeamResponse(Team team, int memberCount, List<MemberPreview> memberPreviews) {
         return new TeamResponse(
                 team.getTeamId(),
                 team.getName(),
@@ -320,13 +327,37 @@ public class TeamService {
                 team.getInviteCode(),
                 team.getMaxMembers(),
                 memberCount,
-                team.getCreatedAt());
+                team.getCreatedAt(),
+                memberPreviews != null ? memberPreviews : List.of());
+    }
+
+    private List<MemberPreview> toMemberPreviews(List<TeamMember> members) {
+        return members.stream()
+                .limit(5)
+                .map(member -> {
+                    var userOpt = userRepository.findByUserSso(member.getUserSso());
+                    String nickname = member.getNickname();
+                    if (nickname == null || nickname.isBlank()) {
+                        nickname = userOpt
+                                .map(user -> {
+                                    if (user.getFullName() != null && !user.getFullName().isBlank()) {
+                                        return user.getFullName();
+                                    }
+                                    return user.getEmail();
+                                })
+                                .orElse(member.getUserSso());
+                    }
+                    String avatarUrl = userOpt.map(u -> u.getAvatarUrl()).orElse(null);
+                    return new MemberPreview(member.getUserSso(), nickname, avatarUrl);
+                })
+                .toList();
     }
 
     private TeamMemberResponse toMemberResponse(TeamMember member) {
+        var userOpt = userRepository.findByUserSso(member.getUserSso());
         String nickname = member.getNickname();
         if (nickname == null || nickname.isBlank()) {
-            nickname = userRepository.findByUserSso(member.getUserSso())
+            nickname = userOpt
                     .map(user -> {
                         if (user.getFullName() != null && !user.getFullName().isBlank()) {
                             return user.getFullName();
@@ -335,11 +366,13 @@ public class TeamService {
                     })
                     .orElse(member.getUserSso());
         }
+        String avatarUrl = userOpt.map(u -> u.getAvatarUrl()).orElse(null);
         return new TeamMemberResponse(
                 member.getTeamId(),
                 member.getUserSso(),
                 member.getRole() != null ? member.getRole().name() : null,
                 nickname,
+                avatarUrl,
                 member.getJoinedAt());
     }
 }

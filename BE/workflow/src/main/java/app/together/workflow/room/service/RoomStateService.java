@@ -42,6 +42,7 @@ public class RoomStateService {
                 .isPremium(request.isPremium())
                 .maxMembers(maxMembers)
                 .roomType(roomType)
+                .topic(trimToNull(request.topic()))
                 .isPublic(isPublic)
                 .inviteCode(isPublic ? null : generateInviteCode())
                 .status(RoomStatus.OPEN.name())

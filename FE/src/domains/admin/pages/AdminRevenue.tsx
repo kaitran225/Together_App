@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { ChartContainer, LineChart, PieChart, useChartExport, usePdfExport } from '../charts'
 import { AdminKpiCard, AdminPageSection } from '../components'
-import { revenueDistribution, revenueOverTime } from '../data/revenueData'
 import { workflowApi } from '../../../api/client'
 
 export default function AdminRevenue() {
@@ -14,6 +13,8 @@ export default function AdminRevenue() {
     { label: 'Total Revenue', value: '—', hint: 'Loading...' },
     { label: 'Total Transactions', value: '—', hint: 'Loading...' },
   ])
+  const [revenueOverTime, setRevenueOverTime] = useState<{ label: string; series: { revenue: number } }[]>([])
+  const [revenueDistribution, setRevenueDistribution] = useState<{ label: string; value: number }[]>([])
 
   useEffect(() => {
     workflowApi.getAdminRevenueKpis()
@@ -27,6 +28,22 @@ export default function AdminRevenue() {
         }
       })
       .catch((err) => console.error('Failed to load revenue kpis:', err))
+
+    workflowApi.getAdminRevenueOverTime(6)
+      .then((res) => {
+        if (res.success && res.data) {
+          setRevenueOverTime(res.data.map((d) => ({ label: d.label, series: { revenue: d.value } })))
+        }
+      })
+      .catch((err) => console.error('Failed to load revenue over time:', err))
+
+    workflowApi.getAdminRevenueDistribution()
+      .then((res) => {
+        if (res.success && res.data) {
+          setRevenueDistribution(res.data)
+        }
+      })
+      .catch((err) => console.error('Failed to load revenue distribution:', err))
   }, [])
 
   return (

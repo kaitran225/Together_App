@@ -31,12 +31,13 @@ public class TaskSubmissionService {
     private final TaskAssignmentRepository taskAssignmentRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TaskActivityRepository taskActivityRepository;
+    private final BoardColumnRepository boardColumnRepository;
     private final PermissionCheckService permissionCheckService;
 
     /*
-     * Thành viên nộp bài làm/sản phẩm bàn giao cho Task
-     * Quyền: TASK_UPDATE
-     * */
+     * Thành viên nộp bài làm/sản phẩm bàn giao cho Task (IN_PROGRESS → IN_REVIEW)
+     * Quyền: TASK_UPDATE
+     */
     public TaskSubmissionResponse submitTask(Long taskId, String userSso, SubmitTaskRequest request) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, taskId));
@@ -53,6 +54,12 @@ public class TaskSubmissionService {
             throw new BadRequestException(MessageConstants.MESSAGE_TASK_SUBMISSION_CONTENT_REQUIRED);
         }
 
+        String currentStatus = task.getStatus() != null ? task.getStatus() : TaskStatus.OPEN.name();
+        if (!TaskStatus.IN_PROGRESS.name().equalsIgnoreCase(currentStatus)
+                && !TaskStatus.OPEN.name().equalsIgnoreCase(currentStatus)) {
+            throw new BadRequestException(MessageConstants.MESSAGE_TASK_SUBMISSION_CONTENT_REQUIRED);
+        }
+
         TaskSubmission submission = TaskSubmission.builder()
                 .taskId(taskId)
                 .userSso(userSso)
@@ -66,24 +73,31 @@ public class TaskSubmissionService {
 
         TaskSubmission saved = taskSubmissionRepository.save(submission);
 
-        // Tạo activity log
-        TaskActivity activity = TaskActivity.builder()
+        String oldStatus = task.getStatus();
+        task.setStatus(TaskStatus.IN_REVIEW.name());
+        task.setCompletedAt(null);
+        moveTaskToColumnNamed(task, "In Review");
+        taskRepository.save(task);
+
+        taskActivityRepository.save(TaskActivity.builder()
                 .taskId(taskId)
                 .userSso(userSso)
                 .activityType(TaskActivityStatus.SUBMIT.name())
-                .newValue(String.valueOf(saved.getSubmissionId()))
-                .build();
+                .oldValue(oldStatus)
+                .newValue(TaskStatus.IN_REVIEW.name())
+                .metadata(String.format("{\"submissionId\":%s}", saved.getSubmissionId()))
+                .build());
 
         return toSubmissionResponse(saved);
     }
 
     /*
-     * Kiểm tra và chấm điểm bài nộp
-     * Quyền: TASK_EVALUATE (OWNER)
-     * */
-    public TaskSubmissionResponse evaluateSubmission(Long taskId, String userSso, EvaluateTaskRequest request) {
-        TaskSubmission submission = taskSubmissionRepository.findById(taskId)
-                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, taskId));
+     * Kiểm tra và chấm điểm bài nộp
+     * Quyền: TASK_EVALUATE (OWNER)
+     */
+    public TaskSubmissionResponse evaluateSubmission(Long submissionId, String userSso, EvaluateTaskRequest request) {
+        TaskSubmission submission = taskSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, submissionId));
 
         Task task = taskRepository.findById(submission.getTaskId())
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, submission.getTaskId()));
@@ -93,15 +107,18 @@ public class TaskSubmissionService {
 
         if (request.grade() != null) {
             BigDecimal grade = request.grade();
-            if (grade.compareTo(BigDecimal.ZERO) <= 0 || grade.compareTo(BigDecimal.valueOf(10)) > 0) {
+            if (grade.compareTo(BigDecimal.ZERO) < 0 || grade.compareTo(BigDecimal.valueOf(10)) > 0) {
                 throw new BadRequestException(MessageConstants.MESSAGE_TASK_SUBMISSION_GRADE_INVALID);
             }
             submission.setGrade(grade);
         }
 
-        String targetStatus = request.status() != null ? request.status() : TaskSubmissionStatus.PENDING.name();
-        if (!List.of(TaskSubmissionStatus.PENDING.toString(), TaskSubmissionStatus.APPROVED.toString(), TaskSubmissionStatus.REJECTED.toString())
-                .contains(targetStatus)) {
+        String oldSubmissionStatus = submission.getStatus();
+        String targetStatus = request.status() != null ? request.status() : TaskSubmissionStatus.APPROVED.name();
+        if (!List.of(
+                TaskSubmissionStatus.PENDING.name(),
+                TaskSubmissionStatus.APPROVED.name(),
+                TaskSubmissionStatus.REJECTED.name()).contains(targetStatus)) {
             throw new BadRequestException(MessageConstants.MESSAGE_TASK_SUBMISSION_GRADE_INVALID);
         }
 
@@ -111,18 +128,34 @@ public class TaskSubmissionService {
 
         TaskSubmission saved = taskSubmissionRepository.save(submission);
 
-        if (TaskSubmissionStatus.APPROVED.equals(targetStatus)) {
+        if (TaskSubmissionStatus.APPROVED.name().equals(targetStatus)) {
+            String oldTaskStatus = task.getStatus();
             task.setStatus(TaskStatus.DONE.name());
             task.setCompletedAt(Instant.now());
+            moveTaskToColumnNamed(task, "Done");
             taskRepository.save(task);
-
 
             taskActivityRepository.save(TaskActivity.builder()
                     .taskId(task.getTaskId())
                     .userSso(userSso)
                     .activityType(TaskActivityStatus.COMPLETE_TASK.name())
-                    .oldValue(submission.getStatus())
-                    .newValue(TaskActivityStatus.COMPLETE_TASK.name())
+                    .oldValue(oldTaskStatus)
+                    .newValue(TaskStatus.DONE.name())
+                    .build());
+        } else if (TaskSubmissionStatus.REJECTED.name().equals(targetStatus)) {
+            String oldTaskStatus = task.getStatus();
+            task.setStatus(TaskStatus.IN_PROGRESS.name());
+            task.setCompletedAt(null);
+            moveTaskToColumnNamed(task, "In Progress");
+            taskRepository.save(task);
+
+            taskActivityRepository.save(TaskActivity.builder()
+                    .taskId(task.getTaskId())
+                    .userSso(userSso)
+                    .activityType(TaskActivityStatus.MOVE_TASK.name())
+                    .oldValue(oldTaskStatus)
+                    .newValue(TaskStatus.IN_PROGRESS.name())
+                    .metadata("{\"reason\":\"submission_rejected\"}")
                     .build());
         }
 
@@ -130,7 +163,7 @@ public class TaskSubmissionService {
                 .taskId(task.getTaskId())
                 .userSso(userSso)
                 .activityType(TaskActivityStatus.EVALUATE_SUBMISSION.name())
-                .oldValue(submission.getStatus())
+                .oldValue(oldSubmissionStatus)
                 .newValue(targetStatus)
                 .metadata(String.format("{\"grade\": %s}", submission.getGrade()))
                 .build());
@@ -139,9 +172,9 @@ public class TaskSubmissionService {
     }
 
     /*
-    * Lấy danh sách các lần nộp bài của một task
-    * Quyền: WORKFLOW_READ (OWNER)
-    * */
+     * Lấy danh sách các lần nộp bài của một task
+     * Quyền: WORKFLOW_READ
+     */
     public List<TaskSubmissionResponse> getSubmissionsForTask(Long taskId, String userSso) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, taskId));
@@ -151,8 +184,7 @@ public class TaskSubmissionService {
 
         List<TaskSubmission> submissions = taskSubmissionRepository.findByTaskId(taskId);
 
-        // là member thì xem bài nộp của mình
-        if(TeamRole.MEMBER.equals(teamMember.getRole())){
+        if (TeamRole.MEMBER.equals(teamMember.getRole())) {
             return submissions.stream()
                     .filter(sub -> Objects.equals(sub.getUserSso(), userSso))
                     .map(this::toSubmissionResponse)
@@ -162,6 +194,16 @@ public class TaskSubmissionService {
         return submissions.stream()
                 .map(this::toSubmissionResponse)
                 .toList();
+    }
+
+    private void moveTaskToColumnNamed(Task task, String columnName) {
+        if (task.getProjectId() == null || columnName == null || columnName.isBlank()) {
+            return;
+        }
+        boardColumnRepository.findByProjectId(task.getProjectId()).stream()
+                .filter(c -> columnName.equalsIgnoreCase(c.getName()))
+                .findFirst()
+                .ifPresent(c -> task.setColumnId(c.getColumnId()));
     }
 
     private TeamMember getActiveTeamMember(Long teamId, String userSso) {
@@ -187,5 +229,4 @@ public class TaskSubmissionService {
                 sub.getSubmittedAt()
         );
     }
-
 }

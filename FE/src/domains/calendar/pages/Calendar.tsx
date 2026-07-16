@@ -154,62 +154,94 @@ export default function Calendar() {
   const isViewingCurrentMonth =
     viewDate.getFullYear() === today.getFullYear() && viewDate.getMonth() === today.getMonth()
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = chatInput.trim()
     if (!text) return
     setChatInput('')
     setChatMessages((prev) => [...prev, { role: 'user', text }])
-    const reply = getMockAiReply(text, viewDate)
-    
-    setTimeout(async () => {
-      setChatMessages((prev) => [...prev, { role: 'ai', text: reply }])
-      
-      // Auto-schedule detection from mock AI response
-      if (reply.startsWith("Sure! I've added")) {
-        try {
-          const titleMatch = reply.match(/added "([^"]+)"/)
-          const dayMatch = reply.match(/to ([^,]+),/)
-          const timeMatch = reply.match(/at ([^.]+)\./)
-          
-          if (titleMatch) {
-            const title = titleMatch[1]
-            const dayName = dayMatch ? dayMatch[1].trim() : 'Monday'
-            const timeStr = timeMatch ? timeMatch[1].trim() : '4:00 PM'
-            
-            const computedStart = calculateDateTime(dayName, timeStr)
-            const computedEnd = new Date(computedStart)
-            computedEnd.setHours(computedEnd.getHours() + 1)
-            
-            const res = await workflowApi.createSchedule(
-              title,
-              computedStart.toISOString(),
-              computedEnd.toISOString(),
-              undefined,
-              'Created automatically by Together AI.'
-            )
-            if (res.success) {
-              fetchSchedules()
-            }
-          }
-        } catch (e) {
-          console.error("AI scheduling interception failed:", e)
+
+    try {
+      const res = await workflowApi.assistSchedule(text)
+      if (res.success && res.data?.reply) {
+        setChatMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }])
+        if (res.data.created) {
+          fetchSchedules()
         }
+        return
       }
-    }, 400)
+    } catch (e) {
+      console.warn('Schedule assist failed, falling back to mock', e)
+    }
+
+    const reply = getMockAiReply(text, viewDate)
+    setChatMessages((prev) => [...prev, { role: 'ai', text: reply }])
+    if (reply.startsWith("Sure! I've added")) {
+      try {
+        const titleMatch = reply.match(/added "([^"]+)"/)
+        const dayMatch = reply.match(/to ([^,]+),/)
+        const timeMatch = reply.match(/at ([^.]+)\./)
+        if (titleMatch) {
+          const title = titleMatch[1]
+          const dayName = dayMatch ? dayMatch[1].trim() : 'Monday'
+          const timeStr = timeMatch ? timeMatch[1].trim() : '4:00 PM'
+          const computedStart = calculateDateTime(dayName, timeStr)
+          const computedEnd = new Date(computedStart)
+          computedEnd.setHours(computedEnd.getHours() + 1)
+          const createRes = await workflowApi.createSchedule(
+            title,
+            computedStart.toISOString(),
+            computedEnd.toISOString(),
+            undefined,
+            'Created automatically by Together AI.'
+          )
+          if (createRes.success) fetchSchedules()
+        }
+      } catch (e) {
+        console.error('AI scheduling interception failed:', e)
+      }
+    }
   }
 
-  const runOptimizeWeek = () => {
-    setChatMessages((prev) => [...prev, { role: 'user', text: 'Optimize my week' }])
-    setTimeout(() => {
-      setChatMessages((prev) => [...prev, { role: 'ai', text: "I've looked at your week. I suggest blocking 9–11 AM on Tue and Thu for deep work, and keeping Wed afternoon free for meetings. Want me to add these blocks?" }])
-    }, 400)
+  const runOptimizeWeek = async () => {
+    const text = 'Tối ưu lịch tuần này và cho biết khung giờ rảnh để học sâu'
+    setChatMessages((prev) => [...prev, { role: 'user', text }])
+    try {
+      const res = await workflowApi.assistSchedule(text)
+      if (res.success && res.data?.reply) {
+        setChatMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }])
+        return
+      }
+    } catch {
+      /* fallback below */
+    }
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        role: 'ai',
+        text: "I've looked at your week. I suggest blocking 9–11 AM on Tue and Thu for deep work, and keeping Wed afternoon free for meetings. Want me to add these blocks?",
+      },
+    ])
   }
 
-  const runFindFocusTime = () => {
-    setChatMessages((prev) => [...prev, { role: 'user', text: 'Find my focus time' }])
-    setTimeout(() => {
-      setChatMessages((prev) => [...prev, { role: 'ai', text: "Based on your calendar, you have focus time: Tue 9–11 AM, Thu 2–4 PM, and Sat morning. I can add a recurring 'Focus' block for these slots if you'd like." }])
-    }, 400)
+  const runFindFocusTime = async () => {
+    const text = 'Tìm thời gian rảnh / focus time trên lịch của tôi tuần này'
+    setChatMessages((prev) => [...prev, { role: 'user', text }])
+    try {
+      const res = await workflowApi.assistSchedule(text)
+      if (res.success && res.data?.reply) {
+        setChatMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }])
+        return
+      }
+    } catch {
+      /* fallback below */
+    }
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        role: 'ai',
+        text: "Based on your calendar, you have focus time: Tue 9–11 AM, Thu 2–4 PM, and Sat morning. I can add a recurring 'Focus' block for these slots if you'd like.",
+      },
+    ])
   }
 
   return (

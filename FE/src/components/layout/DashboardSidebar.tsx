@@ -13,6 +13,7 @@ const userNavItems = [
   { to: '/subscription', labelKey: 'nav.subscription' },
   { to: '/shop', labelKey: 'nav.shop' },
   { to: '/meet-ai', labelKey: 'nav.togetherAi' },
+  { to: '/support', labelKey: 'nav.support' },
 ] as const
 
 const adminNavItems = [
@@ -23,10 +24,11 @@ const adminNavItems = [
   { to: '/admin/reports', labelKey: 'nav.admin.reports' },
   { to: '/admin/revenue', labelKey: 'nav.admin.revenue' },
   { to: '/admin/support', labelKey: 'nav.admin.support' },
+  { to: '/admin/billing', labelKey: 'nav.admin.billing' },
 ] as const
 
 const iconKeys: Array<'home' | 'study' | 'meetings' | 'teams' | 'calendar' | 'gift' | 'shop' | 'ai' | 'admin' | 'users' | 'settings' | 'moderation' | 'rooms' | 'reports' | 'revenue' | 'support'> = [
-  'home', 'study', 'meetings', 'teams', 'calendar', 'gift', 'shop', 'ai',
+  'home', 'study', 'meetings', 'teams', 'calendar', 'gift', 'shop', 'ai', 'support',
 ]
 
 function NavIcon({ icon }: { icon: (typeof iconKeys)[number] }) {
@@ -132,7 +134,7 @@ export function DashboardSidebar() {
   const { user, logout } = useAuth()
   const role = (user?.systemRole ?? 'USER') as string
   const navItems = role === 'ADMIN' ? adminNavItems : userNavItems
-  const navIcons = role === 'ADMIN' ? (['admin', 'users', 'moderation', 'rooms', 'reports', 'revenue', 'support'] as const) : iconKeys
+  const navIcons = role === 'ADMIN' ? (['admin', 'users', 'moderation', 'rooms', 'reports', 'revenue', 'support', 'shop'] as const) : iconKeys
   const homePath = role === 'ADMIN' ? '/admin/overview' : '/dashboard'
 
   return (

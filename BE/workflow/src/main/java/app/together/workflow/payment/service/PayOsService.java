@@ -11,6 +11,7 @@ import app.together.common.shared.exception.BadRequestException;
 import app.together.common.shared.exception.ResourceNotFoundException;
 import app.together.common.workflow.entity.CoinPackage;
 import app.together.common.workflow.entity.PaymentTransaction;
+import app.together.common.workflow.entity.SubscriptionPlan;
 import app.together.common.workflow.entity.Transaction;
 import app.together.common.workflow.entity.UserMasterData;
 import app.together.common.workflow.enums.PaymentStatus;
@@ -59,6 +60,7 @@ public class PayOsService {
     private final UserRepository userRepository;
     private final CoinPackageMapper coinPackageMapper;
     private final UserWalletMapper userWalletMapper;
+    private final SubscriptionService subscriptionService;
 
     @Value("${app.payment.payos.client-id}")
     private String payosClient;
@@ -115,10 +117,61 @@ public class PayOsService {
                 .build();
 
         PaymentTransaction saved = paymentTransactionRepository.save(transaction);
+        try {
+            Map<String, Object> meta = new java.util.HashMap<>();
+            meta.put("productType", "COIN_PACKAGE");
+            meta.put("packageId", coinPackage.getPackageId());
+            saved.setMetadata(objectMapper.writeValueAsString(meta));
+            paymentTransactionRepository.save(saved);
+        } catch (Exception ignored) {
+            // metadata optional for coin flow
+        }
 
+        String description = "NAP_COIN" + saved.getPaymentId();
+        return createPayOsCheckout(saved, description);
+    }
+
+    /**
+     * Tạo link thanh toán PayOS cho gói đăng ký (VND).
+     */
+    public CheckoutResponse createSubscriptionPaymentLink(String userSso, Long planId) {
+        requireUserSso(userSso);
+        SubscriptionPlan plan = subscriptionService.requireActivePlan(planId);
+
+        PaymentTransaction transaction = PaymentTransaction.builder()
+                .userSso(userSso)
+                .transactionType(TransactionType.PURCHASE.name())
+                .amount(BigDecimal.valueOf(plan.getPriceVnd()))
+                .coinsAmount(0)
+                .currency("VND")
+                .paymentMethod("PAYOS")
+                .status(PaymentStatus.PENDING.name())
+                .build();
+
+        PaymentTransaction saved = paymentTransactionRepository.save(transaction);
+        try {
+            Map<String, Object> meta = new java.util.HashMap<>();
+            meta.put("productType", "SUBSCRIPTION");
+            meta.put("planId", plan.getPlanId());
+            meta.put("tierCode", plan.getTierCode());
+            meta.put("durationDays", plan.getDurationDays() != null ? plan.getDurationDays() : 30);
+            saved.setMetadata(objectMapper.writeValueAsString(meta));
+            paymentTransactionRepository.save(saved);
+        } catch (Exception e) {
+            throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
+        }
+
+        String description = "GOI_" + plan.getTierCode() + saved.getPaymentId();
+        if (description.length() > 25) {
+            description = "SUB" + saved.getPaymentId();
+        }
+        return createPayOsCheckout(saved, description);
+    }
+
+    private CheckoutResponse createPayOsCheckout(PaymentTransaction saved, String description) {
         // 2. Tạo chữ ký Checksum cho đơn hàng của PayOS
         String signatureData = String.format("amount=%d&cancelUrl=%s&description=%s&orderCode=%d&returnUrl=%s",
-                saved.getAmount().longValue(), cancelUrl, "NAP_COIN" + saved.getPaymentId(), saved.getPaymentId(), returnUrl);
+                saved.getAmount().longValue(), cancelUrl, description, saved.getPaymentId(), returnUrl);
 
         String signature = hmacSha256(signatureData, payosChecksumKey);
 
@@ -126,14 +179,15 @@ public class PayOsService {
         try {
             RestClient restClient = RestClient.create();
             Map<String, Object> body = Map.of(
-                    "orderCode", saved.getPaymentId(), // Dùng chính paymentId tự tăng của DB làm orderCode số nguyên
+                    "orderCode", saved.getPaymentId(),
                     "amount", saved.getAmount().longValue(),
-                    "description", "NAP_COIN" + saved.getPaymentId(),
+                    "description", description,
                     "cancelUrl", cancelUrl,
                     "returnUrl", returnUrl,
                     "signature", signature
             );
 
+            @SuppressWarnings("unchecked")
             Map<String, Object> payosResponse = restClient.post()
                     .uri(uriPayos)
                     .header("x-client-id", payosClient)
@@ -143,12 +197,20 @@ public class PayOsService {
                     .body(Map.class);
 
             if (payosResponse != null && "00".equals(payosResponse.get("code"))) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> data = (Map<String, Object>) payosResponse.get("data");
                 String checkoutUrl = (String) data.get("checkoutUrl");
-                String payosOrderId = (String) data.get("payosOrderId");
+                String payosOrderId = data.get("paymentLinkId") != null
+                        ? String.valueOf(data.get("paymentLinkId"))
+                        : (String) data.get("payosOrderId");
 
-                // lưu checkoutUrl vào trong trường metadata định dạng JSONB
-                Map<String, String> metaMap = Map.of("checkoutUrl", checkoutUrl);
+                Map<String, Object> metaMap = new java.util.HashMap<>();
+                if (saved.getMetadata() != null && !saved.getMetadata().isBlank()) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> existing = objectMapper.readValue(saved.getMetadata(), Map.class);
+                    metaMap.putAll(existing);
+                }
+                metaMap.put("checkoutUrl", checkoutUrl);
                 saved.setMetadata(objectMapper.writeValueAsString(metaMap));
                 saved.setPaymentGatewayId(payosOrderId);
                 paymentTransactionRepository.save(saved);
@@ -161,6 +223,8 @@ public class PayOsService {
                 throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
             }
 
+        } catch (BadRequestException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to connect to PayOS gateway: {}", e.getMessage());
             throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
@@ -184,11 +248,59 @@ public class PayOsService {
         if (TransactionType.PAID.name().equals(data.status()) && PaymentStatus.PENDING.name().equals(transaction.getStatus())) {
             Instant now = Instant.now();
 
-            // 2. Chuyển trạng thái giao dịch sang PAID
+            // 2. Chuyển trạng thái giao dịch sang PAID (giữ string PAID để tương thích revenue admin)
             transaction.setStatus(TransactionType.PAID.name());
             transaction.setPaidAt(now);
             paymentTransactionRepository.save(transaction);
 
+            String productType = "COIN_PACKAGE";
+            Long planId = null;
+            try {
+                if (transaction.getMetadata() != null && !transaction.getMetadata().isBlank()) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> meta = objectMapper.readValue(transaction.getMetadata(), Map.class);
+                    if (meta.get("productType") != null) {
+                        productType = String.valueOf(meta.get("productType"));
+                    }
+                    if (meta.get("planId") != null) {
+                        planId = Long.valueOf(String.valueOf(meta.get("planId")));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Unable to parse payment metadata for #{}: {}", transaction.getPaymentId(), e.getMessage());
+            }
+
+            if ("SUBSCRIPTION".equalsIgnoreCase(productType)) {
+                fulfillSubscriptionPayment(transaction, planId);
+            } else {
+                fulfillCoinPayment(transaction, now);
+            }
+        }
+    }
+
+    private void fulfillSubscriptionPayment(PaymentTransaction transaction, Long planId) {
+        if (planId == null) {
+            throw new BadRequestException(MessageConstants.MESSAGE_SUBSCRIPTION_PLAN_NOT_FOUND);
+        }
+        SubscriptionPlan plan = subscriptionService.requireActivePlan(planId);
+        subscriptionService.applyPaidPlan(transaction.getUserSso(), plan);
+
+        UserMasterData masterData = userMasterDataRepository.findByUserSso(transaction.getUserSso())
+                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(transaction.getUserSso()).build()));
+
+        transactionRepository.save(Transaction.builder()
+                .userMasterDataId(masterData.getMasterDataId())
+                .amount(transaction.getAmount() != null ? transaction.getAmount().intValue() : 0)
+                .type(TransactionType.PURCHASE.name())
+                .category("SUBSCRIPTION_PURCHASE")
+                .description("Mua gói " + plan.getName() + " qua PayOS - hóa đơn #" + transaction.getPaymentId())
+                .build());
+
+        log.info("Successfully processed PayOS subscription payment #{} for userSso {} -> tier {}",
+                transaction.getPaymentId(), transaction.getUserSso(), plan.getTierCode());
+    }
+
+    private void fulfillCoinPayment(PaymentTransaction transaction, Instant now) {
             // 3. Tiến hành cộng Coin vào ví UserWallet (Auth Schema)
             User user = userRepository.findByUserSso(transaction.getUserSso())
                     .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_USER_NOT_FOUND, transaction.getUserSso()));
@@ -204,8 +316,9 @@ public class PayOsService {
                             .status(WalletStatus.ACTIVE)
                             .build()));
 
-            wallet.setBalance(wallet.getBalance() + transaction.getCoinsAmount());
-            wallet.setLifetimeEarned(wallet.getLifetimeEarned() + transaction.getCoinsAmount());
+            int coins = transaction.getCoinsAmount() != null ? transaction.getCoinsAmount() : 0;
+            wallet.setBalance(wallet.getBalance() + coins);
+            wallet.setLifetimeEarned(wallet.getLifetimeEarned() + coins);
             wallet.setLastTransactionAt(now);
             userWalletRepository.save(wallet);
 
@@ -215,17 +328,15 @@ public class PayOsService {
 
             transactionRepository.save(Transaction.builder()
                     .userMasterDataId(masterData.getMasterDataId())
-                    .amount(transaction.getCoinsAmount())
+                    .amount(coins)
                     .type(TransactionType.PURCHASE.name())
                     .category("COIN_PURCHASE")
                     .description("Nạp Coin thành công qua PayOS cho hóa đơn #" + transaction.getPaymentId())
                     .build());
 
             log.info("Successfully processed PayOS payment for transaction #{}. Credited {} coins to userSso {}.",
-                    transaction.getPaymentId(), transaction.getCoinsAmount(), transaction.getUserSso());
-        }
+                    transaction.getPaymentId(), coins, transaction.getUserSso());
     }
-
 
     private boolean verifyWebhookSignature(PayOsWebhookData data, String signature) {
         Map<String, Object> sortedMap = new TreeMap<>();

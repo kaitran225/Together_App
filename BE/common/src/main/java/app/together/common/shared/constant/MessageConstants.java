@@ -36,6 +36,8 @@ public final class MessageConstants {
     public static final String MESSAGE_COIN_PACKAGE_NOT_FOUND = "COIN_PACKAGE_NOT_FOUND";
     public static final String MESSAGE_COIN_PACKAGE_INVALID = "COIN_PACKAGE_INVALID";
     public static final String MESSAGE_COIN_PACKAGE_NAME_REQUIRED = "COIN_PACKAGE_NAME_REQUIRED";
+    public static final String MESSAGE_SUBSCRIPTION_PLAN_NOT_FOUND = "SUBSCRIPTION_PLAN_NOT_FOUND";
+    public static final String MESSAGE_SUBSCRIPTION_PLAN_NAME_REQUIRED = "SUBSCRIPTION_PLAN_NAME_REQUIRED";
     public static final String MESSAGE_EMAIL_VERIFICATION_NOT_FOUND = "EMAIL_VERIFICATION_NOT_FOUND";
     public static final String MESSAGE_EMAIL_VERIFICATION_INVALID = "EMAIL_VERIFICATION_INVALID";
     public static final String MESSAGE_EMAIL_VERIFICATION_EXPIRED = "EMAIL_VERIFICATION_EXPIRED";
@@ -233,5 +235,7 @@ public final class MessageConstants {
     public static final String MESSAGE_PACKAGE_NOT_FOUND = "PACKAGE_NOT_FOUND";
     public static final String MESSAGE_PACKAGE_INVALID = "PACKAGE_INVALID";
     public static final String MESSAGE_DURATION_INVALID = "DURATION_INVALID";
+    public static final String MESSAGE_PLAN_TYPE_INVALID = "PLAN_TYPE_INVALID";
+    public static final String MESSAGE_ROOM_ALREADY_CLOSED = "ROOM_ALREADY_CLOSED";
     public static final String MESSAGE_NOT_ENOUGH_COINS = "NOT_ENOUGH_COINS";
 }

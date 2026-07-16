@@ -232,8 +232,14 @@ public class AuthService {
 
             if (idToken != null) {
                 GoogleIdToken.Payload payload = idToken.getPayload();
-                String fullName = (String) payload.get("name");
                 String email = payload.getEmail();
+                if (email == null || email.isBlank()) {
+                    throw new UnauthorizedException(MessageConstants.MESSAGE_GOOGLE_TOKEN_INVALID, ErrorCodes.UNAUTHORIZED);
+                }
+                String fullName = (String) payload.get("name");
+                if (fullName == null || fullName.isBlank()) {
+                    fullName = email;
+                }
 
                 return Map.of(
                         "email", email,

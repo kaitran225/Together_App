@@ -12,6 +12,7 @@ import {
   SignUp,
   ConfirmMail,
   ResetPassword,
+  VerifyEmail,
   Dashboard,
   StudyRoomDiscovery,
   CreateNewRoomStudy,
@@ -41,7 +42,7 @@ import {
   Transaction,
   Subscription,
   Shop,
-  AdminUsers,
+  ContactSupport,
   AdminAccountSettings,
   AdminOverview,
   AdminUserManagement,
@@ -50,9 +51,10 @@ import {
   AdminReports,
   AdminRevenue,
   AdminSupport,
+  AdminBilling,
 } from './pages/app'
 
-const STANDALONE_PATHS = ['/callback', '/welcome', '/sign-up', '/confirm-mail', '/reset-password', '/debug']
+const STANDALONE_PATHS = ['/callback', '/welcome', '/sign-up', '/confirm-mail', '/reset-password', '/verify-email', '/debug']
 
 function ProtectedDashboardRoute({ element }: { element: ReactElement }) {
   return (
@@ -92,6 +94,7 @@ export default function App() {
         <Route path="/sign-up" element={<AuthLayout><SignUp /></AuthLayout>} />
         <Route path="/confirm-mail" element={<AuthLayout><ConfirmMail /></AuthLayout>} />
         <Route path="/reset-password" element={<AuthLayout><ResetPassword /></AuthLayout>} />
+        <Route path="/verify-email" element={<AuthLayout><VerifyEmail /></AuthLayout>} />
         <Route path="/debug" element={<DebugComponents />} />
         <Route path="/dashboard" element={<ProtectedDashboardRoute element={<Dashboard />} />} />
         <Route path="/study-rooms" element={<ProtectedDashboardRoute element={<StudyRoomDiscovery />} />} />
@@ -124,6 +127,7 @@ export default function App() {
         <Route path="/transaction" element={<ProtectedDashboardRoute element={<Transaction />} />} />
         <Route path="/subscription" element={<ProtectedDashboardRoute element={<Subscription />} />} />
         <Route path="/shop" element={<ProtectedDashboardRoute element={<Shop />} />} />
+        <Route path="/support" element={<ProtectedDashboardRoute element={<ContactSupport />} />} />
         <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
         <Route path="/admin/overview" element={<AdminRoute element={<AdminOverview />} />} />
         <Route path="/admin/users-management" element={<AdminRoute element={<AdminUserManagement />} />} />
@@ -132,7 +136,7 @@ export default function App() {
         <Route path="/admin/reports" element={<AdminRoute element={<AdminReports />} />} />
         <Route path="/admin/revenue" element={<AdminRoute element={<AdminRevenue />} />} />
         <Route path="/admin/support" element={<AdminRoute element={<AdminSupport />} />} />
-        <Route path="/admin/users" element={<AdminRoute element={<AdminUsers />} />} />
+        <Route path="/admin/billing" element={<AdminRoute element={<AdminBilling />} />} />
         <Route path="/admin/account" element={<AdminRoute element={<AdminAccountSettings />} />} />
       </Routes>
     </div>

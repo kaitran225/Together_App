@@ -7,6 +7,7 @@ import app.together.common.workflow.entity.UserAchievement;
 import app.together.common.workflow.entity.UserAchievementId;
 import app.together.common.workflow.repository.AchievementRepository;
 import app.together.common.workflow.repository.UserAchievementRepository;
+import app.together.workflow.payment.service.WalletService;
 import app.together.workflow.room.event.StudySessionCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,11 +33,13 @@ public class GamificationListener {
     private static final int COMPLETION_BONUS_EXP = 50;
     private static final int STREAK_BONUS_EXP = 10;
     private static final int MIN_EXP = 0;
+    private static final int LEVEL_UP_COIN_REWARD = 50;
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final UserRepository userRepository;
     private final AchievementRepository achievementRepository;
     private final UserAchievementRepository userAchievementRepository;
+    private final WalletService walletService;
 
     @EventListener
     @Transactional
@@ -90,8 +93,9 @@ public class GamificationListener {
         user.setLastActiveDate(today);
 
         // ── 3. Tính Level dựa trên tổng EXP ──
+        int previousLevel = user.getLevel() != null ? user.getLevel() : 1;
         int totalExp = user.getExp();
-        
+
         int tempLevel = 1;
         int remainingExp = totalExp;
         while (true) {
@@ -103,12 +107,20 @@ public class GamificationListener {
                 break;
             }
         }
-        user.setLevel(Math.max(1, tempLevel));
+        int newLevel = Math.max(1, tempLevel);
+        user.setLevel(newLevel);
 
         userRepository.save(user);
 
         log.info("Gamification: user={} exp+={} streak={} longest={} level={}",
                 event.userSso(), expEarned, currentStreak, longestStreak, user.getLevel());
+
+        // ── 3b. Thưởng Coin khi lên cấp ──
+        if (newLevel > previousLevel) {
+            int levelsGained = newLevel - previousLevel;
+            walletService.credit(user.getUserSso(), LEVEL_UP_COIN_REWARD * levelsGained,
+                    "LEVEL_UP", String.format("Thưởng lên cấp %d (+%d level)", newLevel, levelsGained));
+        }
 
         // ── 4. Kiểm tra & trao tặng Achievements ──
         checkAndGrantAchievements(user);
@@ -152,6 +164,11 @@ public class GamificationListener {
                 // Cộng phần thưởng EXP và Coin nếu có
                 if (achievement.getExpReward() != null && achievement.getExpReward() > 0) {
                     user.setExp(user.getExp() + achievement.getExpReward());
+                    userRepository.save(user);
+                }
+                if (achievement.getCoinReward() != null && achievement.getCoinReward() > 0) {
+                    walletService.credit(user.getUserSso(), achievement.getCoinReward(),
+                            "ACHIEVEMENT", "Thưởng thành tựu: " + achievement.getDisplayName());
                 }
 
                 log.info("Achievement UNLOCKED: user={} achievement={}",

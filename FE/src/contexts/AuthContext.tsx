@@ -2,12 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   authenticate,
   changeUserPassword,
-  createUser,
   listUsers,
-  toggleUserStatus,
   updateUser,
   verifyUserPassword,
-  type UserRole,
 } from '../mocks/auth'
 import { authApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/client'
 import type { UserDto } from '../types/dto'
@@ -32,7 +29,6 @@ const DEBUG_AUTH_BYPASS = false
 
 type LoginInput = { identifier: string; password: string }
 type ProfileInput = { fullName: string; email: string; avatarUrl?: string; skills?: string[]; learningGoals?: string[] }
-type CreateUserInput = { username: string; email: string; fullName: string; role: UserRole; password: string; avatarUrl?: string }
 
 type AuthContextValue = {
   user: UserDto | null
@@ -44,9 +40,6 @@ type AuthContextValue = {
   logout: () => void
   refreshUsers: () => void
   refreshProfile: () => Promise<void>
-  createMockUser: (input: CreateUserInput) => { ok: boolean; error?: string }
-  updateMockUser: (id: string, updates: Partial<any>) => { ok: boolean; error?: string }
-  toggleMockUserStatus: (id: string) => { ok: boolean; error?: string }
   updateOwnProfile: (input: ProfileInput) => Promise<{ ok: boolean; error?: string }>
   changeOwnPassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<{ ok: boolean; error?: string }>
   updateOwnPreferences: (preferences: any) => { ok: boolean; error?: string }
@@ -155,35 +148,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [])
 
-  const createMockUser = useCallback((input: CreateUserInput) => {
-    const existing = listUsers().find(
-      (item) =>
-        item.username.toLowerCase() === input.username.trim().toLowerCase() ||
-        item.email.toLowerCase() === input.email.trim().toLowerCase()
-    )
-    if (existing) return { ok: false, error: 'Username or email already exists.' }
-    createUser(input)
-    refreshUsers()
-    return { ok: true }
-  }, [refreshUsers])
-
-  const updateMockUser = useCallback((id: string, updates: Partial<any>) => {
-    const updated = updateUser(id, updates)
-    if (!updated) return { ok: false, error: 'User not found.' }
-    if (user?.userSso === updated.id) setUser(mapToUserDto(updated))
-    refreshUsers()
-    return { ok: true }
-  }, [refreshUsers, user?.userSso])
-
-  const toggleMockUserStatus = useCallback((id: string) => {
-    const updated = toggleUserStatus(id)
-    if (!updated) return { ok: false, error: 'User not found.' }
-    if (user?.userSso === updated.id && !updated.active) setUser(null)
-    if (user?.userSso === updated.id && updated.active) setUser(mapToUserDto(updated))
-    refreshUsers()
-    return { ok: true }
-  }, [refreshUsers, user?.userSso])
-
   const updateOwnProfile = useCallback(async (input: ProfileInput) => {
     if (!user) return { ok: false, error: 'Not authenticated.' }
     if (useMock) {
@@ -273,22 +237,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refreshUsers,
     refreshProfile,
-    createMockUser,
-    updateMockUser,
-    toggleMockUserStatus,
     updateOwnProfile,
     changeOwnPassword,
     updateOwnPreferences,
   }), [
-    createMockUser,
     changeOwnPassword,
     login,
     loginWithGoogle,
     logout,
     refreshUsers,
     refreshProfile,
-    toggleMockUserStatus,
-    updateMockUser,
     updateOwnPreferences,
     updateOwnProfile,
     effectiveUser,

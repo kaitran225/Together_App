@@ -6,8 +6,13 @@ public final class SubscriptionDtos {
 
     private SubscriptionDtos(){}
 
+    public record CheckoutSubscriptionRequest(
+            Long planId
+    ) {}
+
+    /** Kept for admin/manual apply; not used for user coin payment anymore. */
     public record UpgradeTierRequest(
-            String targetTier, // PRO, TEAMS, PLUS
+            String targetTier,
             Integer durationDays
     ) {}
 
@@ -15,7 +20,7 @@ public final class SubscriptionDtos {
             String userSso,
             String planType,
             Instant planExpiresAt,
-            Integer coinsDeducted,
-            Integer walletBalanceAfter
+            Long amountVnd,
+            String status
     ) {}
 }

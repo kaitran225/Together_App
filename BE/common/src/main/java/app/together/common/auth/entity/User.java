@@ -3,6 +3,7 @@ package app.together.common.auth.entity;
 import app.together.common.shared.persistence.BaseAuditEntity;
 
 import app.together.common.auth.enums.SystemRole;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -35,6 +36,7 @@ public class User extends BaseAuditEntity {
     @Column(nullable = false, unique = true)
     String email;
 
+    @JsonIgnore
     @Column(name = "password_hash")
     String passwordHash;
 

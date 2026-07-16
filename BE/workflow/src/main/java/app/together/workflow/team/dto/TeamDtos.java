@@ -38,6 +38,12 @@ public class TeamDtos {
 
     // ── Response DTOs ──
 
+    public record MemberPreview(
+            String userSso,
+            String nickname,
+            String avatarUrl) {
+    }
+
     public record TeamResponse(
             Long teamId,
             String name,
@@ -47,7 +53,8 @@ public class TeamDtos {
             String inviteCode,
             Integer maxMembers,
             Integer currentMemberCount,
-            Instant createdAt) {
+            Instant createdAt,
+            List<MemberPreview> memberPreviews) {
     }
 
     public record TeamMemberResponse(
@@ -55,6 +62,7 @@ public class TeamDtos {
             String userSso,
             String role,
             String nickname,
+            String avatarUrl,
             Instant joinedAt) {
     }
 

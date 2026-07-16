@@ -34,6 +34,12 @@ public class PersonalScheduleController {
         return ApiResponse.ok(personalScheduleService.createSchedule(currentUserSso, request));
     }
 
+    @PostMapping("/assist")
+    public ApiResponse<ScheduleAssistResponse> assist(@RequestBody ScheduleAssistRequest request){
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        return ApiResponse.ok(personalScheduleService.assistWithPrompt(currentUserSso, request));
+    }
+
     @GetMapping
     public ApiResponse<List<ScheduleResponse>> getMySchedules(){
         String currentUserSso = SecurityUtils.requireCurrentUserSso();

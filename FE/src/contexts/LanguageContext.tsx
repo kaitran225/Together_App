@@ -25,6 +25,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.logout': 'Logout',
     'nav.guest': 'Guest',
     'nav.togetherAi': 'Together AI',
+    'nav.support': 'Support',
     'nav.admin.dashboard': 'Dashboard',
     'nav.admin.users': 'Users',
     'nav.admin.moderation': 'Moderation',
@@ -32,6 +33,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.admin.reports': 'Reports',
     'nav.admin.revenue': 'Revenue',
     'nav.admin.support': 'Support',
+    'nav.admin.billing': 'Billing',
     'nav.collapse': 'Collapse',
     'nav.expand': 'Expand',
 
@@ -93,6 +95,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.logout': 'Đăng xuất',
     'nav.guest': 'Khách',
     'nav.togetherAi': 'Trợ lý AI',
+    'nav.support': 'Hỗ trợ',
     'nav.admin.dashboard': 'Bảng điều khiển',
     'nav.admin.users': 'Người dùng',
     'nav.admin.moderation': 'Kiểm duyệt',
@@ -100,6 +103,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.admin.reports': 'Báo cáo',
     'nav.admin.revenue': 'Doanh thu',
     'nav.admin.support': 'Hỗ trợ',
+    'nav.admin.billing': 'Thanh toán',
     'nav.collapse': 'Thu gọn',
     'nav.expand': 'Mở rộng',
 

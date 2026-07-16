@@ -4,7 +4,24 @@ import { Button, Input, Modal, Card, Checkbox } from '../../../components/common
 import { myTeamsData, archivedData } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 
-function MyTeamCard({ id, tag, code, subtitle, members }: { id: string; tag: string; code: string; subtitle: string; members: number }) {
+function MyTeamCard({
+  id,
+  tag,
+  code,
+  subtitle,
+  members,
+  avatarUrl,
+  memberPreviews = [],
+}: {
+  id: string
+  tag: string
+  code: string
+  subtitle: string
+  members: number
+  avatarUrl?: string
+  memberPreviews?: { userSso: string; nickname?: string; avatarUrl?: string }[]
+}) {
+  const previews = memberPreviews.slice(0, 3)
   return (
     <Link
       to={`/teams/board?teamId=${id}`}
@@ -16,20 +33,40 @@ function MyTeamCard({ id, tag, code, subtitle, members }: { id: string; tag: str
         </span>
       </div>
       <div className="px-3 pb-3 flex flex-col flex-1 min-h-0">
-        <div className="w-full aspect-[4/3] max-h-[120px] rounded-lg border border-[var(--color-border)] bg-[var(--color-charcoal)] flex items-center justify-center text-[9px] font-semibold text-neutral-700 uppercase">
-          [Image]
+        <div className="w-full aspect-[4/3] max-h-[120px] rounded-lg border border-[var(--color-border)] bg-[var(--color-charcoal)] overflow-hidden flex items-center justify-center text-[9px] font-semibold text-neutral-700 uppercase">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={code} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-2xl font-bold text-neutral-500">{code.slice(0, 2).toUpperCase()}</span>
+          )}
         </div>
         <p className="mt-2 text-sm font-bold text-neutral-900 truncate">{code}</p>
         <p className="text-xs text-neutral-600 truncate">{subtitle}</p>
         <div className="mt-auto pt-2 flex items-center justify-between gap-2">
           <div className="flex -space-x-1">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="w-5 h-5 rounded-full bg-[var(--color-background)] border border-[var(--color-border)] flex-shrink-0"
-                aria-hidden
-              />
-            ))}
+            {(previews.length > 0 ? previews : [1, 2, 3].slice(0, Math.min(3, Math.max(members, 1)))).map((m, i) => {
+              const preview = typeof m === 'object' ? m : null
+              const label = preview?.nickname || preview?.userSso || '?'
+              const initials = label.slice(0, 2).toUpperCase()
+              return preview?.avatarUrl ? (
+                <img
+                  key={preview.userSso || i}
+                  src={preview.avatarUrl}
+                  alt={label}
+                  title={label}
+                  className="w-5 h-5 rounded-full border border-[var(--color-border)] object-cover flex-shrink-0 bg-[var(--color-background)]"
+                />
+              ) : (
+                <div
+                  key={preview?.userSso || i}
+                  title={preview ? label : undefined}
+                  className="w-5 h-5 rounded-full bg-[var(--color-background)] border border-[var(--color-border)] flex-shrink-0 flex items-center justify-center text-[8px] font-bold text-neutral-600"
+                  aria-hidden={!preview}
+                >
+                  {preview ? initials : null}
+                </div>
+              )
+            })}
           </div>
           <span className="text-[10px] font-bold text-neutral-700 uppercase tracking-[0.06em]">
             {members} members
@@ -85,6 +122,8 @@ export default function AllTeams() {
             code: t.name,
             subtitle: t.description || '',
             members: t.currentMemberCount || 1,
+            avatarUrl: t.avatarUrl || undefined,
+            memberPreviews: Array.isArray(t.memberPreviews) ? t.memberPreviews : [],
           }))
           const isMock = import.meta.env.VITE_USE_MOCK === 'true'
           if (mapped.length > 0) {

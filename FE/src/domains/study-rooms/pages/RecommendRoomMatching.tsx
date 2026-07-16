@@ -17,16 +17,10 @@ export default function RecommendRoomMatching() {
     readApi.getSuggestedRooms()
       .then((res) => {
         if (res.success && res.data && res.data.length > 0) {
+          const topicLabels: Record<string, string> = { math: 'MATHEMATICS', science: 'SCIENCE', lang: 'LANGUAGES' }
           const mapped = res.data.map((r: any) => {
             const activeCount = r.members ? r.members.filter((m: any) => m.isActive).length : 0
-            const t = r.title.toLowerCase()
-            const d = r.description?.toLowerCase() || ''
-            let topic = 'MATHEMATICS'
-            if (t.includes('sci') || t.includes('bio') || t.includes('phy') || t.includes('chem') || d.includes('science') || d.includes('chemistry')) {
-              topic = 'SCIENCE'
-            } else if (t.includes('lang') || t.includes('spanish') || t.includes('french') || t.includes('english') || t.includes('japanese')) {
-              topic = 'LANGUAGES'
-            }
+            const topic = topicLabels[r.topic] || 'OTHER'
             return {
               id: String(r.roomId),
               title: r.title,

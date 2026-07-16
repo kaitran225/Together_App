@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/workflow/rooms")
 @RequiredArgsConstructor
@@ -27,6 +29,22 @@ public class RoomController {
     private final RoomService roomService;
     private final RoomWebRtcConfigService roomWebRtcConfigService;
     private final RoomEventHandler roomEventHandler;
+
+    @GetMapping
+    public ApiResponse<List<RoomResponse>> listActiveRooms() {
+        return ApiResponse.ok(roomService.listActivePublicRooms());
+    }
+
+    @GetMapping("/my")
+    public ApiResponse<List<RoomResponse>> listMyRooms() {
+        String currentUserSso = requireCurrentUserSso();
+        return ApiResponse.ok(roomService.listMyRooms(currentUserSso));
+    }
+
+    @GetMapping("/suggested")
+    public ApiResponse<List<RoomResponse>> listSuggestedRooms() {
+        return ApiResponse.ok(roomService.listSuggestedRooms());
+    }
 
     @PostMapping
     public ApiResponse<RoomResponse> createRoom(@RequestBody CreateRoomRequest request) {

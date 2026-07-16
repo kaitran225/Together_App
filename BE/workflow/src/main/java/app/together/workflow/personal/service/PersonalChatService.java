@@ -8,6 +8,8 @@ import app.together.common.workflow.repository.ChatConversationRepository;
 import app.together.common.workflow.repository.ChatMessageRepository;
 import app.together.common.workflow.repository.DocumentRepository;
 import app.together.common.workflow.entity.Document;
+import app.together.common.workflow.enums.ProcessingStatus;
+import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.personal.service.ai.OllamaAiService;
 import app.together.workflow.personal.dto.ChatDtos.*;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,8 @@ public class PersonalChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final DocumentRepository documentRepository;
     private final OllamaAiService ollamaAiService;
+    private final FeatureUsageService featureUsageService;
+    private final PersonalScheduleService personalScheduleService;
 
     /**
      * Tạo một luồng hội thoại chat mới với Chatbot AI.
@@ -55,6 +59,8 @@ public class PersonalChatService {
             throw new BadRequestException("Bạn không có quyền gửi tin nhắn vào luồng hội thoại này.");
         }
 
+        featureUsageService.chargeIfFree(userSso, "AI_CHAT", 60);
+
         Instant now = Instant.now();
 
         // 1. Lưu tin nhắn của Người dùng (USER) vào database
@@ -74,11 +80,28 @@ public class PersonalChatService {
                 if (document != null && document.getExtractedText() != null && !document.getExtractedText().isBlank()) {
                     String answer = ollamaAiService.answerQuestionFromDocument(document.getExtractedText(), request.messageText().trim());
                     aiResponse = new AiServiceResponse(answer, "CHAT", "{}");
+                } else if (document != null && ProcessingStatus.PROCESSING.toString().equals(document.getProcessingStatus())) {
+                    aiResponse = new AiServiceResponse(
+                        "Tài liệu \"" + document.getTitle() + "\" vẫn đang được xử lý, vui lòng đợi vài phút rồi hỏi lại.",
+                        "CHAT", "{}");
                 } else {
-                    aiResponse = ollamaAiService.chat(request.messageText().trim());
+                    aiResponse = new AiServiceResponse(
+                        "Tôi chưa đọc được nội dung tài liệu \"" + (document != null ? document.getTitle() : "đã chọn")
+                            + "\" (có thể do định dạng file chưa được hỗ trợ, chỉ PDF là trích xuất được), nên câu trả lời dưới đây KHÔNG dựa trên tài liệu:\n\n"
+                            + ollamaAiService.chat(request.messageText().trim()).replyText(),
+                        "CHAT", "{}");
                 }
             } else {
-                aiResponse = ollamaAiService.chat(request.messageText().trim());
+                String scheduleContext = null;
+                String msg = request.messageText() != null ? request.messageText().trim() : "";
+                if (looksLikeScheduleQuestion(msg)) {
+                    try {
+                        scheduleContext = personalScheduleService.buildScheduleContextForUser(userSso);
+                    } catch (Exception ex) {
+                        log.warn("Could not load schedule context for chat: {}", ex.getMessage());
+                    }
+                }
+                aiResponse = ollamaAiService.chatWithContext(scheduleContext, msg);
             }
         } catch (Exception e) {
             log.error("Failed to call Ollama, returning offline fallback response", e);
@@ -126,6 +149,18 @@ public class PersonalChatService {
         return chatMessageRepository.findByConversationIdOrderBySentAtAsc(conversationId).stream()
                 .map(this::toMessageResponse)
                 .toList();
+    }
+
+    private boolean looksLikeScheduleQuestion(String msg) {
+        if (msg == null || msg.isBlank()) {
+            return false;
+        }
+        String lower = msg.toLowerCase();
+        return lower.contains("lịch") || lower.contains("lich")
+                || lower.contains("rảnh") || lower.contains("ranh")
+                || lower.contains("free time") || lower.contains("schedule")
+                || lower.contains("calendar") || lower.contains("họp")
+                || lower.contains("thời gian trống") || lower.contains("tóm tắt lịch");
     }
 
     private ChatConversationResponse toConversationResponse(ChatConversation conv) {

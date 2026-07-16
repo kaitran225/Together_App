@@ -3,7 +3,7 @@ import { getFakeMeResponse } from '../mocks/user'
 
 export type { ApiResponse, MeResponse } from '../types/dto'
 
-const AUTH_ISSUER = 'http://192.168.1.31:8880'
+const AUTH_ISSUER = 'http://localhost:8880'
 
 /** Set VITE_USE_MOCK=true in .env to use fake user and health responses without backend. */
 export const useMock = import.meta.env.VITE_USE_MOCK === 'true'
@@ -185,11 +185,28 @@ export const readApi = {
   },
   async getRooms(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
+    // Prefer workflow (always needed for create/join). Fall back to read service if workflow list fails.
+    try {
+      const wr = await fetch('/api/v1/workflow/rooms', {
+        headers: { Authorization: `Bearer ${getStoredToken()}` },
+      })
+      if (wr.ok) return wr.json()
+    } catch {
+      // ignore and try read
+    }
     const r = await fetch('/api/v1/read/rooms')
     return r.json()
   },
   async getSuggestedRooms(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
+    try {
+      const wr = await fetch('/api/v1/workflow/rooms/suggested', {
+        headers: { Authorization: `Bearer ${getStoredToken()}` },
+      })
+      if (wr.ok) return wr.json()
+    } catch {
+      // ignore
+    }
     const r = await fetch('/api/v1/read/rooms/suggested')
     return r.json()
   },
@@ -210,6 +227,14 @@ export const readApi = {
   },
   async getMyRooms(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
+    try {
+      const wr = await fetch('/api/v1/workflow/rooms/my', {
+        headers: { Authorization: `Bearer ${getStoredToken()}` },
+      })
+      if (wr.ok) return wr.json()
+    } catch {
+      // ignore
+    }
     const r = await fetch('/api/v1/read/rooms/my', {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
@@ -231,7 +256,8 @@ export const workflowApi = {
     maxMembers: number,
     isPremium: boolean,
     isPublic: boolean,
-    roomType = 'SOCIAL'
+    roomType = 'SOCIAL',
+    topic?: string
   ): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch('/api/v1/workflow/rooms', {
@@ -249,6 +275,7 @@ export const workflowApi = {
         isPremium,
         isPublic,
         roomType,
+        topic,
       }),
     })
     return r.json()
@@ -598,6 +625,18 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async checkoutSubscription(planId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true, data: { checkoutUrl: 'http://localhost:5173/subscription' } })
+    const r = await fetch('/api/v1/workflow/payment/subscription/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getStoredToken()}`,
+      },
+      body: JSON.stringify({ planId }),
+    })
+    return r.json()
+  },
   async getCoinPackages(): Promise<ApiResponse<any[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch('/api/v1/workflow/payment/coin-packages', {
@@ -619,15 +658,10 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async upgradeSubscription(targetTier: string, durationDays: number): Promise<ApiResponse<any>> {
-    if (useMock) return Promise.resolve({ success: true })
-    const r = await fetch('/api/v1/workflow/payment/subscription/upgrade', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${getStoredToken()}`,
-      },
-      body: JSON.stringify({ targetTier, durationDays }),
+  async getSubscriptionPlans(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/payment/subscription/plans', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
   },
@@ -722,6 +756,80 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async createAdminUser(email: string, password: string, fullName: string, systemRole: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ email, password, fullName, systemRole }),
+    })
+    return r.json()
+  },
+  async updateAdminUserRole(userSso: string, systemRole: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/users/${userSso}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ systemRole }),
+    })
+    return r.json()
+  },
+  async updateAdminUserPlan(userSso: string, planType: string, durationDays?: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/users/${userSso}/plan`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ planType, durationDays: durationDays ?? null, planExpiresAt: null }),
+    })
+    return r.json()
+  },
+  async forceCloseAdminRoom(roomId: number): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/rooms/${roomId}/force-close`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getMySupportMessages(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/support/messages', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async sendSupportMessage(message: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/support/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ message }),
+    })
+    return r.json()
+  },
+  async getAdminSupportConversations(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/support/conversations', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminSupportConversation(userSso: string): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/personal/admin/support/conversations/${userSso}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async sendAdminSupportReply(userSso: string, message: string): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/support/conversations/${userSso}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ message }),
+    })
+    return r.json()
+  },
   async setSystemConfig(key: string, value: string, description?: string): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const url = `/api/v1/workflow/personal/admin/configs?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}${description ? `&description=${encodeURIComponent(description)}` : ''}`
@@ -752,9 +860,37 @@ export const workflowApi = {
     })
     return r.json()
   },
+  async getAdminUserGrowth(months = 6): Promise<ApiResponse<{ label: string; value: number }[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/personal/admin/overview/user-growth?months=${months}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminPlanDistribution(): Promise<ApiResponse<{ label: string; value: number }[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/overview/plan-distribution', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
   async getAdminRevenueKpis(): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true, data: { totalRevenue: 0, totalTransactions: 0, currency: 'VND' } })
     const r = await fetch('/api/v1/workflow/personal/admin/revenue/kpis', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminRevenueOverTime(months = 6): Promise<ApiResponse<{ label: string; value: number }[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch(`/api/v1/workflow/personal/admin/revenue/over-time?months=${months}`, {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async getAdminRevenueDistribution(): Promise<ApiResponse<{ label: string; value: number }[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/revenue/distribution', {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
@@ -878,6 +1014,20 @@ export const workflowApi = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
       body: JSON.stringify({ title, startTime, endTime, categoryId, description, location, isAllDay }),
+    })
+    return r.json()
+  },
+  async assistSchedule(prompt: string): Promise<ApiResponse<{ reply: string; created?: any }>> {
+    if (useMock) {
+      return Promise.resolve({
+        success: true,
+        data: { reply: `Sure! I've noted: ${prompt}`, created: null },
+      })
+    }
+    const r = await fetch('/api/v1/workflow/personal/schedules/assist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify({ prompt }),
     })
     return r.json()
   },
@@ -1253,6 +1403,33 @@ export const workflowApi = {
   async updateCoinPackage(packageId: number, data: any): Promise<ApiResponse<any>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/personal/admin/coin-packages/${packageId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+
+  // ── Admin Subscription Plans ──
+  async getAdminSubscriptionPlans(): Promise<ApiResponse<any[]>> {
+    if (useMock) return Promise.resolve({ success: true, data: [] })
+    const r = await fetch('/api/v1/workflow/personal/admin/subscription-plans', {
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
+    })
+    return r.json()
+  },
+  async createSubscriptionPlan(data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch('/api/v1/workflow/personal/admin/subscription-plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
+      body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+  async updateSubscriptionPlan(planId: number, data: any): Promise<ApiResponse<any>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/personal/admin/subscription-plans/${planId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
       body: JSON.stringify(data),

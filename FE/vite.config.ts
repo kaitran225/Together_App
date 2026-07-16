@@ -10,7 +10,7 @@ export default defineConfig({
     globals: true,
   },
   server: {
-    port: 5173,
+    port: 5174,
     host: true,
     proxy: {
       '/api/v1/workflow': { target: 'http://localhost:8881', changeOrigin: true },

@@ -1,4 +1,4 @@
-export { Welcome, SignUp, ConfirmMail, ResetPassword } from '../../domains/auth'
+export { Welcome, SignUp, ConfirmMail, ResetPassword, VerifyEmail } from '../../domains/auth'
 export { Dashboard } from '../../domains/dashboard'
 export {
   StudyRoomDiscovery,
@@ -17,9 +17,9 @@ export { ProfileWithSidebar, PublicProfile, Personalize, Personalize2, Personali
 export { Calendar } from '../../domains/calendar'
 export { Notification } from '../../domains/notifications'
 export { Transaction, Subscription, Shop } from '../../domains/billing'
+export { ContactSupport } from '../../domains/support'
 export {
   AdminDashboard,
-  AdminUsers,
   AdminAccountSettings,
   AdminOverview,
   AdminUserManagement,
@@ -28,4 +28,5 @@ export {
   AdminReports,
   AdminRevenue,
   AdminSupport,
+  AdminBilling,
 } from '../../domains/admin'

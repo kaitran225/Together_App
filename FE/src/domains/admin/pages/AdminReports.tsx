@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { ChartContainer, BarChart, LineChart, useChartExport, usePdfExport } from '../charts'
 import { AdminKpiCard, AdminPageSection } from '../components'
-import { newUsersByMonth, subscriptionsVsCancellation } from '../data/reportsData'
+import { subscriptionsVsCancellation } from '../data/reportsData'
 import { workflowApi } from '../../../api/client'
 
 export default function AdminReports() {
@@ -16,6 +16,7 @@ export default function AdminReports() {
     { label: 'Total Users', value: '—', hint: 'Loading...' },
     { label: 'Active Users', value: '—', hint: 'Loading...' },
   ])
+  const [newUsersByMonth, setNewUsersByMonth] = useState<{ label: string; value: number }[]>([])
 
   useEffect(() => {
     workflowApi.getAdminOverview()
@@ -24,11 +25,19 @@ export default function AdminReports() {
           const d = res.data
           setKpis([
             { label: 'Total Users', value: String(d.totalUsers ?? 0), hint: 'Tổng số người dùng đăng ký' },
-            { label: 'Active Users', value: String(d.activeUsers ?? 0), hint: 'Người dùng hoạt động hệ thống' },
+            { label: 'Active Users', value: String(d.activeUsers ?? 0), hint: 'Hoạt động trong 30 ngày qua' },
           ])
         }
       })
       .catch((err) => console.error('Failed to load reports kpis:', err))
+
+    workflowApi.getAdminUserGrowth(6)
+      .then((res) => {
+        if (res.success && res.data) {
+          setNewUsersByMonth(res.data)
+        }
+      })
+      .catch((err) => console.error('Failed to load new users by month:', err))
   }, [])
 
   return (
@@ -80,9 +89,13 @@ export default function AdminReports() {
             <BarChart data={newUsersByMonth} />
           </ChartContainer>
         </div>
+        {/* Still mock: the backend has no subscription/cancellation lifecycle tracking yet —
+            payment_transactions only records generic purchases, with no way to distinguish a
+            new subscription from a coin top-up or to record a cancellation event at all. Wiring
+            this up for real requires adding that tracking first, not just an API call. */}
         <div ref={subExport.chartRef}>
           <ChartContainer
-            title="Subscriptions vs cancellation"
+            title="Subscriptions vs cancellation (demo data)"
             legend={[{ label: 'Subscriptions', color: '#8FC766' }, { label: 'Cancellations', color: '#DE6B38' }]}
             action={
               <Button
@@ -94,6 +107,9 @@ export default function AdminReports() {
               </Button>
             }
           >
+            <p className="text-xs text-neutral-500 mb-2 px-1">
+              Chưa có dữ liệu thật — hệ thống chưa theo dõi subscription/cancellation lifecycle. Biểu đồ bên dưới chỉ là mẫu.
+            </p>
             <LineChart
               data={subscriptionsVsCancellation}
               series={[

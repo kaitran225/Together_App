@@ -155,10 +155,20 @@ public class ScrumBoardService {
                 // cập nhật vị trí cột mới
                 task.setColumnId(targetColumn.getColumnId());
 
-                // nếu chuyển sang cột "Done", tự động cập nhật status hoàn thành của Task
-                if (TaskStatus.DONE.name().equalsIgnoreCase(targetColumn.getName())) {
+                // đồng bộ status task theo tên cột Scrum
+                String columnName = targetColumn.getName() != null ? targetColumn.getName().trim() : "";
+                if ("Done".equalsIgnoreCase(columnName)) {
                         task.setStatus(TaskStatus.DONE.name());
                         task.setCompletedAt(Instant.now());
+                } else if ("In Review".equalsIgnoreCase(columnName)) {
+                        task.setStatus(TaskStatus.IN_REVIEW.name());
+                        task.setCompletedAt(null);
+                } else if ("In Progress".equalsIgnoreCase(columnName)) {
+                        task.setStatus(TaskStatus.IN_PROGRESS.name());
+                        task.setCompletedAt(null);
+                } else if ("To Do".equalsIgnoreCase(columnName)) {
+                        task.setStatus(TaskStatus.OPEN.name());
+                        task.setCompletedAt(null);
                 } else {
                         task.setStatus(TaskStatus.IN_PROGRESS.name());
                         task.setCompletedAt(null);

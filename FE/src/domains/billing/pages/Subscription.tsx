@@ -2,44 +2,41 @@ import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
 
-function FeatureItem({
-  text,
-  prefix,
-  light,
-}: {
-  text: string
-  prefix: '-' | '+'
-  light?: boolean
-}) {
-  const textClass = light ? 'text-white' : 'text-neutral-900'
+function FeatureItem({ text }: { text: string }) {
   return (
     <div className="inline-flex items-start gap-2">
-      <span className={`shrink-0 text-sm font-bold leading-5 ${textClass}`}>{prefix}</span>
-      <span className={`min-w-0 text-sm font-normal leading-5 ${textClass}`}>{text}</span>
+      <span className="shrink-0 text-sm font-bold leading-5 text-neutral-900">+</span>
+      <span className="min-w-0 text-sm font-normal leading-5 text-neutral-900">{text}</span>
     </div>
   )
 }
 
 export default function Subscription() {
-  const [packages, setPackages] = useState<any[]>([])
+  const [plans, setPlans] = useState<any[]>([])
+  const [checkingOutPlanId, setCheckingOutPlanId] = useState<number | null>(null)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
-    workflowApi.getCoinPackages().then(res => {
-      if (res.success && res.data) setPackages(res.data)
+    workflowApi.getSubscriptionPlans().then((res) => {
+      if (res.success && res.data) setPlans(res.data)
     })
   }, [])
 
-  const handleUpgrade = async (packageId: number) => {
+  const handleCheckout = async (planId: number) => {
+    setCheckingOutPlanId(planId)
+    setMessage('')
     try {
-      const res = await workflowApi.checkoutPayOs(packageId)
-      if (res.success && res.data && res.data.checkoutUrl) {
+      const res = await workflowApi.checkoutSubscription(planId)
+      if (res.success && res.data?.checkoutUrl) {
         window.location.href = res.data.checkoutUrl
-      } else {
-        alert("Failed to generate payment checkout link.")
+        return
       }
+      setMessage(res.message || 'Không tạo được link thanh toán. Vui lòng thử lại.')
     } catch (e) {
       console.error(e)
-      alert("Error initiating payment checkout.")
+      setMessage('Có lỗi xảy ra khi thanh toán gói.')
+    } finally {
+      setCheckingOutPlanId(null)
     }
   }
 
@@ -50,52 +47,68 @@ export default function Subscription() {
           Gói đăng ký
         </h1>
         <p className="w-full max-w-[28rem] text-center text-sm leading-6 text-neutral-700 sm:max-w-[672px] sm:text-base sm:leading-7">
-          Chọn gói phù hợp với nhu cầu học tập của bạn
+          Chọn gói phù hợp — thanh toán bằng tiền Việt (VND) qua PayOS.
         </p>
+        {message && <p className="text-sm font-medium text-accent">{message}</p>}
       </div>
 
-      <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4 lg:gap-4">
-        {packages.map((pack) => {
-          const features: string[] = pack.features || []
-          const desc = pack.description || ''
-          const isFree = pack.priceVnd === 0
+      <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6 lg:gap-6 pt-4">
+        {plans.map((plan) => {
+          const features: string[] = plan.features || []
+          const priceVnd = Number(plan.priceVnd ?? 0)
+          const days = plan.durationDays ?? 30
+          const isPopular = plan.isPopular === true
 
           return (
-            <div key={pack.packageId} className={`relative flex min-w-0 flex-col justify-between rounded-2xl border ${pack.isPopular ? 'border-primary/30' : 'border-white/10'} bg-[var(--color-surface)] p-4 shadow-none sm:p-5 lg:min-h-[380px] lg:p-6`}>
-              {pack.isPopular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded border border-primary bg-primary px-3 py-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-primary-foreground">Most Popular</span>
-                </div>
+            <div
+              key={plan.planId}
+              className={`relative flex min-w-0 flex-col justify-between rounded-2xl p-4 sm:p-5 lg:min-h-[380px] lg:p-6 transition-all bg-[var(--color-surface)] ${
+                isPopular
+                  ? 'border-2 border-indigo-600 shadow-md scale-[1.02]'
+                  : 'border border-white/10 shadow-none'
+              }`}
+            >
+              {/* Nhãn nổi bật cho gói Popular */}
+              {isPopular && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow whitespace-nowrap">
+                  Phổ biến nhất
+                </span>
               )}
+
               <div className="flex flex-col">
                 <div className="flex flex-col gap-2 pb-3 sm:pb-4">
-                  <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">{pack.packageName}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">{pack.priceVnd.toLocaleString()}VND</span>
+                  <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1 flex-wrap">
+                    <span className="text-3xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">
+                      {priceVnd.toLocaleString('vi-VN')}₫
+                    </span>
+                    <span className="text-sm text-neutral-500">/ {days} ngày</span>
                   </div>
-                  <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">{desc}</p>
+                  <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">{plan.description}</p>
                 </div>
                 <ul className="flex flex-col gap-2 pb-6 sm:gap-3 sm:pb-8">
                   {features.map((f: string) => (
                     <li key={f} className="flex items-start gap-3">
-                      <FeatureItem text={f} prefix={pack.isPopular ? '+' : '-'} />
+                      <FeatureItem text={f} />
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="flex gap-2">
-                {isFree ? (
-                  <Button variant="secondary" size="md" className="w-full uppercase" onClick={() => alert("You are already on the Free plan.")}>Active</Button>
-                ) : (
-                  <>
-                    <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(pack.packageId)}>Start</Button>
-                    {!pack.isPopular && <Button variant="secondary" size="md" className="flex-1 uppercase" onClick={() => handleUpgrade(pack.packageId)}>3 days trial</Button>}
-                  </>
-                )}
-              </div>
+              <Button
+                variant={isPopular ? 'primary' : 'secondary'}
+                size="md"
+                className="w-full uppercase"
+                disabled={checkingOutPlanId === plan.planId}
+                onClick={() => handleCheckout(plan.planId)}
+              >
+                {checkingOutPlanId === plan.planId ? 'Đang chuyển tới thanh toán...' : 'Thanh toán'}
+              </Button>
             </div>
           )
         })}
+        {plans.length === 0 && (
+          <p className="col-span-full text-center text-sm text-neutral-500">Chưa có gói đăng ký nào khả dụng.</p>
+        )}
       </div>
     </div>
   )

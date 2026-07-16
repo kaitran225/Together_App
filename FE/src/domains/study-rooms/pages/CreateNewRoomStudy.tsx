@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button, Card, Input, RadioGroup, Textarea, Select, Switch } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
+import { topicOptions } from '../../../mocks'
 
 const durationDaysOptions = [
   { value: '1', label: '1 ngày (1 Day)' },
@@ -15,6 +16,7 @@ export default function CreateNewRoomStudy() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [topic, setTopic] = useState('')
   const [goalDescription, setGoalDescription] = useState('')
   const [goalDurationDays, setGoalDurationDays] = useState(7)
   const [maxMembers, setMaxMembers] = useState(10)
@@ -43,7 +45,8 @@ export default function CreateNewRoomStudy() {
         maxMembers,
         isPremium,
         isPublic,
-        'SOCIAL' // roomType defaults to 'SOCIAL'
+        'SOCIAL', // roomType defaults to 'SOCIAL'
+        topic || undefined
       )
       if (res.success) {
         if (res.data?.roomId) {
@@ -88,6 +91,12 @@ export default function CreateNewRoomStudy() {
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+            />
+            <Select
+              label="Chủ đề (Topic)"
+              options={[{ value: '', label: 'Không chọn (Uncategorized)' }, ...topicOptions]}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
             />
             <Textarea
               label="Mục tiêu học tập (Main Study Goals)"

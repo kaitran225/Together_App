@@ -56,6 +56,9 @@ public class Room extends BaseAuditEntity {
     @Column(name = "status")
     String status;
 
+    @Column(name = "topic", length = 32)
+    String topic;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "room_type", nullable = false, length = 32)
     RoomType roomType;

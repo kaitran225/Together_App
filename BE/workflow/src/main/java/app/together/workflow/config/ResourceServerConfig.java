@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -21,7 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 @EnableWebSecurity
 public class ResourceServerConfig {
 
-        @Value("${app.cors.allowed-origins:http://localhost:5173}")
+        @Value("${app.cors.allowed-origins:http://localhost:5174}")
         private String allowedOrigins;
 
         @Bean
@@ -54,6 +55,8 @@ public class ResourceServerConfig {
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payos/webhook")).permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payment/payos/webhook")).permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/payment/coin-packages")).permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/v1/workflow/rooms").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/v1/workflow/rooms/suggested").permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/api/v1/workflow/public/**")).permitAll()
                                                 .requestMatchers(new AntPathRequestMatcher("/error")).permitAll()
                                                 .anyRequest().authenticated())
@@ -64,8 +67,12 @@ public class ResourceServerConfig {
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(List.of(allowedOrigins.split(",")));
-                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                List<String> origins = List.of(allowedOrigins.split(",")).stream()
+                                .map(String::trim)
+                                .filter(s -> !s.isEmpty())
+                                .toList();
+                configuration.setAllowedOriginPatterns(origins);
+                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 configuration.setAllowedHeaders(List.of("*"));
                 configuration.setAllowCredentials(true);
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

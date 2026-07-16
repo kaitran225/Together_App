@@ -31,6 +31,17 @@ export default function StudyRoom() {
   const pcsRef = useRef<{ [userSso: string]: RTCPeerConnection }>({})
   const [remoteStreams, setRemoteStreams] = useState<{ [userSso: string]: MediaStream }>({})
 
+  // Kept in sync with the corresponding state so the WS signal subscription
+  // (which is only ever bound once, see the [roomId, user?.userSso] effect
+  // below) always reads the latest values instead of a stale mount-time closure.
+  const stompClientRef = useRef<StompClient | null>(null)
+  const localStreamRef = useRef<MediaStream | null>(null)
+  const iceServersRef = useRef<any[]>([])
+
+  useEffect(() => { stompClientRef.current = stompClient }, [stompClient])
+  useEffect(() => { localStreamRef.current = localStream }, [localStream])
+  useEffect(() => { iceServersRef.current = iceServers }, [iceServers])
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsStudied((prev) => prev + 1)
@@ -86,19 +97,19 @@ export default function StudyRoom() {
     }
 
     const pc = new RTCPeerConnection({
-      iceServers: iceServers.length > 0 ? iceServers : [{ urls: 'stun:stun.l.google.com:19002' }]
+      iceServers: iceServersRef.current.length > 0 ? iceServersRef.current : [{ urls: 'stun:stun.l.google.com:19302' }]
     })
     pcsRef.current[targetSso] = pc
 
-    if (localStream) {
-      localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, localStream)
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current!)
       })
     }
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && stompClient) {
-        stompClient.send('/app/room.signal', {
+      if (event.candidate && stompClientRef.current) {
+        stompClientRef.current.send('/app/room.signal', {
           roomId: String(roomId),
           fromUser: user?.userSso,
           toUser: "",
@@ -148,10 +159,11 @@ export default function StudyRoom() {
   const initiateCall = async (targetSso: string) => {
     try {
       const pc = createPeerConnection(targetSso)
+      if (pc.signalingState !== 'stable') return
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
-      stompClient?.send('/app/room.signal', {
+      stompClientRef.current?.send('/app/room.signal', {
         roomId: String(roomId),
         fromUser: user?.userSso,
         toUser: "",
@@ -175,7 +187,7 @@ export default function StudyRoom() {
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
 
-      stompClient?.send('/app/room.signal', {
+      stompClientRef.current?.send('/app/room.signal', {
         roomId: String(roomId),
         fromUser: user?.userSso,
         toUser: "",

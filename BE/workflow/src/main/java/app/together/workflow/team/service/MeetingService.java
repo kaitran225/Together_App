@@ -12,6 +12,7 @@ import app.together.common.workflow.enums.MeetingStatus;
 import app.together.common.workflow.repository.*;
 import app.together.common.auth.repository.UserRepository;
 import app.together.common.auth.entity.User;
+import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.team.dto.MeetingDtos.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class MeetingService {
     private final UserRepository userRepository;
     private final PermissionCheckService permissionCheckService;
     private final GenerateAiSummary generateAiSummary;
+    private final FeatureUsageService featureUsageService;
 
     @org.springframework.beans.factory.annotation.Value("${app.ai.service-url=https://dev-together-ai-gateway.onrender.com/}")
     private String aiServerUrl;
@@ -56,6 +58,8 @@ public class MeetingService {
         if (meetingRepository.findFirstByTeamIdAndActualEndIsNullOrderByCreatedAtDesc(teamId).isPresent()) {
             throw new BadRequestException("Đang có một cuộc họp diễn ra trong nhóm, không thể tạo mới.");
         }
+
+        featureUsageService.chargeIfFree(userSso, "MEETING_CREATE", 0);
 
         Meeting meeting = Meeting.builder()
                 .teamId(teamId)

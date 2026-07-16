@@ -22,6 +22,7 @@ public final class RoomDtos {
                         Boolean isPublic,
                         Integer maxMembers,
                         String roomType,
+                        String topic,
                         Instant activatedAt,
                         Instant expiresAt,
                         Instant closedAt,
@@ -46,7 +47,8 @@ public final class RoomDtos {
                         Integer maxMembers,
                         Boolean isPremium,
                         Boolean isPublic,
-                        String roomType) {
+                        String roomType,
+                        String topic) {
         }
 
         public record JoinRoomRequest(String inviteCode) {

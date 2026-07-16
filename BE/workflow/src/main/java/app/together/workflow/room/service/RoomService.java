@@ -14,8 +14,11 @@ import app.together.common.workflow.repository.RoomActivityRepository;
 import app.together.common.workflow.repository.RoomMemberRepository;
 import app.together.common.workflow.repository.RoomRepository;
 import app.together.common.workflow.repository.UserMasterDataRepository;
+import app.together.common.workflow.enums.RoomRequestStatus;
+import app.together.common.workflow.enums.RoomStatus;
 import app.together.workflow.manager.room.RoomDomainManager;
 import app.together.workflow.manager.room.RoomDomainManagerRegistry;
+import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.JoinRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
@@ -28,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -51,12 +55,14 @@ public class RoomService {
     private final RoomActivityRepository roomActivityRepository;
     private final UserMasterDataRepository userMasterDataRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final FeatureUsageService featureUsageService;
 
     public RoomResponse createRoom(String userSso, CreateRoomRequest request) {
         permissionCheckService.requireSystemPermission(Permission.ROOM_CREATE);
         roomValidator.validateCreateRoomRequest(userSso, request);
 
         roomValidator.validateAndReserveSlot(userSso);
+        featureUsageService.chargeIfFree(userSso, "ROOM_CREATE", 0);
 
         Instant now = Instant.now();
         boolean isPublic = Boolean.TRUE.equals(request.isPublic());
@@ -259,6 +265,57 @@ public class RoomService {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_INVALID);
         }
         return toRoomResponse(getRoomEntity(roomId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomResponse> listActivePublicRooms() {
+        return roomRepository.findAll().stream()
+                .filter(this::isVisibleActiveRoom)
+                .filter(room -> Boolean.TRUE.equals(room.getIsPublic()))
+                .sorted(Comparator.comparing(Room::getActivatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::toRoomResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomResponse> listMyRooms(String userSso) {
+        List<Long> roomIds = roomMemberRepository.findByUserSso(userSso).stream()
+                .map(RoomMember::getRoomId)
+                .distinct()
+                .toList();
+        return roomRepository.findAllById(roomIds).stream()
+                .filter(this::isVisibleActiveRoom)
+                .sorted(Comparator.comparing(Room::getActivatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::toRoomResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomResponse> listSuggestedRooms() {
+        return roomRepository.findAll().stream()
+                .filter(this::isVisibleActiveRoom)
+                .filter(room -> Boolean.TRUE.equals(room.getIsPublic()))
+                .sorted(Comparator.comparingLong((Room room) ->
+                        roomMemberRepository.countByRoomIdAndIsActiveTrue(room.getRoomId())).reversed())
+                .limit(5)
+                .map(this::toRoomResponse)
+                .toList();
+    }
+
+    private boolean isVisibleActiveRoom(Room room) {
+        if (room.getDeletedAt() != null) {
+            return false;
+        }
+        String status = room.getStatus();
+        if (status == null) {
+            return false;
+        }
+        if (RoomRequestStatus.EXPIRED.name().equalsIgnoreCase(status)) {
+            return false;
+        }
+        // Treat OPEN/FULL as browseable; keep DRAFT out of discovery
+        return RoomStatus.OPEN.name().equalsIgnoreCase(status)
+                || RoomStatus.FULL.name().equalsIgnoreCase(status);
     }
 
     private Room getRoomEntity(Long roomId) {

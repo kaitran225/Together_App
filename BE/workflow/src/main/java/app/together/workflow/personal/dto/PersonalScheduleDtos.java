@@ -43,4 +43,15 @@ public class PersonalScheduleDtos {
             String icon
     ) {
     }
+
+    public record ScheduleAssistRequest(
+            String prompt
+    ) {
+    }
+
+    public record ScheduleAssistResponse(
+            String reply,
+            ScheduleResponse created
+    ) {
+    }
 }

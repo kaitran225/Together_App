@@ -2,8 +2,21 @@ import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, CloseIcon, DocumentIcon, IconButton, Input, MenuIcon, Modal, Progress, QuizletQuizModal, Textarea } from '../../../components/common'
 import { FlashcardModal } from '../../../components/FlashcardModal'
-import { SUMMARY_HISTORY, MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
+import { MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
+
+function formatRelativeTime(iso?: string): string {
+  if (!iso) return ''
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} Hour${hours > 1 ? 's' : ''} Ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Yesterday'
+  return `${days} Days Ago`
+}
 
 const MessageRenderer = ({ text }: { text: string }) => {
   try {
@@ -62,6 +75,28 @@ export default function AiSupport() {
   const summarizeInputRef = useRef<HTMLInputElement>(null)
   const [lastUploadedDocumentId, setLastUploadedDocumentId] = useState<number | undefined>(undefined)
   const [sessionDocuments, setSessionDocuments] = useState<{ id: number; name: string; status?: string }[]>([])
+  const [documentHistory, setDocumentHistory] = useState<{ id: number; name: string; time: string }[]>([])
+
+  const loadDocumentHistory = async () => {
+    try {
+      const res = await workflowApi.getDocuments()
+      if (res.success && res.data) {
+        setDocumentHistory(
+          res.data.map((d: any) => ({
+            id: d.documentId,
+            name: d.fileName || d.title || 'Document',
+            time: formatRelativeTime(d.lastAccessedAt),
+          }))
+        )
+      }
+    } catch (err) {
+      console.error('Error loading document history:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadDocumentHistory()
+  }, [])
 
   useEffect(() => {
     const hasActiveProcessing = sessionDocuments.some(
@@ -238,6 +273,7 @@ export default function AiSupport() {
     setMessages(prev => [...prev, tempUserMsg])
 
     try {
+      let uploadedDocumentId = lastUploadedDocumentId
       if (currentAttachments.length > 0) {
         setMessages(prev => [...prev, {
           messageId: Date.now() + Math.random(),
@@ -249,6 +285,7 @@ export default function AiSupport() {
           const res = await workflowApi.uploadDocument(att.file)
           if (res.success && res.data && res.data.documentId) {
             const docId = res.data.documentId
+            uploadedDocumentId = docId
             setLastUploadedDocumentId(docId)
             setSessionDocuments(prev => {
               if (prev.some(d => d.id === docId)) return prev
@@ -257,9 +294,9 @@ export default function AiSupport() {
           }
         }
       }
-      
+
       if (text) {
-        await workflowApi.sendChatMessage(convId, text, lastUploadedDocumentId)
+        await workflowApi.sendChatMessage(convId, text, uploadedDocumentId)
       }
       fetchMessages(convId)
       // Refresh quizzes in case BE generated new ones
@@ -666,18 +703,22 @@ export default function AiSupport() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide">History</p>
-                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label="Refresh" icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
+                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label="Refresh" onClick={loadDocumentHistory} icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
                   </div>
                   <ul className="space-y-1.5">
-                    {SUMMARY_HISTORY.map((item) => (
-                      <li key={item.id}>
-                        <Button type="button" variant="ghost" size="sm" className="w-full !justify-start flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-neutral-50 text-left hover:bg-neutral-100 text-sm font-medium text-neutral-900">
-                          <span className="text-neutral-400 shrink-0" aria-hidden><DocumentIcon className="w-4 h-4" /></span>
-                          <span className="min-w-0 truncate flex-1">{item.name}</span>
-                          <span className="text-[10px] text-neutral-500 shrink-0">{item.time}</span>
-                        </Button>
-                      </li>
-                    ))}
+                    {documentHistory.length === 0 ? (
+                      <li className="text-xs text-neutral-400 px-3 py-2.5">No documents yet.</li>
+                    ) : (
+                      documentHistory.map((item) => (
+                        <li key={item.id}>
+                          <Button type="button" variant="ghost" size="sm" className="w-full !justify-start flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-neutral-50 text-left hover:bg-neutral-100 text-sm font-medium text-neutral-900">
+                            <span className="text-neutral-400 shrink-0" aria-hidden><DocumentIcon className="w-4 h-4" /></span>
+                            <span className="min-w-0 truncate flex-1">{item.name}</span>
+                            <span className="text-[10px] text-neutral-500 shrink-0">{item.time}</span>
+                          </Button>
+                        </li>
+                      ))
+                    )}
                   </ul>
                 </div>
               </div>

@@ -21,6 +21,7 @@ public final class RoomDtos {
             String status,
             Boolean isPublic,
             Integer maxMembers,
+            String topic,
             Instant activatedAt,
             Instant expiresAt,
             Instant closedAt,

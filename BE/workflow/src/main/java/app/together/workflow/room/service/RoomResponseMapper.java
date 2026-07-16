@@ -37,6 +37,7 @@ public class RoomResponseMapper {
                 room.getIsPublic(),
                 room.getMaxMembers(),
                 room.getRoomType() == null ? null : room.getRoomType().name(),
+                room.getTopic(),
                 room.getActivatedAt(),
                 room.getExpiresAt(),
                 room.getClosedAt(),
