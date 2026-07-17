@@ -32,7 +32,7 @@ public final class ScrumBoardDtos {
             String priority,
             BigDecimal estimatedHours,
             BigDecimal actualHours,
-            LocalDate duDate,
+            LocalDate dueDate,
             Long sprintId,
             String assignee,
             LocalDate startDate,

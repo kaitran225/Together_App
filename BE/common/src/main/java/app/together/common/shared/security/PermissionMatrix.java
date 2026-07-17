@@ -119,11 +119,11 @@ public final class PermissionMatrix {
                                         TEAM_REPORT_VIEW,
                                         TASK_CREATE,
                                         TASK_UPDATE,
-                                        TEAM_MEETING_CREATE,
                                         WORKFLOW_READ ->
                                 PermissionRule.allOf(Patterns.teamMember());
 
                         case
+                                        TEAM_MEETING_CREATE,
                                         TEAM_EDIT,
                                         TEAM_INVITE_MEMBER,
                                         TEAM_REMOVE_MEMBER,

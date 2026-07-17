@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { Button, IconButton, Input } from '../ui'
 import { AttachIcon } from '../icons'
 
-const DEFAULT_ACCEPT_FILES = '.pdf,.doc,.docx,.txt,.md,image/*'
+const DEFAULT_ACCEPT_FILES = '.pdf'
 
 export interface ChatInputBarProps {
   value: string

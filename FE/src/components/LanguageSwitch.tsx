@@ -1,26 +1,42 @@
 import { useTranslation } from '../contexts/LanguageContext'
 
 export function LanguageSwitch() {
-  const { language, setLanguage } = useTranslation()
-
-  const toggleLanguage = () => {
-    setLanguage(language === 'en' ? 'vi' : 'en')
-  }
+  const { language, setLanguage, t } = useTranslation()
 
   return (
-    <button
-      type="button"
-      onClick={toggleLanguage}
-      className="flex items-center gap-2 px-3 py-2 rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)] text-neutral-900 text-sm font-semibold hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-      aria-label="Switch language"
-      title={language === 'en' ? 'Chuyển sang tiếng Việt' : 'Switch to English'}
+    <div
+      className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)] p-0.5"
+      role="group"
+      aria-label="Language"
     >
-      <span className="text-base leading-none shrink-0" aria-hidden>
-        {language === 'en' ? '🇬🇧' : '🇻🇳'}
-      </span>
-      <span className="hidden sm:inline font-extrabold uppercase tracking-widest text-[10px] text-neutral-700 dark:text-neutral-300">
-        {language === 'en' ? 'EN' : 'VI'}
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={() => setLanguage('en')}
+        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+          language === 'en'
+            ? 'bg-[var(--color-surface)] text-neutral-900 shadow-sm'
+            : 'text-neutral-500 hover:text-neutral-800'
+        }`}
+        aria-pressed={language === 'en'}
+        title={t('lang.switchToEn')}
+      >
+        <span aria-hidden>🇬🇧</span>
+        <span className="hidden sm:inline">{t('lang.en')}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => setLanguage('vi')}
+        className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
+          language === 'vi'
+            ? 'bg-[var(--color-surface)] text-neutral-900 shadow-sm'
+            : 'text-neutral-500 hover:text-neutral-800'
+        }`}
+        aria-pressed={language === 'vi'}
+        title={t('lang.switchToVi')}
+      >
+        <span aria-hidden>🇻🇳</span>
+        <span className="hidden sm:inline">{t('lang.vi')}</span>
+      </button>
+    </div>
   )
 }

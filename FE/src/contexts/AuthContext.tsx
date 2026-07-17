@@ -34,6 +34,8 @@ type AuthContextValue = {
   user: UserDto | null
   users: any[] // Mock users array kept for legacy fallback
   isAuthenticated: boolean
+  /** true after initial token restore attempt finishes (or mock mode). */
+  isAuthReady: boolean
   isAdmin: boolean
   login: (input: LoginInput) => Promise<{ ok: boolean; error?: string; user?: UserDto }>
   loginWithGoogle: (idToken: string) => Promise<{ ok: boolean; error?: string; user?: UserDto }>
@@ -50,6 +52,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null)
   const [users, setUsers] = useState<any[]>(() => listUsers())
+  const [isAuthReady, setIsAuthReady] = useState(() => useMock || DEBUG_AUTH_BYPASS)
   const bypassUser = useMemo<UserDto | null>(() => {
     if (!DEBUG_AUTH_BYPASS) return null
     const all = listUsers()
@@ -61,22 +64,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUsers = useCallback(() => setUsers(listUsers()), [])
 
   useEffect(() => {
-    if (useMock) return
+    if (useMock || DEBUG_AUTH_BYPASS) {
+      setIsAuthReady(true)
+      return
+    }
     const token = getStoredToken()
-    if (token) {
-      authApi.me(token)
-        .then((res) => {
-          if (res.success && res.data) {
-            setUser(mapToUserDto(res.data))
-          } else {
-            clearStoredToken()
-            setUser(null)
-          }
-        })
-        .catch(() => {
+    if (!token) {
+      setIsAuthReady(true)
+      return
+    }
+    let cancelled = false
+    authApi.me(token)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success && res.data) {
+          setUser(mapToUserDto(res.data))
+        } else {
           clearStoredToken()
           setUser(null)
-        })
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        clearStoredToken()
+        setUser(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsAuthReady(true)
+      })
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -231,6 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: effectiveUser,
     users,
     isAuthenticated: DEBUG_AUTH_BYPASS ? true : !!effectiveUser,
+    isAuthReady,
     isAdmin: effectiveUser?.systemRole === 'ADMIN',
     login,
     loginWithGoogle,
@@ -250,6 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateOwnPreferences,
     updateOwnProfile,
     effectiveUser,
+    isAuthReady,
     users,
   ])
 

@@ -6,77 +6,77 @@ import { LanguageSwitch } from '../LanguageSwitch'
 import { useState } from 'react'
 import { useTranslation } from '../../contexts/LanguageContext'
 
-type BreadcrumbItem = { label: string; href?: string }
+type BreadcrumbItem = { labelKey: string; href?: string }
 
 const BREADCRUMBS: Record<string, BreadcrumbItem[]> = {
-  '/dashboard': [{ label: 'Dashboard' }],
-  '/profile': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Profile' }],
-  '/study-rooms': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Study Rooms' }],
-  '/study-rooms/create': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Study Rooms', href: '/study-rooms' }, { label: 'Create Room' }],
-  '/study-rooms/create-new': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Study Rooms', href: '/study-rooms' }, { label: 'Create New Room' }],
-  '/study-rooms/recommend': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Study Rooms', href: '/study-rooms' }, { label: 'Recommend matching' }],
-  '/study-room': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Study Rooms', href: '/study-rooms' }, { label: 'Study room' }],
-  '/study-room-dashboard': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Study Rooms', href: '/study-rooms' }, { label: 'My rooms' }],
-  '/teams': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Teams' }],
-  '/team-management': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Teams', href: '/teams' }, { label: 'Team management' }],
-  '/calendar': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Calendar' }],
-  '/subscription': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Subscription' }],
-  '/shop': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Shop' }],
-  '/meet-ai': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Meet AI' }],
-  '/ai-support': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Meet AI', href: '/meet-ai' }, { label: 'AI Support' }],
-  '/quizlet': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Quiz' }],
-  '/quizlet-result': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Quiz result' }],
-  '/focus-room': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Focus room' }],
-  '/focus-room-dialog': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Focus room' }],
-  '/notifications': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Notifications' }],
-  '/transaction': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Profile', href: '/profile' }, { label: 'Transactions' }],
-  '/personalize': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Profile', href: '/profile' }, { label: 'Personalize' }],
-  '/personalize-2': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Profile', href: '/profile' }, { label: 'Personalize' }],
-  '/personalize-3': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Profile', href: '/profile' }, { label: 'Personalize' }],
-  '/meetings': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Meetings' }],
-  '/meetings/room': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Meetings', href: '/meetings' }, { label: 'In meeting' }],
-  '/teams/board': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Teams', href: '/teams' }, { label: 'Board' }],
-  '/scrum-board': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Teams', href: '/teams' }, { label: 'Board', href: '/teams/board' }],
-  '/sprint-board': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Teams', href: '/teams' }, { label: 'Board', href: '/teams/board' }],
-  '/sprint-member-board': [{ label: 'Dashboard', href: '/dashboard' }, { label: 'Teams', href: '/teams' }, { label: 'Board', href: '/teams/board' }, { label: 'Members' }],
-  '/admin': [{ label: 'Admin' }],
-  '/admin/overview': [{ label: 'Admin' }, { label: 'Dashboard' }],
-  '/admin/users-management': [{ label: 'Admin' }, { label: 'Users' }],
-  '/admin/moderation': [{ label: 'Admin' }, { label: 'Moderation' }],
-  '/admin/social-rooms': [{ label: 'Admin' }, { label: 'Social Rooms' }],
-  '/admin/reports': [{ label: 'Admin' }, { label: 'Reports' }],
-  '/admin/revenue': [{ label: 'Admin' }, { label: 'Revenue' }],
-  '/admin/support': [{ label: 'Admin' }, { label: 'Support' }],
-  '/admin/billing': [{ label: 'Admin' }, { label: 'Billing' }],
-  '/admin/account': [{ label: 'Admin', href: '/admin' }, { label: 'Account' }],
+  '/dashboard': [{ labelKey: 'crumb.dashboard' }],
+  '/profile': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.profile' }],
+  '/study-rooms': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.studyRooms' }],
+  '/study-rooms/create': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.studyRooms', href: '/study-rooms' }, { labelKey: 'crumb.createRoom' }],
+  '/study-rooms/create-new': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.studyRooms', href: '/study-rooms' }, { labelKey: 'crumb.createNewRoom' }],
+  '/study-rooms/recommend': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.studyRooms', href: '/study-rooms' }, { labelKey: 'crumb.recommend' }],
+  '/study-room': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.studyRooms', href: '/study-rooms' }, { labelKey: 'crumb.studyRoom' }],
+  '/study-room-dashboard': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.studyRooms', href: '/study-rooms' }, { labelKey: 'crumb.myRooms' }],
+  '/teams': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.teams' }],
+  '/team-management': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.teams', href: '/teams' }, { labelKey: 'crumb.teamManagement' }],
+  '/calendar': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.calendar' }],
+  '/subscription': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.subscription' }],
+  '/shop': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.shop' }],
+  '/meet-ai': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.meetAi' }],
+  '/ai-support': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.meetAi', href: '/meet-ai' }, { labelKey: 'crumb.aiSupport' }],
+  '/quizlet': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.quiz' }],
+  '/quizlet-result': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.quizResult' }],
+  '/focus-room': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.focusRoom' }],
+  '/focus-room-dialog': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.focusRoom' }],
+  '/notifications': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.notifications' }],
+  '/transaction': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.profile', href: '/profile' }, { labelKey: 'crumb.transactions' }],
+  '/personalize': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.profile', href: '/profile' }, { labelKey: 'crumb.personalize' }],
+  '/personalize-2': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.profile', href: '/profile' }, { labelKey: 'crumb.personalize' }],
+  '/personalize-3': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.profile', href: '/profile' }, { labelKey: 'crumb.personalize' }],
+  '/meetings': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.meetings' }],
+  '/meetings/room': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.meetings', href: '/meetings' }, { labelKey: 'crumb.inMeeting' }],
+  '/teams/board': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.teams', href: '/teams' }, { labelKey: 'crumb.board' }],
+  '/scrum-board': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.teams', href: '/teams' }, { labelKey: 'crumb.board', href: '/teams/board' }],
+  '/sprint-board': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.teams', href: '/teams' }, { labelKey: 'crumb.board', href: '/teams/board' }],
+  '/sprint-member-board': [{ labelKey: 'crumb.dashboard', href: '/dashboard' }, { labelKey: 'crumb.teams', href: '/teams' }, { labelKey: 'crumb.board', href: '/teams/board' }, { labelKey: 'crumb.members' }],
+  '/admin': [{ labelKey: 'crumb.admin' }],
+  '/admin/overview': [{ labelKey: 'crumb.admin' }, { labelKey: 'crumb.dashboard' }],
+  '/admin/users-management': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.users' }],
+  '/admin/moderation': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.moderation' }],
+  '/admin/social-rooms': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.socialRooms' }],
+  '/admin/reports': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.reports' }],
+  '/admin/revenue': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.revenue' }],
+  '/admin/support': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.support' }],
+  '/admin/billing': [{ labelKey: 'crumb.admin' }, { labelKey: 'nav.admin.billing' }],
+  '/admin/account': [{ labelKey: 'crumb.admin', href: '/admin' }, { labelKey: 'crumb.account' }],
 }
 
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard': 'Home',
-  '/profile': 'Profile',
-  '/study-rooms': 'Study Rooms',
-  '/meetings': 'Meetings',
-  '/teams': 'Teams',
-  '/teams/board': 'Board',
-  '/calendar': 'Calendar',
-  '/subscription': 'Subscription',
-  '/shop': 'Shop',
-  '/meet-ai': 'Together AI',
-  '/notifications': 'Notifications',
-  '/admin': 'Admin Home',
-  '/admin/overview': 'Dashboard',
-  '/admin/users-management': 'Users',
-  '/admin/moderation': 'Moderation',
-  '/admin/social-rooms': 'Social Rooms',
-  '/admin/reports': 'Reports',
-  '/admin/revenue': 'Revenue',
-  '/admin/support': 'Support',
-  '/admin/billing': 'Billing',
-  '/admin/account': 'Admin Account',
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  '/dashboard': 'page.home',
+  '/profile': 'page.profile',
+  '/study-rooms': 'page.studyRooms',
+  '/meetings': 'page.meetings',
+  '/teams': 'page.teams',
+  '/teams/board': 'page.board',
+  '/calendar': 'page.calendar',
+  '/subscription': 'page.subscription',
+  '/shop': 'page.shop',
+  '/meet-ai': 'page.togetherAi',
+  '/notifications': 'page.notifications',
+  '/admin': 'page.adminHome',
+  '/admin/overview': 'nav.admin.dashboard',
+  '/admin/users-management': 'nav.admin.users',
+  '/admin/moderation': 'nav.admin.moderation',
+  '/admin/social-rooms': 'nav.admin.socialRooms',
+  '/admin/reports': 'nav.admin.reports',
+  '/admin/revenue': 'nav.admin.revenue',
+  '/admin/support': 'nav.admin.support',
+  '/admin/billing': 'nav.admin.billing',
+  '/admin/account': 'page.adminAccount',
 }
 
-const PAGE_SUBTITLES: Record<string, string> = {
-  '/dashboard': 'You have 3 deadlines today — get started!',
+const PAGE_SUBTITLE_KEYS: Record<string, string> = {
+  '/dashboard': 'page.homeSubtitle',
 }
 
 function getBreadcrumbs(pathname: string): BreadcrumbItem[] | null {
@@ -87,17 +87,17 @@ function getBreadcrumbs(pathname: string): BreadcrumbItem[] | null {
   return sorted[0] ? sorted[0][1] : null
 }
 
-function getPageTitle(pathname: string): string | null {
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname]
-  for (const [path, title] of Object.entries(PAGE_TITLES)) {
+function getPageTitleKey(pathname: string): string | null {
+  if (PAGE_TITLE_KEYS[pathname]) return PAGE_TITLE_KEYS[pathname]
+  for (const [path, title] of Object.entries(PAGE_TITLE_KEYS)) {
     if (path !== '/dashboard' && pathname.startsWith(path)) return title
   }
   return null
 }
 
-function getPageSubtitle(pathname: string): string | null {
-  if (PAGE_SUBTITLES[pathname]) return PAGE_SUBTITLES[pathname]
-  for (const [path, sub] of Object.entries(PAGE_SUBTITLES)) {
+function getPageSubtitleKey(pathname: string): string | null {
+  if (PAGE_SUBTITLE_KEYS[pathname]) return PAGE_SUBTITLE_KEYS[pathname]
+  for (const [path, sub] of Object.entries(PAGE_SUBTITLE_KEYS)) {
     if (path !== '/dashboard' && pathname.startsWith(path)) return sub
   }
   return null
@@ -120,8 +120,8 @@ export function DashboardHeader() {
   const [openUserMenu, setOpenUserMenu] = useState(false)
   const [adminSearch, setAdminSearch] = useState('')
   const breadcrumbs = getBreadcrumbs(pathname)
-  const titleOnly = getPageTitle(pathname)
-  const subtitle = getPageSubtitle(pathname)
+  const titleKey = getPageTitleKey(pathname)
+  const subtitleKey = getPageSubtitleKey(pathname)
   const isHome = pathname === '/dashboard'
 
   return (
@@ -134,36 +134,37 @@ export function DashboardHeader() {
           <nav aria-label="Breadcrumb" className="inline-flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
             {breadcrumbs.map((item, i) => {
               const isLast = i === breadcrumbs.length - 1
+              const label = t(item.labelKey)
               return (
                 <span key={i} className="inline-flex shrink-0 items-center gap-1.5">
                   {i > 0 && <Chevron />}
                   {item.href && !isLast ? (
                     <Link to={item.href} className="text-neutral-900 underline hover:text-neutral-700">
-                      {item.label}
+                      {label}
                     </Link>
                   ) : (
                     <span className={isLast ? 'font-bold text-neutral-900' : 'font-normal text-neutral-500'}>
-                      {item.label}
+                      {label}
                     </span>
                   )}
                 </span>
               )
             })}
           </nav>
-        ) : titleOnly ? (
+        ) : titleKey ? (
           <div className="flex flex-col gap-0.5 min-w-0">
             <h1 className="text-base md:text-lg font-bold text-neutral-900 truncate tracking-tight uppercase tracking-[0.08em]">
-              {isHome ? 'Home' : titleOnly}
+              {isHome ? t('page.home') : t(titleKey)}
             </h1>
-            {subtitle && (
+            {subtitleKey && (
               <p className="text-sm text-neutral-500 truncate hidden sm:block">
-                {subtitle}
+                {t(subtitleKey)}
               </p>
             )}
           </div>
         ) : (
           <>
-            <span className="text-xs text-neutral-600">Welcome to</span>
+            <span className="text-xs text-neutral-600">{t('common.welcomeTo')}</span>
             <Link to="/dashboard" className="text-sm font-bold text-primary hover:brightness-110 truncate transition-colors duration-150 active:opacity-80">
               together
             </Link>
@@ -173,6 +174,8 @@ export function DashboardHeader() {
       <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
         {isAdminView ? (
           <>
+            <LanguageSwitch />
+            <ThemeSwitch />
             <div className="hidden md:flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)] px-3 py-2">
               <svg className="h-4 w-4 text-neutral-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <circle cx="11" cy="11" r="8" />
@@ -180,7 +183,7 @@ export function DashboardHeader() {
               </svg>
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder={t('common.search')}
                 value={adminSearch}
                 onChange={(e) => setAdminSearch(e.target.value)}
                 className="w-40 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-500 focus:outline-none"
@@ -189,10 +192,10 @@ export function DashboardHeader() {
             <Link
               to="/notifications"
               className="w-8 h-8 inline-flex items-center justify-center rounded-full text-neutral-500 hover:bg-[var(--color-charcoal)] hover:text-neutral-900 flex-shrink-0 transition-colors duration-150"
-              aria-label="Notifications"
+              aria-label={t('nav.notifications')}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </Link>
             <div className="relative">
@@ -215,8 +218,8 @@ export function DashboardHeader() {
               </button>
               {openUserMenu && (
                 <div className="absolute right-0 top-10 z-20 min-w-[140px] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-none">
-                  <Link to="/profile" className="block rounded-lg px-2.5 py-2 text-xs text-neutral-700 hover:bg-[var(--color-charcoal)]">Profile</Link>
-                  <button type="button" onClick={logout} className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-neutral-700 hover:bg-[var(--color-charcoal)]">Logout</button>
+                  <Link to="/profile" className="block rounded-lg px-2.5 py-2 text-xs text-neutral-700 hover:bg-[var(--color-charcoal)]">{t('common.profile')}</Link>
+                  <button type="button" onClick={logout} className="w-full rounded-lg px-2.5 py-2 text-left text-xs text-neutral-700 hover:bg-[var(--color-charcoal)]">{t('common.logout')}</button>
                 </div>
               )}
             </div>
@@ -242,7 +245,7 @@ export function DashboardHeader() {
         <Link
           to="/notifications"
           className="w-8 h-8 inline-flex items-center justify-center rounded-full text-neutral-500 hover:bg-white/10 hover:text-neutral-900 flex-shrink-0 transition-colors duration-150"
-          aria-label="Notifications"
+          aria-label={t('nav.notifications')}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -263,7 +266,7 @@ export function DashboardHeader() {
             )}
           </span>
           <div className="hidden sm:block text-left min-w-0">
-            <p className="text-xs font-medium text-neutral-900 truncate leading-tight">{user?.fullName ?? 'Guest'}</p>
+            <p className="text-xs font-medium text-neutral-900 truncate leading-tight">{user?.fullName ?? t('nav.guest')}</p>
           </div>
         </Link>
           </>

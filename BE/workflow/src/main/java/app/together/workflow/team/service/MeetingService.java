@@ -12,7 +12,9 @@ import app.together.common.workflow.enums.MeetingStatus;
 import app.together.common.workflow.repository.*;
 import app.together.common.auth.repository.UserRepository;
 import app.together.common.auth.entity.User;
+import app.together.common.auth.enums.UserTier;
 import app.together.workflow.payment.service.FeatureUsageService;
+import app.together.workflow.personal.service.NotificationPublisher;
 import app.together.workflow.team.dto.MeetingDtos.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,6 +42,8 @@ public class MeetingService {
     private final PermissionCheckService permissionCheckService;
     private final GenerateAiSummary generateAiSummary;
     private final FeatureUsageService featureUsageService;
+    private final NotificationPublisher notificationPublisher;
+    private final TeamRepository teamRepository;
 
     @org.springframework.beans.factory.annotation.Value("${app.ai.service-url=https://dev-together-ai-gateway.onrender.com/}")
     private String aiServerUrl;
@@ -85,7 +90,36 @@ public class MeetingService {
                 .joinedAt(Instant.now())
                 .build());
 
-        return toMeetingResponse(saved);
+        // Notify other active team members about the new meeting
+        String teamName = teamRepository.findById(teamId).map(Team::getName).orElse("nhóm");
+        String creatorName = userRepository.findByUserSso(userSso)
+                .map(u -> {
+                    if (u.getFullName() != null && !u.getFullName().isBlank()) return u.getFullName();
+                    if (u.getEmail() != null && !u.getEmail().isBlank()) return u.getEmail().split("@")[0];
+                    return userSso;
+                })
+                .orElse(userSso);
+
+        List<String> recipients = teamMemberRepository.findByTeamId(teamId).stream()
+                .filter(m -> m.getLeftAt() == null)
+                .map(TeamMember::getUserSso)
+                .filter(sso -> sso != null && !sso.equals(userSso))
+                .toList();
+
+        if (!recipients.isEmpty()) {
+            notificationPublisher.notifyUsers(
+                    recipients,
+                    NotificationPublisher.TYPE_MEETING,
+                    "Cuộc họp mới: " + saved.getTitle(),
+                    String.format("%s đã tạo cuộc họp \"%s\" trong nhóm \"%s\". Vào Meetings để tham gia.",
+                            creatorName, saved.getTitle(), teamName),
+                    NotificationPublisher.LINK_MEETING,
+                    saved.getMeetingId(),
+                    Instant.now().plus(3, ChronoUnit.DAYS)
+            );
+        }
+
+        return toMeetingResponse(saved, userSso);
     }
 
     /*
@@ -123,7 +157,7 @@ public class MeetingService {
         participant.setLeftAt(null);
         meetingParticipantRepository.save(participant);
 
-        return toMeetingResponse(meeting);
+        return toMeetingResponse(meeting, userSso);
     }
 
     /*
@@ -196,9 +230,26 @@ public class MeetingService {
                 });
             }
         }
-        generateAiSummary.generateAndProcessAiSummary(saved);
 
-        return toMeetingResponse(saved);
+        // AI summary + task split only for TEAM / COMBO (paid) plans
+        if (isTeamOrComboPlan(userSso)) {
+            generateAiSummary.generateAndProcessAiSummary(saved);
+        }
+
+        return toMeetingResponse(saved, userSso);
+    }
+
+    private boolean isTeamOrComboPlan(String userSso) {
+        return userRepository.findByUserSso(userSso)
+                .map(user -> {
+                    UserTier tier = UserTier.parse(user.getPlanType());
+                    if (tier != UserTier.TEAM && tier != UserTier.COMBO) {
+                        return false;
+                    }
+                    Instant expires = user.getPlanExpiresAt();
+                    return expires == null || !expires.isBefore(Instant.now());
+                })
+                .orElse(false);
     }
 
     /*
@@ -245,6 +296,10 @@ public class MeetingService {
         TeamMember teamMember = getActiveTeamMember(meeting.getTeamId(), userSso);
         permissionCheckService.requireTeamRole(Permission.TEAM_MEETING_JOIN, teamMember.getRole());
 
+        if (!isTeamOrComboPlan(userSso)) {
+            throw new ForbiddenException(MessageConstants.MESSAGE_PERMISSION_DENIED);
+        }
+
         String fileName = audioFile.getOriginalFilename();
         log.info("Received audio file {} for transcription of meeting {}", fileName, meetingId);
 
@@ -284,17 +339,24 @@ public class MeetingService {
         // Kích hoạt phân tích tóm tắt AI bất đồng bộ
         generateAiSummary.generateAndProcessAiSummary(saved);
 
-        return toMeetingResponse(saved);
+        return toMeetingResponse(saved, userSso);
     }
 
     public MeetingResponse getActiveMeeting(Long teamId, String userSso) {
         getActiveTeamMember(teamId, userSso);
         return meetingRepository.findFirstByTeamIdAndActualEndIsNullOrderByCreatedAtDesc(teamId)
-                .map(this::toMeetingResponse)
+                .map(m -> toMeetingResponse(m, userSso))
                 .orElse(null);
     }
 
-    private MeetingResponse toMeetingResponse(Meeting m) {
+    private MeetingResponse toMeetingResponse(Meeting m, String userSso) {
+        String currentUserRole = null;
+        if (userSso != null && !userSso.isBlank() && m.getTeamId() != null) {
+            currentUserRole = teamMemberRepository.findById(new TeamMemberId(m.getTeamId(), userSso))
+                    .filter(member -> member.getLeftAt() == null)
+                    .map(member -> member.getRole() != null ? member.getRole().name() : null)
+                    .orElse(null);
+        }
         return new MeetingResponse(
                 m.getMeetingId(),
                 m.getTeamId(),
@@ -310,6 +372,7 @@ public class MeetingService {
                 m.getActualStart(),
                 m.getActualEnd(),
                 m.getRecordingUrl(),
-                m.getTranscriptUrl());
+                m.getTranscriptUrl(),
+                currentUserRole);
     }
 }

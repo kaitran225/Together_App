@@ -184,6 +184,15 @@
   html:not(.dark) .border-white\/10 { border-color: color-mix(in srgb, var(--color-cream-300) 35%, transparent) !important; }
   html:not(.dark) .border-white\/15 { border-color: color-mix(in srgb, var(--color-cream-300) 45%, transparent) !important; }
   html:not(.dark) .border-white\/20 { border-color: color-mix(in srgb, var(--color-cream-300) 55%, transparent) !important; }
+
+  /* Dark mode: remap hardcoded light surfaces so the whole app stays in sync */
+  .dark .bg-white { background-color: var(--color-surface) !important; }
+  .dark .bg-white\/80 { background-color: color-mix(in srgb, var(--color-surface) 80%, transparent) !important; }
+  .dark .bg-white\/90 { background-color: color-mix(in srgb, var(--color-surface) 90%, transparent) !important; }
+  .dark .bg-neutral-50 { background-color: var(--color-charcoal) !important; }
+  .dark .bg-neutral-50\/70 { background-color: color-mix(in srgb, var(--color-charcoal) 70%, transparent) !important; }
+  .dark .hover\:bg-white\/10:hover { background-color: color-mix(in srgb, var(--color-surface) 10%, transparent) !important; }
+  .dark .hover\:bg-neutral-50:hover { background-color: var(--color-charcoal) !important; }
   .bg-gradient-brand { background-color: var(--gradient-brand); }
   .bg-gradient-atlitude-1 { background-color: var(--gradient-atlitude-1); }
   .bg-gradient-atlitude-2 { background-color: var(--gradient-atlitude-2); }

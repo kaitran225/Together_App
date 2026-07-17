@@ -1,11 +1,18 @@
 package app.together.workflow.team.service;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import app.together.common.auth.enums.TeamRole;
+import app.together.common.auth.repository.UserRepository;
 import app.together.common.shared.constant.MessageConstants;
 import app.together.common.shared.exception.BadRequestException;
 import app.together.common.shared.exception.ForbiddenException;
@@ -13,10 +20,14 @@ import app.together.common.shared.exception.ResourceNotFoundException;
 import app.together.common.shared.security.Permission;
 import app.together.common.shared.security.PermissionCheckService;
 import app.together.common.workflow.entity.Project;
+import app.together.common.workflow.entity.Task;
+import app.together.common.workflow.entity.TaskAssignment;
 import app.together.common.workflow.entity.TeamMember;
 import app.together.common.workflow.entity.TeamMemberId;
 import app.together.common.workflow.enums.ProjectStatus;
+import app.together.common.workflow.enums.TaskStatus;
 import app.together.common.workflow.repository.ProjectRepository;
+import app.together.common.workflow.repository.TaskAssignmentRepository;
 import app.together.common.workflow.repository.TeamMemberRepository;
 import app.together.common.workflow.repository.TeamRepository;
 import app.together.common.workflow.repository.TaskRepository;
@@ -34,6 +45,8 @@ public class ProjectsService {
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
     private final TaskRepository taskRepository;
+    private final TaskAssignmentRepository taskAssignmentRepository;
+    private final UserRepository userRepository;
     private final ScrumBoardService scrumBoardService;
     private final PermissionCheckService permissionCheckService;
 
@@ -208,26 +221,155 @@ public class ProjectsService {
         TeamMember member = getActiveTeamMember(project.getTeamId(), userSso);
         permissionCheckService.requireTeamRole(Permission.WORKFLOW_READ, member.getRole());
 
-        List<app.together.common.workflow.entity.Task> tasks = taskRepository.findByProjectId(projectId);
+        List<TeamMember> teamMembers = teamMemberRepository.findByTeamId(project.getTeamId()).stream()
+                .filter(m -> m.getLeftAt() == null)
+                .toList();
+
+        // Created By luôn là Owner của team
+        String ownerSso = teamMembers.stream()
+                .filter(m -> TeamRole.OWNER.equals(m.getRole()))
+                .map(TeamMember::getUserSso)
+                .findFirst()
+                .orElse(project.getCreatedBy());
+        String ownerName = resolveDisplayName(ownerSso);
+
+        List<Task> tasks = taskRepository.findByProjectId(projectId).stream()
+                .filter(t -> t.getDeletedAt() == null)
+                .toList();
+
+        List<Long> taskIds = tasks.stream().map(Task::getTaskId).toList();
+        List<TaskAssignment> assignments = taskIds.isEmpty()
+                ? List.of()
+                : taskAssignmentRepository.findByTaskIdIn(taskIds);
+
+        Map<Long, String> assigneeByTaskId = assignments.stream()
+                .collect(Collectors.toMap(
+                        TaskAssignment::getTaskId,
+                        TaskAssignment::getUserSso,
+                        (a, b) -> a));
 
         StringBuilder csv = new StringBuilder();
-        // Add UTF-8 BOM
         csv.append('\ufeff');
-        csv.append("Task ID,Title,Description,Status,Priority,Estimated Hours,Start Date,Due Date,Created By\n");
 
-        for (app.together.common.workflow.entity.Task task : tasks) {
+        // ── Section 1: Task list ──
+        csv.append("=== TASK LIST ===\n");
+        csv.append("Task ID,Title,Description,Status,Priority,Assignee,Estimated Hours,Actual Hours,Start Date,Due Date,Completed At,Created By\n");
+
+        for (Task task : tasks) {
+            String assigneeSso = assigneeByTaskId.get(task.getTaskId());
+            String assigneeName = assigneeSso != null ? resolveDisplayName(assigneeSso) : "";
             csv.append(task.getTaskId()).append(",")
-               .append(escapeCsv(task.getTitle())).append(",")
-               .append(escapeCsv(task.getDescription())).append(",")
-               .append(escapeCsv(task.getStatus())).append(",")
-               .append(escapeCsv(task.getPriority())).append(",")
-               .append(task.getEstimatedHours() != null ? task.getEstimatedHours() : 0).append(",")
-               .append(task.getStartDate() != null ? task.getStartDate().toString() : "").append(",")
-               .append(task.getDueDate() != null ? task.getDueDate().toString() : "").append(",")
-               .append(escapeCsv(task.getCreatedBy())).append("\n");
+                    .append(escapeCsv(task.getTitle())).append(",")
+                    .append(escapeCsv(task.getDescription())).append(",")
+                    .append(escapeCsv(task.getStatus())).append(",")
+                    .append(escapeCsv(task.getPriority())).append(",")
+                    .append(escapeCsv(assigneeName)).append(",")
+                    .append(task.getEstimatedHours() != null ? task.getEstimatedHours() : 0).append(",")
+                    .append(task.getActualHours() != null ? task.getActualHours() : "").append(",")
+                    .append(task.getStartDate() != null ? task.getStartDate().toString() : "").append(",")
+                    .append(task.getDueDate() != null ? task.getDueDate().toString() : "").append(",")
+                    .append(task.getCompletedAt() != null ? task.getCompletedAt().toString() : "").append(",")
+                    .append(escapeCsv(ownerName)).append("\n");
         }
 
+        // ── Section 2: Member task statistics ──
+        csv.append("\n=== MEMBER TASK STATISTICS ===\n");
+        csv.append("Member,Role,Total Assigned,To Do,In Progress,In Review,Done,Other\n");
+
+        Map<Long, Task> taskById = tasks.stream()
+                .collect(Collectors.toMap(Task::getTaskId, t -> t, (a, b) -> a));
+
+        // Count assignments per member
+        Map<String, Map<String, Integer>> statsByMember = new LinkedHashMap<>();
+        for (TeamMember tm : teamMembers) {
+            Map<String, Integer> bucket = new HashMap<>();
+            bucket.put("total", 0);
+            bucket.put("todo", 0);
+            bucket.put("inProgress", 0);
+            bucket.put("inReview", 0);
+            bucket.put("done", 0);
+            bucket.put("other", 0);
+            statsByMember.put(tm.getUserSso(), bucket);
+        }
+
+        for (TaskAssignment assignment : assignments) {
+            Task task = taskById.get(assignment.getTaskId());
+            if (task == null) {
+                continue;
+            }
+            Map<String, Integer> bucket = statsByMember.computeIfAbsent(assignment.getUserSso(), k -> {
+                Map<String, Integer> b = new HashMap<>();
+                b.put("total", 0);
+                b.put("todo", 0);
+                b.put("inProgress", 0);
+                b.put("inReview", 0);
+                b.put("done", 0);
+                b.put("other", 0);
+                return b;
+            });
+            bucket.merge("total", 1, Integer::sum);
+            String phase = normalizeStatusBucket(task.getStatus());
+            bucket.merge(phase, 1, Integer::sum);
+        }
+
+        for (TeamMember tm : teamMembers) {
+            Map<String, Integer> bucket = statsByMember.getOrDefault(tm.getUserSso(), Map.of());
+            csv.append(escapeCsv(resolveDisplayName(tm.getUserSso()))).append(",")
+                    .append(escapeCsv(tm.getRole() != null ? tm.getRole().name() : "")).append(",")
+                    .append(bucket.getOrDefault("total", 0)).append(",")
+                    .append(bucket.getOrDefault("todo", 0)).append(",")
+                    .append(bucket.getOrDefault("inProgress", 0)).append(",")
+                    .append(bucket.getOrDefault("inReview", 0)).append(",")
+                    .append(bucket.getOrDefault("done", 0)).append(",")
+                    .append(bucket.getOrDefault("other", 0)).append("\n");
+        }
+
+        // Unassigned tasks summary
+        long unassigned = tasks.stream()
+                .filter(t -> !assigneeByTaskId.containsKey(t.getTaskId()))
+                .count();
+        csv.append("\nUnassigned Tasks,").append(unassigned).append("\n");
+        csv.append("Total Tasks,").append(tasks.size()).append("\n");
+        csv.append("Report Owner,").append(escapeCsv(ownerName)).append("\n");
+
         return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private String resolveDisplayName(String userSso) {
+        if (userSso == null || userSso.isBlank()) {
+            return "";
+        }
+        return userRepository.findByUserSso(userSso)
+                .map(u -> {
+                    if (u.getFullName() != null && !u.getFullName().isBlank()) {
+                        return u.getFullName();
+                    }
+                    if (u.getEmail() != null && !u.getEmail().isBlank()) {
+                        return u.getEmail().split("@")[0];
+                    }
+                    return userSso;
+                })
+                .orElse(userSso);
+    }
+
+    private String normalizeStatusBucket(String status) {
+        if (status == null || status.isBlank()) {
+            return "todo";
+        }
+        String n = status.trim().toUpperCase().replace('-', '_').replace(' ', '_');
+        if (Objects.equals(n, TaskStatus.OPEN.name()) || n.equals("TO_DO") || n.equals("TODO") || n.equals("BACKLOG") || n.equals("DRAFT")) {
+            return "todo";
+        }
+        if (Objects.equals(n, TaskStatus.IN_PROGRESS.name()) || n.equals("INPROGRESS") || n.equals("DOING")) {
+            return "inProgress";
+        }
+        if (Objects.equals(n, TaskStatus.IN_REVIEW.name()) || n.equals("INREVIEW") || n.equals("REVIEW")) {
+            return "inReview";
+        }
+        if (Objects.equals(n, TaskStatus.DONE.name()) || n.equals("COMPLETED") || n.equals("COMPLETE")) {
+            return "done";
+        }
+        return "other";
     }
 
     private String escapeCsv(String value) {

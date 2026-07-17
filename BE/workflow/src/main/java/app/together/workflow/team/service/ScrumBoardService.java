@@ -45,6 +45,7 @@ public class ScrumBoardService {
         private final TeamMemberRepository teamMemberRepository;
         private final PermissionCheckService permissionCheckService;
         private final app.together.common.workflow.repository.TaskAssignmentRepository taskAssignmentRepository;
+        private final TaskLifecycleHelper taskLifecycleHelper;
 
         public void initializeScrumBoard(Long projectId) {
                 List<BoardColumn> boardColums = List.of(
@@ -71,7 +72,9 @@ public class ScrumBoardService {
                 permissionCheckService.requireTeamRole(Permission.WORKFLOW_READ, teamMember.getRole());
 
                 List<BoardColumn> columns = boardColumnRepository.findByProjectId(projectId);
-                List<Task> tasks = taskRepository.findByProjectId(projectId);
+                List<Task> tasks = taskRepository.findByProjectId(projectId).stream()
+                                .filter(task -> task.getDeletedAt() == null)
+                                .toList();
 
                 List<Long> taskIds = tasks.stream().map(Task::getTaskId).toList();
                 List<app.together.common.workflow.entity.TaskAssignment> assignments = taskIds.isEmpty() ? List.of() :
@@ -156,22 +159,29 @@ public class ScrumBoardService {
                 task.setColumnId(targetColumn.getColumnId());
 
                 // đồng bộ status task theo tên cột Scrum
+                String oldStatus = task.getStatus();
                 String columnName = targetColumn.getName() != null ? targetColumn.getName().trim() : "";
                 if ("Done".equalsIgnoreCase(columnName)) {
                         task.setStatus(TaskStatus.DONE.name());
                         task.setCompletedAt(Instant.now());
+                        taskLifecycleHelper.applyActualHoursOnComplete(task);
                 } else if ("In Review".equalsIgnoreCase(columnName)) {
                         task.setStatus(TaskStatus.IN_REVIEW.name());
                         task.setCompletedAt(null);
                 } else if ("In Progress".equalsIgnoreCase(columnName)) {
                         task.setStatus(TaskStatus.IN_PROGRESS.name());
                         task.setCompletedAt(null);
-                } else if ("To Do".equalsIgnoreCase(columnName)) {
+                        taskLifecycleHelper.markInProgressStarted(task);
+                } else if ("To Do".equalsIgnoreCase(columnName) || "Todo".equalsIgnoreCase(columnName)
+                                || "To-Do".equalsIgnoreCase(columnName)) {
                         task.setStatus(TaskStatus.OPEN.name());
                         task.setCompletedAt(null);
                 } else {
                         task.setStatus(TaskStatus.IN_PROGRESS.name());
                         task.setCompletedAt(null);
+                        if (taskLifecycleHelper.isTransitioningToInProgress(oldStatus, TaskStatus.IN_PROGRESS.name())) {
+                                taskLifecycleHelper.markInProgressStarted(task);
+                        }
                 }
                 taskRepository.save(task);
 

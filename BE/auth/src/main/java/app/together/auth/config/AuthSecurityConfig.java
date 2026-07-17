@@ -54,7 +54,7 @@ public class AuthSecurityConfig {
     @Value("${app.oauth2.client-secret:{noop}secret}")
     private String clientSecret;
 
-    @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5174}")
+    @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5174/callback}")
     private String redirectUris;
 
     @Bean
@@ -99,7 +99,8 @@ public class AuthSecurityConfig {
                 "/api/v1/auth/reset-password",
                 "/api/v1/auth/reset-password/confirm",
                 "/api/v1/auth/dev-verify-all",
-                "/api/v1/public/**"
+                "/api/v1/public/**",
+                "/error"
         };
         http
                 .cors(Customizer.withDefaults())

@@ -68,4 +68,11 @@ public class TaskController {
         String currentUserSso = SecurityUtils.requireCurrentUserSso();
         return ApiResponse.ok(taskService.updateTask(taskId, currentUserSso, request));
     }
+
+    @DeleteMapping("/tasks/{taskId}")
+    public ApiResponse<Void> deleteTask(@PathVariable Long taskId) {
+        String currentUserSso = SecurityUtils.requireCurrentUserSso();
+        taskService.deleteTask(taskId, currentUserSso);
+        return ApiResponse.ok(null);
+    }
 }

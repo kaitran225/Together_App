@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
+    List<Notification> findByUserSsoOrderByCreatedAtDesc(String userSso);
+
     List<Notification> findByUserSso(String userSso);
 
     boolean existsByUserSsoAndTypeAndLinkId(String userSso, String type, Long linkId);

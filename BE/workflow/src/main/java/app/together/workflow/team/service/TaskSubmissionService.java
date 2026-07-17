@@ -33,6 +33,7 @@ public class TaskSubmissionService {
     private final TaskActivityRepository taskActivityRepository;
     private final BoardColumnRepository boardColumnRepository;
     private final PermissionCheckService permissionCheckService;
+    private final TaskLifecycleHelper taskLifecycleHelper;
 
     /*
      * Thành viên nộp bài làm/sản phẩm bàn giao cho Task (IN_PROGRESS → IN_REVIEW)
@@ -55,8 +56,7 @@ public class TaskSubmissionService {
         }
 
         String currentStatus = task.getStatus() != null ? task.getStatus() : TaskStatus.OPEN.name();
-        if (!TaskStatus.IN_PROGRESS.name().equalsIgnoreCase(currentStatus)
-                && !TaskStatus.OPEN.name().equalsIgnoreCase(currentStatus)) {
+        if (!isSubmittableStatus(currentStatus)) {
             throw new BadRequestException(MessageConstants.MESSAGE_TASK_ACTIVITY_INVALID);
         }
 
@@ -74,6 +74,8 @@ public class TaskSubmissionService {
         TaskSubmission saved = taskSubmissionRepository.save(submission);
 
         String oldStatus = task.getStatus();
+        // Đảm bảo đã ghi nhận mốc bắt đầu làm việc (nếu nộp từ To Do/OPEN)
+        taskLifecycleHelper.markInProgressStarted(task);
         task.setStatus(TaskStatus.IN_REVIEW.name());
         task.setCompletedAt(null);
         moveTaskToColumnNamed(task, "In Review");
@@ -132,6 +134,7 @@ public class TaskSubmissionService {
             String oldTaskStatus = task.getStatus();
             task.setStatus(TaskStatus.DONE.name());
             task.setCompletedAt(Instant.now());
+            taskLifecycleHelper.applyActualHoursOnComplete(task);
             moveTaskToColumnNamed(task, "Done");
             taskRepository.save(task);
 
@@ -146,6 +149,7 @@ public class TaskSubmissionService {
             String oldTaskStatus = task.getStatus();
             task.setStatus(TaskStatus.IN_PROGRESS.name());
             task.setCompletedAt(null);
+            taskLifecycleHelper.markInProgressStarted(task);
             moveTaskToColumnNamed(task, "In Progress");
             taskRepository.save(task);
 
@@ -204,6 +208,33 @@ public class TaskSubmissionService {
                 .filter(c -> columnName.equalsIgnoreCase(c.getName()))
                 .findFirst()
                 .ifPresent(c -> task.setColumnId(c.getColumnId()));
+    }
+
+    /**
+     * Cho phép nộp bài khi status là OPEN / IN_PROGRESS, kể cả khi FE lưu tên cột
+     * ("To Do", "In Progress") thay vì enum.
+     */
+    private boolean isSubmittableStatus(String status) {
+        String normalized = normalizeTaskStatus(status);
+        return TaskStatus.OPEN.name().equals(normalized)
+                || TaskStatus.IN_PROGRESS.name().equals(normalized);
+    }
+
+    private String normalizeTaskStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return TaskStatus.OPEN.name();
+        }
+        String normalized = status.trim().toUpperCase(java.util.Locale.ROOT)
+                .replace('-', '_')
+                .replace(' ', '_');
+        return switch (normalized) {
+            case "TO_DO", "TODO", "BACKLOG", "OPEN", "DRAFT" -> TaskStatus.OPEN.name();
+            case "IN_PROGRESS", "INPROGRESS", "DOING", "PROGRESS" -> TaskStatus.IN_PROGRESS.name();
+            case "IN_REVIEW", "INREVIEW", "REVIEW" -> TaskStatus.IN_REVIEW.name();
+            case "DONE", "COMPLETED", "COMPLETE" -> TaskStatus.DONE.name();
+            case "CANCELLED", "CANCELED" -> TaskStatus.CANCELLED.name();
+            default -> normalized;
+        };
     }
 
     private TeamMember getActiveTeamMember(Long teamId, String userSso) {

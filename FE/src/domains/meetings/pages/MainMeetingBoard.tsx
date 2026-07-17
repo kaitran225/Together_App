@@ -3,7 +3,44 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, Card, ChatInputBar, Modal } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useTranslation } from '../../../contexts/LanguageContext'
 import { StompClient } from '../../../api/websocket'
+
+type Participant = {
+  name: string
+  sso: string
+  isYou: boolean
+}
+
+function getDisplayName(u: { fullName?: string | null; username?: string | null; userSso?: string | null } | null | undefined) {
+  if (!u) return 'Unknown'
+  return u.fullName || u.username || u.userSso || 'You'
+}
+
+/** Google Meet–style grid: fill available space by participant count */
+function getGridLayout(count: number): { gridClass: string; tileClass: string } {
+  if (count <= 1) {
+    return { gridClass: 'grid-cols-1 max-w-4xl', tileClass: 'aspect-video max-h-[70vh]' }
+  }
+  if (count === 2) {
+    return { gridClass: 'grid-cols-1 sm:grid-cols-2 max-w-5xl', tileClass: 'aspect-video' }
+  }
+  if (count === 3) {
+    return { gridClass: 'grid-cols-2 max-w-5xl auto-rows-fr', tileClass: 'aspect-video' }
+  }
+  if (count === 4) {
+    return { gridClass: 'grid-cols-2 max-w-5xl', tileClass: 'aspect-video' }
+  }
+  if (count <= 6) {
+    return { gridClass: 'grid-cols-2 lg:grid-cols-3 max-w-6xl', tileClass: 'aspect-video' }
+  }
+  return { gridClass: 'grid-cols-3 max-w-6xl', tileClass: 'aspect-video' }
+}
+
+function hasLiveVideo(stream?: MediaStream | null): boolean {
+  if (!stream) return false
+  return stream.getVideoTracks().some((t) => t.readyState === 'live' && t.enabled && !t.muted)
+}
 
 export default function MainMeetingBoard() {
   const navigate = useNavigate()
@@ -12,6 +49,7 @@ export default function MainMeetingBoard() {
   const meetingId = meetingIdStr ? parseInt(meetingIdStr) : null
 
   const { user, refreshProfile } = useAuth()
+  const { t } = useTranslation()
   
   const [meetingInfo, setMeetingInfo] = useState({ title: '', description: '' })
   const [summary, setSummary] = useState<any>(null)
@@ -20,18 +58,17 @@ export default function MainMeetingBoard() {
 
   // Timer
   const [secondsElapsed, setSecondsElapsed] = useState(0)
+  const [isEnded, setIsEnded] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
+  const isEndedRef = useRef(false)
+  const secondsElapsedRef = useRef(0)
+  const finalizeLocalSessionRef = useRef<(runAi: boolean) => void>(() => {})
 
   // WebRTC & Chat States
   const [messages, setMessages] = useState<any[]>([])
   
-  // Use display name if available, otherwise SSO
-  const getDisplayName = (u: any) => {
-    if (!u) return 'Unknown'
-    return u.fullName || u.username || u.userSso || 'You'
-  }
-  
-  const [participants, setParticipants] = useState<any[]>(() => {
-    return user ? [{ name: getDisplayName(user), sso: user.userSso, isYou: true }] : []
+  const [participants, setParticipants] = useState<Participant[]>(() => {
+    return user ? [{ name: getDisplayName(user), sso: user.userSso || '', isYou: true }] : []
   })
   const [stompClient, setStompClient] = useState<StompClient | null>(null)
   const [chatInput, setChatInput] = useState('')
@@ -41,6 +78,7 @@ export default function MainMeetingBoard() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const pcsRef = useRef<{ [userSso: string]: RTCPeerConnection }>({})
   const [remoteStreams, setRemoteStreams] = useState<{ [userSso: string]: MediaStream }>({})
+  const [remoteVideoOn, setRemoteVideoOn] = useState<{ [userSso: string]: boolean }>({})
 
   // Recording State
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -59,341 +97,71 @@ export default function MainMeetingBoard() {
   // Refs to avoid stale closures
   const stompClientRef = useRef<StompClient | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
-
-  // Start Timer
-  useEffect(() => {
-    const timer = setInterval(() => setSecondsElapsed(prev => prev + 1), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const formatTime = (totalSeconds: number) => {
-    const hrs = Math.floor(totalSeconds / 3600)
-    const mins = Math.floor((totalSeconds % 3600) / 60)
-    const secs = totalSeconds % 60
-    if (hrs > 0) return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  // Load existing summary
-  const loadSummaryData = async () => {
-    if (!meetingId) return
-    try {
-      const summaryRes = await workflowApi.getMeetingSummary(meetingId)
-      if (summaryRes.success && summaryRes.data) {
-        setSummary(summaryRes.data)
-      }
-    } catch (err) {
-      console.log('No existing summary found or error.')
-    }
-  }
+  const userRef = useRef(user)
+  const meetingIdRef = useRef(meetingId)
 
   useEffect(() => {
-    loadSummaryData()
-  }, [meetingId])
-
-  // Get User Media and Setup Recording
-  useEffect(() => {
-    if (videoOn || micOn) {
-      navigator.mediaDevices.getUserMedia({
-        video: videoOn ? { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } } : false,
-        audio: micOn
-      })
-        .then((stream) => {
-          setLocalStream(stream)
-          
-          // Start Recording
-          if (stream && !mediaRecorderRef.current) {
-            recordedChunksRef.current = []
-            try {
-              const options = { mimeType: 'video/webm;codecs=vp9,opus' }
-              const recorder = new MediaRecorder(stream, MediaRecorder.isTypeSupported(options.mimeType) ? options : undefined)
-              
-              recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) recordedChunksRef.current.push(e.data)
-              }
-              
-              recorder.onstop = () => {
-                const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' })
-                const url = URL.createObjectURL(blob)
-                setRecordingBlobUrl(url)
-              }
-              
-              recorder.start(1000) // Collect chunks every second
-              mediaRecorderRef.current = recorder
-            } catch (err) {
-              console.warn('MediaRecorder not supported or failed to start', err)
-            }
-          }
-        })
-        .catch((err) => {
-          console.warn('Camera/Mic access denied or unavailable:', err)
-          setLocalStream(null)
-        })
-    } else {
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop())
-        setLocalStream(null)
-      }
-    }
-    
-    return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop()
-      }
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop())
-      }
-    }
-  }, [videoOn, micOn])
-
-  // WebRTC Setup
-  const createPeerConnection = (targetSso: string, targetName: string) => {
-    if (pcsRef.current[targetSso]) return pcsRef.current[targetSso]
-
-    const storedIce = window.localStorage.getItem('webrtc-ice-servers')
-    const iceServers = storedIce ? JSON.parse(storedIce) : [{ urls: 'stun:stun.l.google.com:19302' }]
-    
-    const pc = new RTCPeerConnection({ iceServers })
-    pcsRef.current[targetSso] = pc
-
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current!))
-    }
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && stompClientRef.current && meetingId) {
-        stompClientRef.current.send('/app/room.signal', {
-          roomId: String(meetingId),
-          fromUser: user?.userSso,
-          toUser: "",
-          type: 'candidate',
-          payload: { type: 'candidate', toUser: targetSso, data: event.candidate },
-          sentAt: new Date().toISOString()
-        })
-      }
-    }
-
-    pc.onnegotiationneeded = async () => {
-      try {
-        const offer = await pc.createOffer()
-        await pc.setLocalDescription(offer)
-        stompClientRef.current?.send('/app/room.signal', {
-          roomId: String(meetingId),
-          fromUser: user?.userSso,
-          toUser: "",
-          type: 'offer',
-          payload: { type: 'offer', toUser: targetSso, targetName: getDisplayName(user), data: pc.localDescription },
-          sentAt: new Date().toISOString()
-        })
-      } catch (err) {
-        console.error('Failed to renegotiate', err)
-      }
-    }
-
-    pc.ontrack = (event) => {
-      const stream = event.streams[0]
-      if (stream) {
-        setRemoteStreams((prev) => ({ ...prev, [targetSso]: stream }))
-        setParticipants(prev => {
-          if (!prev.find(p => p.sso === targetSso)) {
-            return [...prev, { name: targetName, sso: targetSso, isYou: false }]
-          }
-          return prev
-        })
-      }
-    }
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        closePeerConnection(targetSso)
-      }
-    }
-
-    return pc
-  }
-
-  const closePeerConnection = (targetSso: string) => {
-    const pc = pcsRef.current[targetSso]
-    if (pc) {
-      pc.close()
-      delete pcsRef.current[targetSso]
-    }
-    // DO NOT remove from participants UI when connection drops. 
-    // They might still be in the websocket room.
-    // setParticipants(prev => prev.filter(p => p.sso !== targetSso || p.isYou))
-  }
-
-  const initiateCall = async (targetSso: string, targetName: string) => {
-    try {
-      const pc = createPeerConnection(targetSso, targetName)
-      // The offer will be created automatically by onnegotiationneeded 
-      // if tracks are added, but we explicitly create one if none is needed yet.
-      // Wait, onnegotiationneeded might fire anyway. Let's just create it to be sure.
-      const offer = await pc.createOffer()
-      await pc.setLocalDescription(offer)
-      stompClientRef.current?.send('/app/room.signal', {
-        roomId: String(meetingId),
-        fromUser: user?.userSso,
-        toUser: "",
-        type: 'offer',
-        payload: { type: 'offer', toUser: targetSso, targetName: getDisplayName(user), data: offer },
-        sentAt: new Date().toISOString()
-      })
-    } catch (err) {
-      console.error('Failed to initiate call to', targetSso, err)
-    }
-  }
-
-  const handleOffer = async (senderSso: string, senderName: string, offer: RTCSessionDescriptionInit) => {
-    try {
-      const pc = createPeerConnection(senderSso, senderName)
-      await pc.setRemoteDescription(new RTCSessionDescription(offer))
-      const answer = await pc.createAnswer()
-      await pc.setLocalDescription(answer)
-
-      stompClientRef.current?.send('/app/room.signal', {
-        roomId: String(meetingId),
-        fromUser: user?.userSso,
-        toUser: "",
-        type: 'answer',
-        payload: { type: 'answer', toUser: senderSso, data: answer },
-        sentAt: new Date().toISOString()
-      })
-    } catch (err) {
-      console.error('Error handling offer', err)
-    }
-  }
-
-  // WebSocket Connection & Fetch Details
-  useEffect(() => {
-    if (!meetingId || !user) return
-
-    workflowApi.joinMeeting(meetingId).then((res) => {
-      if (res.success && res.data) {
-        setMeetingInfo({
-          title: res.data.title || `Meeting #${meetingId}`,
-          description: res.data.description || 'No description provided.'
-        })
-      }
-    }).catch(console.error)
-
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsHost = window.location.hostname === 'localhost' ? 'localhost:8881' : window.location.host
-    const wsUrl = `${wsProtocol}//${wsHost}/ws`
-    const client = new StompClient(wsUrl)
-    setStompClient(client)
-    stompClientRef.current = client
-
-    client.connect().then(() => {
-      client.send('/app/room.signal', {
-        roomId: String(meetingId),
-        fromUser: user.userSso,
-        toUser: "",
-        type: 'join',
-        payload: { type: 'join', fromUser: user.userSso, senderName: getDisplayName(user) },
-        sentAt: new Date().toISOString()
-      })
-
-      client.subscribe(`/topic/rooms/${meetingId}/chat`, (msg) => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            user: msg.senderName || msg.senderSso || 'Participant',
-            text: msg.message,
-            time: msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('vi-VN'),
-            own: msg.senderSso === user?.userSso,
-            ai: false
-          }
-        ])
-      })
-
-      client.subscribe(`/topic/rooms/${meetingId}/signals`, (event) => {
-        const sender = event.actor
-        if (sender === user?.userSso) return
-        const payload = event.payload
-        if (!payload) return
-
-        if (payload.type === 'join') {
-          const sName = payload.senderName || sender
-          setParticipants(prev => {
-            if (!prev.find(p => p.sso === sender)) {
-              return [...prev, { name: sName, sso: sender, isYou: false }]
-            }
-            return prev
-          })
-          if (user.userSso && user.userSso > sender) {
-            initiateCall(sender, sName)
-          } else if (user.userSso) {
-            client.send('/app/room.signal', {
-              roomId: String(meetingId),
-              fromUser: user.userSso,
-              toUser: sender,
-              type: 'hello',
-              payload: { type: 'hello', toUser: sender, fromUser: user.userSso, senderName: getDisplayName(user) },
-              sentAt: new Date().toISOString()
-            })
-          }
-        } else if (payload.type === 'hello' && payload.toUser === user?.userSso) {
-          const sName = payload.senderName || payload.fromUser || sender
-          setParticipants(prev => {
-            if (!prev.find(p => p.sso === sender)) {
-              return [...prev, { name: sName, sso: sender, isYou: false }]
-            }
-            return prev
-          })
-          if (user.userSso && user.userSso > sender) {
-            initiateCall(sender, sName)
-          }
-        } else if (payload.toUser === user?.userSso) {
-          const { type, data, targetName } = payload
-          const sName = targetName || sender
-          if (type === 'offer') handleOffer(sender, sName, data)
-          else if (type === 'answer') pcsRef.current[sender]?.setRemoteDescription(new RTCSessionDescription(data))
-          else if (type === 'candidate') pcsRef.current[sender]?.addIceCandidate(new RTCIceCandidate(data))
-        }
-      })
-    })
-
-    return () => {
-      client.disconnect()
-      Object.keys(pcsRef.current).forEach(closePeerConnection)
-    }
-  }, [meetingId, user?.userSso])
-
-  useEffect(() => {
-    if (!localStream) return
-    Object.values(pcsRef.current).forEach(pc => {
-      const senders = pc.getSenders()
-      senders.forEach(sender => { try { pc.removeTrack(sender) } catch (e) {} })
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream))
-    })
+    localStreamRef.current = localStream
   }, [localStream])
 
-  // End Meeting & Auto Analysis
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  useEffect(() => {
+    meetingIdRef.current = meetingId
+  }, [meetingId])
+
+  useEffect(() => {
+    if (!user?.userSso) return
+    setParticipants((prev) => {
+      const self = { name: getDisplayName(user), sso: user.userSso!, isYou: true }
+      if (!prev.some((p) => p.isYou)) return [self, ...prev.filter((p) => p.sso !== user.userSso)]
+      return prev.map((p) => (p.isYou ? self : p))
+    })
+  }, [user])
+
+  useEffect(() => {
+    isEndedRef.current = isEnded
+  }, [isEnded])
+
+  useEffect(() => {
+    secondsElapsedRef.current = secondsElapsed
+  }, [secondsElapsed])
+
+  // Start Timer — stops when meeting ends
+  useEffect(() => {
+    if (isEnded) return
+    const timer = setInterval(() => setSecondsElapsed((prev) => prev + 1), 1000)
+    return () => clearInterval(timer)
+  }, [isEnded])
+
+  const canUseAiAnalysis = () => {
+    const plan = String(user?.planType || 'FREE').toUpperCase()
+    return plan === 'TEAM' || plan === 'TEAMS' || plan === 'COMBO'
+  }
+
   const triggerAutoAnalysis = async () => {
     if (!meetingId) return
     setIsTranscribing(true)
     setUploadError('')
-    
+
     try {
-      // 1. Stop recorder and get final blob
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
       }
-      
-      // Wait briefly for recorder to process the final chunks
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+
       let fileToUpload: File
       if (recordedChunksRef.current.length > 0) {
         const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' })
         fileToUpload = new File([blob], `meeting_${meetingId}_auto_record.webm`, { type: 'audio/webm' })
       } else {
-        // Fallback dummy file if no recording permission was granted
         const dummyBlob = new Blob(['dummy audio content'], { type: 'audio/mp3' })
         fileToUpload = new File([dummyBlob], 'dummy.mp3', { type: 'audio/mp3' })
       }
-      
+
       const res = await workflowApi.transcribeMeeting(meetingId, fileToUpload)
       if (res.success) {
         let attempts = 0
@@ -420,28 +188,478 @@ export default function MainMeetingBoard() {
     }
   }
 
+  const finalizeLocalSession = (runAi: boolean) => {
+    if (isEndedRef.current) return
+    isEndedRef.current = true
+    setIsEnded(true)
+    localStreamRef.current?.getTracks().forEach((track) => track.stop())
+    Object.keys(pcsRef.current).forEach(closePeerConnection)
+    const exp = Math.floor(secondsElapsedRef.current / 60) * 10 + 50
+    setExpEarned(exp)
+    setShowEndModal(true)
+    if (runAi && canUseAiAnalysis()) {
+      void triggerAutoAnalysis()
+    } else {
+      setIsTranscribing(false)
+    }
+    if (refreshProfile) refreshProfile()
+  }
+  finalizeLocalSessionRef.current = finalizeLocalSession
+
+  // closePeerConnection is defined below; re-bind after WebRTC helpers for safety
+  const formatTime = (totalSeconds: number) => {
+    const hrs = Math.floor(totalSeconds / 3600)
+    const mins = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
+    if (hrs > 0) return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Load existing summary
+  const loadSummaryData = async () => {
+    if (!meetingId) return
+    try {
+      const summaryRes = await workflowApi.getMeetingSummary(meetingId)
+      if (summaryRes.success && summaryRes.data) {
+        setSummary(summaryRes.data)
+      }
+    } catch (err) {
+      console.log('No existing summary found or error.')
+    }
+  }
+
+  useEffect(() => {
+    loadSummaryData()
+  }, [meetingId])
+
+  // Get User Media once; toggle tracks via enabled (avoids renegotiation / silent mic bugs)
+  useEffect(() => {
+    let cancelled = false
+    let acquired: MediaStream | null = null
+
+    navigator.mediaDevices
+      .getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        acquired = stream
+        stream.getAudioTracks().forEach((t) => {
+          t.enabled = micOn
+        })
+        stream.getVideoTracks().forEach((t) => {
+          t.enabled = videoOn
+        })
+        setLocalStream(stream)
+
+        if (!mediaRecorderRef.current) {
+          recordedChunksRef.current = []
+          try {
+            const mimeCandidates = [
+              'audio/webm;codecs=opus',
+              'audio/webm',
+              'video/webm;codecs=vp9,opus',
+              'video/webm'
+            ]
+            const mimeType = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m))
+            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+            recorder.ondataavailable = (e) => {
+              if (e.data.size > 0) recordedChunksRef.current.push(e.data)
+            }
+            recorder.onstop = () => {
+              const blob = new Blob(recordedChunksRef.current, { type: mimeType || 'audio/webm' })
+              setRecordingBlobUrl(URL.createObjectURL(blob))
+            }
+            recorder.start(1000)
+            mediaRecorderRef.current = recorder
+          } catch (err) {
+            console.warn('MediaRecorder not supported or failed to start', err)
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Camera/Mic access denied or unavailable:', err)
+        setLocalStream(null)
+      })
+
+    return () => {
+      cancelled = true
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop()
+        } catch {
+          // ignore
+        }
+      }
+      mediaRecorderRef.current = null
+      acquired?.getTracks().forEach((t) => t.stop())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- acquire once on mount
+  }, [])
+
+  // Mic / camera toggles — enable tracks without remounting getUserMedia
+  useEffect(() => {
+    if (!localStream) return
+    localStream.getAudioTracks().forEach((t) => {
+      t.enabled = micOn
+    })
+  }, [micOn, localStream])
+
+  useEffect(() => {
+    if (!localStream) return
+    localStream.getVideoTracks().forEach((t) => {
+      t.enabled = videoOn
+    })
+  }, [videoOn, localStream])
+
+  const upsertParticipant = (sso: string, name: string) => {
+    setParticipants((prev) => {
+      if (prev.some((p) => p.sso === sso)) {
+        return prev.map((p) => (p.sso === sso ? { ...p, name: name || p.name } : p))
+      }
+      return [...prev, { name: name || sso, sso, isYou: false }]
+    })
+  }
+
+  const sendSignal = (type: string, payload: Record<string, unknown>) => {
+    const mid = meetingIdRef.current
+    const me = userRef.current
+    if (!mid || !me?.userSso || !stompClientRef.current) return
+    stompClientRef.current.send('/app/room.signal', {
+      roomId: String(mid),
+      fromUser: me.userSso,
+      // Always broadcast on room topic; FE filters by payload.toUser.
+      // (Outer toUser routes to a private queue the FE does not subscribe to.)
+      toUser: '',
+      type,
+      payload,
+      sentAt: new Date().toISOString()
+    })
+  }
+
+  const createPeerConnection = (targetSso: string) => {
+    if (pcsRef.current[targetSso]) return pcsRef.current[targetSso]
+
+    const storedIce = window.localStorage.getItem('webrtc-ice-servers')
+    const iceServers = storedIce ? JSON.parse(storedIce) : [{ urls: 'stun:stun.l.google.com:19302' }]
+
+    const pc = new RTCPeerConnection({ iceServers })
+    pcsRef.current[targetSso] = pc
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current!)
+      })
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal('candidate', { type: 'candidate', toUser: targetSso, data: event.candidate })
+      }
+    }
+
+    pc.ontrack = (event) => {
+      const stream = event.streams[0]
+      if (!stream) return
+      setRemoteStreams((prev) => ({ ...prev, [targetSso]: stream }))
+      if (event.track.kind === 'video') {
+        const enabled = event.track.enabled && event.track.readyState === 'live' && !event.track.muted
+        setRemoteVideoOn((prev) => ({ ...prev, [targetSso]: enabled }))
+        event.track.onmute = () => setRemoteVideoOn((prev) => ({ ...prev, [targetSso]: false }))
+        event.track.onunmute = () => setRemoteVideoOn((prev) => ({ ...prev, [targetSso]: true }))
+        event.track.onended = () => setRemoteVideoOn((prev) => ({ ...prev, [targetSso]: false }))
+      }
+    }
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        closePeerConnection(targetSso)
+      }
+    }
+
+    return pc
+  }
+
+  const closePeerConnection = (targetSso: string) => {
+    const pc = pcsRef.current[targetSso]
+    if (pc) {
+      pc.close()
+      delete pcsRef.current[targetSso]
+    }
+    setRemoteStreams((prev) => {
+      if (!prev[targetSso]) return prev
+      const next = { ...prev }
+      delete next[targetSso]
+      return next
+    })
+    setRemoteVideoOn((prev) => {
+      if (prev[targetSso] === undefined) return prev
+      const next = { ...prev }
+      delete next[targetSso]
+      return next
+    })
+  }
+
+  const initiateCall = async (targetSso: string) => {
+    try {
+      const pc = createPeerConnection(targetSso)
+      if (pc.signalingState !== 'stable') return
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      sendSignal('offer', {
+        type: 'offer',
+        toUser: targetSso,
+        targetName: getDisplayName(userRef.current),
+        data: offer
+      })
+    } catch (err) {
+      console.error('Failed to initiate call to', targetSso, err)
+    }
+  }
+
+  const handleOffer = async (senderSso: string, offer: RTCSessionDescriptionInit) => {
+    try {
+      const pc = createPeerConnection(senderSso)
+      const me = userRef.current?.userSso
+      // Non-initiator is polite and yields on glare; initiator ignores colliding offers
+      if (pc.signalingState !== 'stable') {
+        if (me && me < senderSso) return
+        try {
+          await pc.setLocalDescription({ type: 'rollback' } as RTCSessionDescriptionInit)
+        } catch {
+          // rollback unsupported — fall through and try accepting remote offer
+        }
+      }
+      await pc.setRemoteDescription(new RTCSessionDescription(offer))
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+      sendSignal('answer', { type: 'answer', toUser: senderSso, data: answer })
+    } catch (err) {
+      console.error('Error handling offer from', senderSso, err)
+    }
+  }
+
+  const handleAnswer = async (senderSso: string, answer: RTCSessionDescriptionInit) => {
+    try {
+      const pc = pcsRef.current[senderSso]
+      if (!pc) return
+      if (pc.signalingState !== 'have-local-offer') return
+      await pc.setRemoteDescription(new RTCSessionDescription(answer))
+    } catch (err) {
+      console.error('Error handling answer from', senderSso, err)
+    }
+  }
+
+  const handleCandidate = async (senderSso: string, candidate: RTCIceCandidateInit) => {
+    try {
+      const pc = pcsRef.current[senderSso]
+      if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate))
+    } catch (err) {
+      console.error('Error handling candidate from', senderSso, err)
+    }
+  }
+
+  const broadcastCameraState = (enabled: boolean) => {
+    sendSignal('camera', { type: 'camera', data: { videoOn: enabled } })
+  }
+
+  // WebSocket Connection & Fetch Details
+  useEffect(() => {
+    if (!meetingId || !user?.userSso) return
+
+    workflowApi.joinMeeting(meetingId).then((res) => {
+      if (res.success && res.data) {
+        setMeetingInfo({
+          title: res.data.title || `Meeting #${meetingId}`,
+          description: res.data.description || 'No description provided.'
+        })
+        const role = String(res.data.currentUserRole || '').toUpperCase()
+        setIsOwner(role === 'OWNER')
+      }
+    }).catch(console.error)
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:8881' : window.location.host
+    const wsUrl = `${wsProtocol}//${wsHost}/ws`
+    const client = new StompClient(wsUrl)
+    setStompClient(client)
+    stompClientRef.current = client
+
+    client.connect().then(() => {
+      // Subscribe BEFORE announcing join so we don't miss offers from existing peers
+      client.subscribe(`/topic/rooms/${meetingId}/chat`, (msg) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            user: msg.senderName || msg.senderSso || 'Participant',
+            text: msg.message,
+            time: msg.sentAt
+              ? new Date(msg.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+              : new Date().toLocaleTimeString('vi-VN'),
+            own: msg.senderSso === userRef.current?.userSso,
+            ai: false
+          }
+        ])
+      })
+
+      client.subscribe(`/topic/rooms/${meetingId}/signals`, (event) => {
+        const sender = event.actor
+        const me = userRef.current?.userSso
+        if (!me || sender === me) return
+        const payload = event.payload
+        if (!payload) return
+
+        if (payload.type === 'camera') {
+          const enabled = Boolean(payload.data?.videoOn)
+          setRemoteVideoOn((prev) => ({ ...prev, [sender]: enabled }))
+          return
+        }
+
+        if (payload.type === 'leave') {
+          setParticipants((prev) => prev.filter((p) => p.sso !== sender))
+          closePeerConnection(sender)
+          return
+        }
+
+        if (payload.type === 'meeting-end') {
+          finalizeLocalSessionRef.current(false)
+          return
+        }
+
+        if (payload.type === 'join') {
+          const sName = payload.senderName || sender
+          upsertParticipant(sender, sName)
+          // Reply with presence so the late joiner discovers us (topic broadcast)
+          sendSignal('hello', {
+            type: 'hello',
+            toUser: sender,
+            fromUser: me,
+            senderName: getDisplayName(userRef.current)
+          })
+          // Lexicographically smaller SSO initiates to avoid glare
+          if (me < sender) {
+            void initiateCall(sender)
+          }
+          return
+        }
+
+        if (payload.type === 'hello' && payload.toUser === me) {
+          const sName = payload.senderName || payload.fromUser || sender
+          upsertParticipant(sender, sName)
+          if (me < sender) {
+            void initiateCall(sender)
+          }
+          return
+        }
+
+        if (payload.toUser !== me) return
+
+        if (payload.type === 'offer') {
+          upsertParticipant(sender, payload.targetName || sender)
+          void handleOffer(sender, payload.data)
+        } else if (payload.type === 'answer') {
+          void handleAnswer(sender, payload.data)
+        } else if (payload.type === 'candidate') {
+          void handleCandidate(sender, payload.data)
+        }
+      })
+
+      // Brief delay so SUBSCRIBE frames are registered before peers reply with offers
+      setTimeout(() => {
+        sendSignal('join', {
+          type: 'join',
+          fromUser: user.userSso,
+          senderName: getDisplayName(user)
+        })
+        broadcastCameraState(videoOn)
+      }, 150)
+    }).catch((err) => console.error('WebSocket connection error:', err))
+
+    return () => {
+      try {
+        sendSignal('leave', { type: 'leave', fromUser: user.userSso })
+      } catch {
+        // ignore
+      }
+      client.disconnect()
+      Object.keys(pcsRef.current).forEach(closePeerConnection)
+    }
+  }, [meetingId, user?.userSso])
+
+  // Keep peer tracks in sync + renegotiate when stream / participant list changes
+  useEffect(() => {
+    if (!stompClient || !user?.userSso) return
+
+    participants.forEach((p) => {
+      if (p.isYou || p.sso === user.userSso) return
+
+      const existed = !!pcsRef.current[p.sso]
+      const pc = createPeerConnection(p.sso)
+
+      if (existed && localStream) {
+        const senders = pc.getSenders()
+        senders.forEach((sender) => {
+          try {
+            pc.removeTrack(sender)
+          } catch {
+            // ignore
+          }
+        })
+        localStream.getTracks().forEach((track) => pc.addTrack(track, localStream))
+      }
+
+      const isInitiator = user.userSso! < p.sso
+      if (existed || isInitiator) {
+        void initiateCall(p.sso)
+      }
+    })
+  }, [participants, stompClient, user?.userSso, localStream])
+
+  useEffect(() => {
+    if (!stompClient) return
+    broadcastCameraState(videoOn)
+  }, [videoOn, stompClient])
+
+  // Keep finalize callback pointing at latest helpers (closePeerConnection, etc.)
+  finalizeLocalSessionRef.current = finalizeLocalSession
+
+  const handleLeaveMeeting = () => {
+    if (isEndedRef.current) return
+    sendSignal('leave', { type: 'leave', fromUser: user?.userSso })
+    try {
+      stompClientRef.current?.disconnect()
+    } catch {
+      // ignore
+    }
+    localStreamRef.current?.getTracks().forEach((track) => track.stop())
+    Object.keys(pcsRef.current).forEach(closePeerConnection)
+    isEndedRef.current = true
+    setIsEnded(true)
+    navigate('/meetings')
+  }
+
   const handleEndCallClick = async () => {
+    if (!isOwner) {
+      handleLeaveMeeting()
+      return
+    }
+    sendSignal('meeting-end', { type: 'meeting-end' })
     if (meetingId) {
       try {
         await workflowApi.endMeeting(meetingId)
-        // Refresh the profile to get updated EXP
-        if (refreshProfile) {
-          refreshProfile()
-        }
-      } catch (e) { console.error(e) }
+      } catch (e) {
+        console.error(e)
+      }
     }
-    
-    // Stop AV tracks
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop())
-    }
-    
-    // Calculate mock EXP
-    const exp = Math.floor(secondsElapsed / 60) * 10 + 50
-    setExpEarned(exp)
-
-    setShowEndModal(true)
-    triggerAutoAnalysis()
+    finalizeLocalSession(true)
   }
 
   const parseJsonList = (str: any): string[] => {
@@ -460,8 +678,8 @@ export default function MainMeetingBoard() {
   const actionItems = summary ? parseJsonTasks(summary.actionItems) : []
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-0 p-3 bg-neutral-200 relative">
-      <div className="flex flex-col gap-1 pb-3 px-4 bg-white rounded-t-xl mt-0 pt-4 border-b-2 shadow-sm">
+    <div className="flex h-full min-h-0 flex-col gap-0 p-3 bg-[var(--color-background)] relative">
+      <div className="flex flex-col gap-1 pb-3 px-4 bg-[var(--color-surface)] rounded-t-xl mt-0 pt-4 border-b-2 border-[var(--color-border)] shadow-sm">
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-lg font-extrabold text-neutral-900 tracking-tight">
@@ -472,41 +690,93 @@ export default function MainMeetingBoard() {
           <div className="flex flex-col items-end gap-2">
             <Badge variant="streak" className="rounded-md normal-case bg-red-100 text-red-600 border border-red-300">
               <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse mr-1.5 inline-block"></span>
-              Recording Live - {formatTime(secondsElapsed)}
+              {t('meetings.recordingLive')} - {formatTime(secondsElapsed)}
             </Badge>
           </div>
         </div>
       </div>
 
       <div className="flex-1 flex min-h-0 gap-3 mt-3">
-        {/* Left Area: Video Grid */}
+        {/* Left Area: Video Grid (Meet-style scaling) */}
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 grid min-h-0 grid-cols-2 lg:grid-cols-3 gap-3 overflow-auto border-2 border-neutral-300 rounded-xl bg-white p-4 shadow-md content-start">
-            {participants.map((p, i) => (
-              <Card key={i} variant="interactive" className="flex flex-col rounded-xl border-2 border-neutral-300 bg-neutral-900 overflow-hidden p-0 relative aspect-video shadow-md">
-                {p.isYou && videoOn && localStream ? (
-                  <video
-                    ref={(el) => { if (el && el.srcObject !== localStream) el.srcObject = localStream }}
-                    autoPlay playsInline muted className="w-full h-full object-cover"
-                  />
-                ) : !p.isYou && remoteStreams[p.sso] ? (
-                  <video
-                    ref={(el) => { if (el && el.srcObject !== remoteStreams[p.sso]) el.srcObject = remoteStreams[p.sso] }}
-                    autoPlay playsInline className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-1 flex-col items-center justify-center p-4 text-center h-full">
-                     <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center text-xl text-white font-bold mb-2 shadow-inner">
-                       {p.name.charAt(0).toUpperCase()}
-                     </div>
-                     <span className="text-[10px] font-bold text-neutral-400 uppercase">Camera Off</span>
-                  </div>
-                )}
-                <div className="absolute bottom-2 left-2 bg-black/60 text-white px-2 py-0.5 rounded text-[10px] font-medium backdrop-blur-sm">
-                  {p.name} {p.isYou ? '(YOU)' : ''}
-                </div>
-              </Card>
+          <div className="flex-1 min-h-0 overflow-auto border-2 border-neutral-300 rounded-xl bg-white p-4 shadow-md flex items-center justify-center">
+            {/* Hidden audio elements so remote mic is heard even when camera is off */}
+            {Object.entries(remoteStreams).map(([sso, stream]) => (
+              <audio
+                key={`audio-${sso}`}
+                autoPlay
+                playsInline
+                ref={(el) => {
+                  if (!el) return
+                  if (el.srcObject !== stream) {
+                    el.srcObject = stream
+                    el.play().catch(() => {})
+                  }
+                }}
+                className="hidden"
+              />
             ))}
+            {(() => {
+              const visible = participants.slice(0, 9)
+              const { gridClass, tileClass } = getGridLayout(visible.length)
+              return (
+                <div className={`grid gap-3 w-full ${gridClass}`}>
+                  {visible.map((p, i) => {
+                    const showLocalVideo = p.isYou && videoOn && hasLiveVideo(localStream)
+                    const showRemoteVideo = !p.isYou
+                      && remoteVideoOn[p.sso] !== false
+                      && hasLiveVideo(remoteStreams[p.sso])
+                    const label = `${p.name}${p.isYou ? ` (${t('common.you')})` : ''}`
+                    const initial = (p.name || 'U').charAt(0).toUpperCase()
+
+                    return (
+                      <div
+                        key={p.sso || i}
+                        className={`${tileClass} rounded-xl border-2 overflow-hidden relative bg-neutral-900 shadow-md ${
+                          p.isYou ? 'border-primary' : 'border-neutral-300'
+                        } ${visible.length === 3 && i === 2 ? 'col-span-2 sm:col-span-1 sm:col-start-1 sm:col-end-3 justify-self-center w-full max-w-[50%]' : ''}`}
+                      >
+                        {showLocalVideo ? (
+                          <video
+                            ref={(el) => {
+                              if (el && el.srcObject !== localStream) el.srcObject = localStream
+                            }}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover"
+                          />
+                        ) : showRemoteVideo ? (
+                          <video
+                            ref={(el) => {
+                              if (!el) return
+                              if (el.srcObject !== remoteStreams[p.sso]) {
+                                el.srcObject = remoteStreams[p.sso]
+                                el.play().catch(() => {})
+                              }
+                            }}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+                            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-700 text-xl font-bold text-white shadow-inner">
+                              {initial}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase text-neutral-400">{t('meetings.cameraOffLabel')}</span>
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                          {label}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </div>
         </div>
 
@@ -516,7 +786,7 @@ export default function MainMeetingBoard() {
             <div className="flex-1 flex flex-col bg-white rounded-xl border-2 border-neutral-300 overflow-hidden shadow-md min-h-0">
                <div className="p-3 border-b-2 border-neutral-200 bg-neutral-50 flex justify-between items-center flex-shrink-0">
                  <h3 className="text-xs font-bold uppercase text-neutral-800">
-                   {activeTab === 'chat' ? 'Live Chat' : 'Quick Note'}
+                   {activeTab === 'chat' ? t('meetings.liveChat') : t('meetings.quickNote')}
                  </h3>
                  <button onClick={() => setActiveTab(null)} className="text-neutral-500 hover:text-neutral-800 font-bold">✖</button>
                </div>
@@ -549,7 +819,7 @@ export default function MainMeetingBoard() {
                          setChatInput('')
                        }}
                        onFileChange={() => {}}
-                       placeholder="Type message..." 
+                       placeholder={t('meetings.chatPlaceholder')} 
                      />
                    </div>
                  </>
@@ -558,7 +828,7 @@ export default function MainMeetingBoard() {
                    <div className="flex-1 overflow-y-auto p-3 bg-white flex flex-col">
                      <textarea 
                        className="flex-1 w-full p-2 text-sm border-2 border-neutral-200 rounded-lg resize-none focus:outline-none focus:border-neutral-400"
-                       placeholder="Jot down important notes here..."
+                       placeholder={t('meetings.notePlaceholder')}
                        value={noteInput}
                        onChange={e => setNoteInput(e.target.value)}
                      />
@@ -569,7 +839,7 @@ export default function MainMeetingBoard() {
                         workflowApi.addMeetingNote(Number(meetingId), noteInput, false)
                         setNoteInput('')
                      }}>
-                       Save Note
+                       {t('meetings.saveNote')}
                      </Button>
                    </div>
                  </>
@@ -587,7 +857,7 @@ export default function MainMeetingBoard() {
             className={`font-bold transition-colors ${micOn ? 'hover:bg-neutral-100' : '!bg-red-50 !text-red-700 !border-red-300 hover:!bg-red-100'}`} 
             onClick={() => setMicOn(!micOn)}
           >
-            {micOn ? 'Microphone: ON' : 'Microphone: OFF'}
+            {micOn ? t('meetings.micOn') : t('meetings.micOff')}
           </Button>
           <Button 
             variant="secondary" 
@@ -595,7 +865,7 @@ export default function MainMeetingBoard() {
             className={`font-bold transition-colors ${videoOn ? 'hover:bg-neutral-100' : '!bg-red-50 !text-red-700 !border-red-300 hover:!bg-red-100'}`} 
             onClick={() => setVideoOn(!videoOn)}
           >
-            {videoOn ? 'Camera: ON' : 'Camera: OFF'}
+            {videoOn ? t('meetings.cameraOn') : t('meetings.cameraOff')}
           </Button>
         </div>
         <div className="flex items-center gap-3">
@@ -605,7 +875,7 @@ export default function MainMeetingBoard() {
             className={`font-bold transition-colors ${activeTab === 'chat' ? '!bg-neutral-900 !text-white hover:!bg-neutral-800' : ''}`} 
             onClick={() => setActiveTab(activeTab === 'chat' ? null : 'chat')}
           >
-            💬 Chat
+            {t('meetings.chat')}
           </Button>
           <Button 
             variant="secondary" 
@@ -613,13 +883,19 @@ export default function MainMeetingBoard() {
             className={`font-bold transition-colors ${activeTab === 'note' ? '!bg-neutral-900 !text-white hover:!bg-neutral-800' : ''}`} 
             onClick={() => setActiveTab(activeTab === 'note' ? null : 'note')}
           >
-            📝 Quick Note
+            {t('meetings.quickNote')}
           </Button>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Button variant="primary" size="md" className="!bg-error hover:!bg-red-700 text-white !border-error uppercase font-bold tracking-wide shadow-sm px-8" onClick={handleEndCallClick}>
-            End Meeting
-          </Button>
+          {isOwner ? (
+            <Button variant="primary" size="md" className="!bg-error hover:!bg-red-700 text-white !border-error uppercase font-bold tracking-wide shadow-sm px-8" onClick={handleEndCallClick}>
+              {t('meetings.endMeeting')}
+            </Button>
+          ) : (
+            <Button variant="secondary" size="md" className="uppercase font-bold tracking-wide shadow-sm px-8" onClick={handleLeaveMeeting}>
+              {t('meetings.leaveMeeting')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -627,53 +903,52 @@ export default function MainMeetingBoard() {
       <Modal 
         open={showEndModal} 
         onClose={() => {}} // Disabled outside click
-        size="max-w-4xl"
-        title="Meeting Finished"
+        size={canUseAiAnalysis() ? 'max-w-4xl' : 'max-w-lg'}
+        title={t('meetings.finished')}
       >
-        <div className="flex flex-col md:flex-row gap-6 p-4">
+        <div className={`flex flex-col gap-6 p-4 ${canUseAiAnalysis() ? 'md:flex-row' : ''}`}>
           
           {/* Left Column: Stats & Actions */}
-          <div className="w-full md:w-1/3 flex flex-col gap-4">
+          <div className={`flex flex-col gap-4 ${canUseAiAnalysis() ? 'w-full md:w-1/3' : 'w-full'}`}>
             <Card className="bg-neutral-50 p-5 text-center border border-neutral-200 shadow-inner">
-              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">Total Duration</h3>
+              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">{t('meetings.totalDuration')}</h3>
               <p className="text-3xl font-extrabold text-neutral-900">{formatTime(secondsElapsed)}</p>
             </Card>
 
             <Card className="bg-emerald-50 p-5 text-center border border-emerald-200">
-              <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Exp Earned</h3>
+              <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">{t('meetings.expEarned')}</h3>
               <p className="text-3xl font-extrabold text-emerald-700">+{expEarned}</p>
             </Card>
 
-            <div className="mt-2 space-y-3">
-              {recordingBlobUrl ? (
-                <a href={recordingBlobUrl} download={`meeting_${meetingId}_record.webm`} className="block w-full">
-                  <Button variant="secondary" className="w-full justify-center !bg-blue-50 !text-blue-700 !border-blue-200 hover:!bg-blue-100">
-                    ⬇️ Download Recording
-                  </Button>
-                </a>
-              ) : (
-                 <Button variant="secondary" className="w-full justify-center" disabled>
-                   Generating Record...
-                 </Button>
-              )}
-
-              <Button variant="secondary" className="w-full justify-center !bg-purple-50 !text-purple-700 !border-purple-200 hover:!bg-purple-100">
-                📝 Generate Quick Quiz
-              </Button>
-            </div>
+            {canUseAiAnalysis() && (
+              <div className="mt-2 space-y-3">
+                {recordingBlobUrl ? (
+                  <a href={recordingBlobUrl} download={`meeting_${meetingId}_record.webm`} className="block w-full">
+                    <Button variant="secondary" className="w-full justify-center !bg-blue-50 !text-blue-700 !border-blue-200 hover:!bg-blue-100">
+                      {t('meetings.downloadRecording')}
+                    </Button>
+                  </a>
+                ) : (
+                   <Button variant="secondary" className="w-full justify-center" disabled>
+                     {t('meetings.generatingRecord')}
+                   </Button>
+                )}
+              </div>
+            )}
             
             <div className="mt-auto pt-6 border-t border-neutral-200">
               <Button variant="primary" className="w-full justify-center" onClick={() => navigate('/meetings')}>
-                Return to Meetings
+                {t('meetings.return')}
               </Button>
             </div>
           </div>
 
-          {/* Right Column: AI Analysis */}
+          {/* Right Column: AI Analysis — TEAM / COMBO only */}
+          {canUseAiAnalysis() ? (
           <div className="w-full md:w-2/3 flex flex-col gap-4 bg-white border border-neutral-200 rounded-xl p-5 shadow-sm min-h-[400px]">
              <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
                <h2 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
-                 ✨ AI Post-Meeting Analysis
+                 {t('meetings.aiAnalysis')}
                </h2>
                {isTranscribing && (
                  <Badge variant="milestone" className="animate-pulse">Processing Audio...</Badge>
@@ -693,7 +968,7 @@ export default function MainMeetingBoard() {
                {summary && (
                  <div className="space-y-6 animate-fade-in pb-4">
                     <section>
-                      <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-2">Executive Summary</h3>
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-2">{t('meetings.executiveSummary')}</h3>
                       <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100">
                         <p className="text-sm leading-relaxed text-neutral-800">{summary.content}</p>
                       </div>
@@ -701,7 +976,7 @@ export default function MainMeetingBoard() {
                     
                     {keyPoints.length > 0 && (
                       <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-2">Key Points</h3>
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-2">{t('meetings.keyPoints')}</h3>
                         <ul className="space-y-2 text-sm text-neutral-800 bg-white border border-neutral-100 rounded-xl p-4 shadow-sm">
                           {keyPoints.map((kp, i) => (
                             <li key={i} className="flex gap-2">
@@ -715,7 +990,7 @@ export default function MainMeetingBoard() {
 
                     {actionItems.length > 0 && (
                       <section>
-                        <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-3">Suggested Action Items</h3>
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-neutral-500 mb-3">{t('meetings.actionItems')}</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {actionItems.map((t, i) => (
                             <div key={i} className="flex flex-col text-sm border border-neutral-200 bg-white p-3 rounded-xl shadow-sm hover:border-primary/50 transition-colors cursor-default">
@@ -730,6 +1005,7 @@ export default function MainMeetingBoard() {
                )}
              </div>
           </div>
+          ) : null}
         </div>
       </Modal>
     </div>

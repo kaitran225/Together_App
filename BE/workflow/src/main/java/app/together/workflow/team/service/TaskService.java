@@ -47,6 +47,7 @@ public class TaskService {
     private final TaskActivityRepository taskActivityRepository;
     private final PermissionCheckService permissionCheckService;
     private final app.together.common.auth.repository.UserRepository userRepository;
+    private final TaskLifecycleHelper taskLifecycleHelper;
 
     @org.springframework.beans.factory.annotation.Value("${app.email-service.base-url:http://localhost:8895}")
     private String emailServiceBaseUrl;
@@ -73,13 +74,23 @@ public class TaskService {
             throw new BadRequestException(MessageConstants.MESSAGE_TASK_TITLE_REQUIRED);
         }
 
-        // ưu tiên tự động xếp vào cột đầu tiên nếu không có columId
+        // Mặc định đưa vào cột To Do
         Long targetColumnId = request.columnId();
         if (targetColumnId == null) {
-            targetColumnId = boardColumnRepository.findByProjectId(projectId).stream()
-                    .min((c1, c2) -> Integer.compare(c1.getPosition(), c2.getPosition()))
+            List<BoardColumn> columns = boardColumnRepository.findByProjectId(projectId);
+            targetColumnId = columns.stream()
+                    .filter(c -> c.getName() != null && (
+                            "To Do".equalsIgnoreCase(c.getName().trim())
+                                    || "Todo".equalsIgnoreCase(c.getName().trim())
+                                    || "To-Do".equalsIgnoreCase(c.getName().trim())))
                     .map(BoardColumn::getColumnId)
-                    .orElse(null);
+                    .findFirst()
+                    .orElseGet(() -> columns.stream()
+                            .min((c1, c2) -> Integer.compare(
+                                    c1.getPosition() != null ? c1.getPosition() : 0,
+                                    c2.getPosition() != null ? c2.getPosition() : 0))
+                            .map(BoardColumn::getColumnId)
+                            .orElse(null));
         }
 
         Task task = Task.builder()
@@ -88,7 +99,7 @@ public class TaskService {
                 .parentTaskId(request.parentTaskId())
                 .title(request.title())
                 .description(request.description() != null ? request.description() : null)
-                .status(TaskStatus.OPEN.name())
+                .status(TaskStatus.OPEN.name()) // To Do
                 .priority(request.priority() != null ? request.priority() : TaskPriority.MEDIUM.name())
                 .estimatedHours(request.estimatedHours())
                 .startDate(request.startDate())
@@ -365,8 +376,19 @@ public class TaskService {
         if (request.completedAt() != null) {
             task.setCompletedAt(request.completedAt());
         }
-        if (request.status() != null) {
-            task.setStatus(request.status());
+        if (request.status() != null && !request.status().isBlank()) {
+            String oldStatus = task.getStatus();
+            String newStatus = normalizeTaskStatus(request.status());
+            task.setStatus(newStatus);
+            if (taskLifecycleHelper.isTransitioningToInProgress(oldStatus, newStatus)) {
+                taskLifecycleHelper.markInProgressStarted(task);
+            }
+            if (taskLifecycleHelper.isTransitioningToDone(oldStatus, newStatus)) {
+                if (task.getCompletedAt() == null) {
+                    task.setCompletedAt(Instant.now());
+                }
+                taskLifecycleHelper.applyActualHoursOnComplete(task);
+            }
         }
 
         taskRepository.save(task);
@@ -379,6 +401,56 @@ public class TaskService {
                 .build());
 
         return getTaskDetails(taskId, userSso);
+    }
+
+    /**
+     * Soft-delete task. Quyền: TASK_DELETE (OWNER)
+     */
+    public void deleteTask(Long taskId, String userSso) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_TASK_NOT_FOUND, taskId));
+        TeamMember teamMember = getActiveTeamMember(task.getTeamId(), userSso);
+        permissionCheckService.requireTeamRole(Permission.TASK_DELETE, teamMember.getRole());
+
+        Instant now = Instant.now();
+        task.setDeletedAt(now);
+        task.setUpdatedBy(userSso);
+        taskRepository.save(task);
+
+        taskActivityRepository.save(TaskActivity.builder()
+                .taskId(taskId)
+                .userSso(userSso)
+                .activityType(TaskActivityStatus.UPDATE_TASK.name())
+                .oldValue(task.getStatus())
+                .newValue("DELETED")
+                .build());
+    }
+
+    /**
+     * Map tên cột / status tự do từ FE về enum TaskStatus.
+     */
+    private String normalizeTaskStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return TaskStatus.OPEN.name();
+        }
+        String normalized = status.trim().toUpperCase(java.util.Locale.ROOT)
+                .replace('-', '_')
+                .replace(' ', '_');
+        return switch (normalized) {
+            case "TO_DO", "TODO", "BACKLOG", "OPEN", "DRAFT" -> TaskStatus.OPEN.name();
+            case "IN_PROGRESS", "INPROGRESS", "DOING", "PROGRESS" -> TaskStatus.IN_PROGRESS.name();
+            case "IN_REVIEW", "INREVIEW", "REVIEW" -> TaskStatus.IN_REVIEW.name();
+            case "DONE", "COMPLETED", "COMPLETE" -> TaskStatus.DONE.name();
+            case "CANCELLED", "CANCELED" -> TaskStatus.CANCELLED.name();
+            default -> {
+                // If already a valid enum name, keep it; otherwise default OPEN
+                try {
+                    yield TaskStatus.valueOf(normalized).name();
+                } catch (IllegalArgumentException ex) {
+                    yield TaskStatus.OPEN.name();
+                }
+            }
+        };
     }
 
     // lấy team member hoạt động

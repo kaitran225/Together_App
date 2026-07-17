@@ -1,10 +1,25 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Badge, Button, Card, IconButton, SegmentedControl, SettingsIcon } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
-import { NOTIFICATION_TABS, type NotificationItem, type NotificationType } from '../../../mocks'
+import { useTranslation } from '../../../contexts/LanguageContext'
+import { type NotificationItem, type NotificationType } from '../../../mocks'
 
-const TABS = NOTIFICATION_TABS
-type TabId = (typeof TABS)[number]['id']
+type TabId = 'all' | 'upcoming' | 'teams'
+
+function mapBackendType(raw: string | undefined | null): NotificationType {
+  const type = String(raw || '').toUpperCase()
+  if (type === 'TASK_REMINDER' || type === 'DEADLINE') return 'deadline'
+  if (type === 'TEAM_INVITE' || type === 'TEAM_JOIN' || type === 'TEAM' || type === 'MEETING') return 'team'
+  if (type === 'AI') return 'ai'
+  if (type === 'ACHIEVEMENT') return 'achievement'
+  if (type === 'MESSAGE') return 'message'
+  const lower = String(raw || 'message').toLowerCase()
+  if (lower === 'deadline' || lower === 'team' || lower === 'ai' || lower === 'achievement' || lower === 'message') {
+    return lower
+  }
+  return 'message'
+}
 
 function getIcon(type: NotificationType) {
   const base = 'w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0'
@@ -53,29 +68,45 @@ function getIcon(type: NotificationType) {
 }
 
 function normalizeNotification(item: any): NotificationItem {
-  const type = (item.type || 'message').toLowerCase() as NotificationType
+  const uiType = mapBackendType(item.type)
   const createdAt = item.createdAt ? new Date(item.createdAt) : new Date()
   const time = Number.isNaN(createdAt.getTime()) ? 'Recently' : createdAt.toLocaleDateString('vi-VN')
+  const linkType = item.linkType ? String(item.linkType).toUpperCase() : null
+  const linkId = item.linkId != null ? Number(item.linkId) : null
 
   return {
     id: String(item.notificationId ?? item.id ?? ''),
-    type: type === 'deadline' || type === 'team' || type === 'ai' || type === 'achievement' || type === 'message' ? type : 'message',
+    type: uiType,
     title: item.title || 'Notification',
     description: item.message || 'You have a new update.',
     time,
-    priority: type === 'deadline' || Boolean(item.linkType),
+    priority: uiType === 'deadline' || linkType === 'MEETING',
     unread: item.isRead === false,
+    linkType,
+    linkId: Number.isNaN(linkId as number) ? null : linkId,
   }
 }
 
 function filterByTab(items: NotificationItem[], tab: TabId): NotificationItem[] {
   if (tab === 'all') return items
   if (tab === 'upcoming') return items.filter((n) => n.type === 'deadline' || n.priority)
-  if (tab === 'teams') return items.filter((n) => n.type === 'team' || n.type === 'message')
+  if (tab === 'teams') return items.filter((n) => n.type === 'team' || n.linkType === 'TEAM' || n.linkType === 'MEETING')
   return items
 }
 
+function resolveNotificationPath(n: NotificationItem): string | null {
+  const linkType = String(n.linkType || '').toUpperCase()
+  if (linkType === 'MEETING' && n.linkId) return `/meetings/room?meetingId=${n.linkId}`
+  if (linkType === 'TEAM' && n.linkId) return `/teams/board?teamId=${n.linkId}`
+  if (linkType === 'TASK' && n.linkId) return `/teams`
+  if (n.type === 'team') return '/teams'
+  if (n.type === 'deadline') return '/teams'
+  return null
+}
+
 export default function Notification() {
+  const navigate = useNavigate()
+  const { t } = useTranslation()
   const [tab, setTab] = useState<TabId>('all')
   const [items, setItems] = useState<NotificationItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -101,12 +132,30 @@ export default function Notification() {
 
   const filtered = filterByTab(items, tab)
 
+  const handleClick = async (n: NotificationItem) => {
+    if (n.unread) {
+      const numId = Number(n.id)
+      if (!Number.isNaN(numId)) {
+        try {
+          await workflowApi.markNotificationAsRead(numId)
+          setItems((prev) =>
+            prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
+          )
+        } catch {
+          // ignore
+        }
+      }
+    }
+    const path = resolveNotificationPath(n)
+    if (path) navigate(path)
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Notification Board</h1>
-          <p className="text-neutral-600 mt-1">Don&apos;t miss out on study announcements and group activities.</p>
+          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">{t('notif.title')}</h1>
+          <p className="text-neutral-600 mt-1">{t('notif.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {items.some((n) => n.unread) && (
@@ -118,44 +167,38 @@ export default function Notification() {
                 setItems((prev) => prev.map((item) => ({ ...item, unread: false })))
               }}
             >
-              Mark all as read
+              {t('notif.markAllRead')}
             </Button>
           )}
-          <IconButton icon={<SettingsIcon className="w-5 h-5" />} label="Notification settings" />
+          <IconButton icon={<SettingsIcon className="w-5 h-5" />} label={t('notif.settings')} />
         </div>
       </div>
 
-      <div className="border-b border-neutral-200 pb-2">
+      <div className="border-b border-neutral-200 dark:border-[var(--color-border)] pb-2">
         <SegmentedControl
           value={tab}
           onChange={(next) => setTab(next as TabId)}
-          options={TABS.map((t) => ({ value: t.id, label: t.label }))}
+          options={[
+            { value: 'all', label: t('notif.tab.all') },
+            { value: 'upcoming', label: t('notif.tab.upcoming') },
+            { value: 'teams', label: t('notif.tab.teams') },
+          ]}
         />
       </div>
 
       <ul className="space-y-3">
         {isLoading ? (
-          <li className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Loading notifications…</li>
+          <li className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-neutral-600">{t('notif.loading')}</li>
         ) : filtered.length === 0 ? (
-          <li className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">No notifications yet.</li>
+          <li className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-neutral-600">{t('notif.empty')}</li>
         ) : filtered.map((n) => (
           <li key={n.id}>
             <Card
-              onClick={async () => {
-                if (n.unread) {
-                  const numId = Number(n.id)
-                  if (!Number.isNaN(numId)) {
-                    await workflowApi.markNotificationAsRead(numId)
-                    setItems((prev) =>
-                      prev.map((item) => (item.id === n.id ? { ...item, unread: false } : item))
-                    )
-                  }
-                }
-              }}
+              onClick={() => void handleClick(n)}
               className={`p-4 flex gap-4 items-start border-2 transition-all duration-200 cursor-pointer ${
                 n.unread
                   ? 'bg-neutral-50/70 border-primary/30 hover:border-primary/50 hover:bg-neutral-50'
-                  : 'border-neutral-200 hover:border-neutral-300 bg-white'
+                  : 'border-neutral-200 hover:border-neutral-300 bg-[var(--color-surface)]'
               }`}
             >
               {getIcon(n.type)}
@@ -166,7 +209,7 @@ export default function Notification() {
                 </h3>
                 <p className="text-sm text-neutral-600 mt-1">{n.description}</p>
                 {n.priority && (
-                  <Badge variant="warning" className="mt-2">Priority</Badge>
+                  <Badge variant="warning" className="mt-2">{t('notif.priority')}</Badge>
                 )}
               </div>
               <Badge variant="default" className="shrink-0">
@@ -179,7 +222,7 @@ export default function Notification() {
 
       {filtered.length > 0 && (
         <div className="flex justify-center pt-2">
-          <Button variant="primary" size="md" onClick={loadNotifications}>Refresh notifications</Button>
+          <Button variant="primary" size="md" onClick={loadNotifications}>{t('notif.refresh')}</Button>
         </div>
       )}
     </div>

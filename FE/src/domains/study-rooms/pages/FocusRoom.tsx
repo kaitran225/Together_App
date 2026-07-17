@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, Modal, QuizletQuizModal, Textarea } from '../../../components/common'
 import { ThemeSwitch } from '../../../components/ThemeSwitch'
+import { LanguageSwitch } from '../../../components/LanguageSwitch'
 import { FlashcardModal } from '../../../components/FlashcardModal'
 import { ACCEPT_FILES, MAX_FILE_SIZE_MB } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
@@ -217,9 +218,16 @@ export default function FocusRoom() {
     loadTasks()
     initChat()
     fetchQuizSets()
-
-    return () => clearInterval(interval)
   }, [])
+
+  // Focus timer — stops when End is pressed or session ends
+  useEffect(() => {
+    if (isEnded || showEndModal) return
+    const interval = setInterval(() => {
+      setSeconds((prev) => prev + 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [isEnded, showEndModal])
 
   const initChat = async () => {
     try {
@@ -489,6 +497,7 @@ export default function FocusRoom() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeSwitch />
+          <LanguageSwitch />
           <span className="px-4 py-2 rounded-lg bg-[var(--color-charcoal)] border border-[var(--color-border)] font-mono text-sm tabular-nums text-neutral-900 dark:text-neutral-100">
             {formatTime(seconds)}
           </span>

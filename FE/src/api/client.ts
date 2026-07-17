@@ -1,7 +1,27 @@
-import type { ApiResponse, MeResponse } from '../types/dto'
+import type {
+  ApiResponse,
+  MeResponse,
+  CreateTaskRequest,
+  UpdateTaskRequest,
+  TaskDetailsResponse,
+  TaskSubmissionResponse,
+  EvaluateTaskRequest,
+  AddTaskDependencyRequest,
+  AddTaskCommentRequest,
+  AddAttachmentRequest,
+} from '../types/dto'
 import { getFakeMeResponse } from '../mocks/user'
 
 export type { ApiResponse, MeResponse } from '../types/dto'
+export type {
+  CreateTaskRequest,
+  UpdateTaskRequest,
+  TaskDetailsResponse,
+  TaskSummaryResponse,
+  TaskSubmissionResponse,
+  SubmitTaskRequest,
+  EvaluateTaskRequest,
+} from '../types/dto'
 
 const AUTH_ISSUER = 'http://localhost:8880'
 
@@ -443,17 +463,7 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async createTask(projectId: string | number, data: {
-    title: string
-    description?: string
-    priority?: string
-    estimatedHours?: number
-    startDate?: string | null
-    dueDate?: string | null
-    parentTaskId?: number | null
-    sprintId?: number | null
-    columnId?: number | null
-  }): Promise<ApiResponse<any>> {
+  async createTask(projectId: string | number, data: CreateTaskRequest): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/projects/${projectId}/tasks`, {
       method: 'POST',
@@ -465,7 +475,7 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async getTask(taskId: string | number): Promise<ApiResponse<any>> {
+  async getTask(taskId: string | number): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}`, {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
@@ -982,8 +992,15 @@ export const workflowApi = {
   },
   async exportProjectTasks(projectId: number): Promise<Blob> {
     if (useMock) {
-      const csvContent = "Task ID,Title,Description,Status,Priority\n1,Sample Task,This is mock data,OPEN,MEDIUM"
-      return new Blob([csvContent], { type: 'text/csv' })
+      const csvContent =
+        '=== TASK LIST ===\n' +
+        'Task ID,Title,Description,Status,Priority,Assignee,Estimated Hours,Actual Hours,Start Date,Due Date,Completed At,Created By\n' +
+        '1,Sample Task,This is mock data,OPEN,MEDIUM,Member A,2,,2026-01-01,2026-01-10,,Owner Name\n' +
+        '\n=== MEMBER TASK STATISTICS ===\n' +
+        'Member,Role,Total Assigned,To Do,In Progress,In Review,Done,Other\n' +
+        'Owner Name,OWNER,0,0,0,0,0,0\n' +
+        'Member A,MEMBER,1,1,0,0,0,0\n'
+      return new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
     }
     const r = await fetch(`/api/v1/workflow/projects/${projectId}/export`, {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
@@ -1317,7 +1334,7 @@ export const workflowApi = {
   },
 
   // ── Task Submissions ──
-  async submitTask(taskId: number, content: string, attachments?: string): Promise<ApiResponse<any>> {
+  async submitTask(taskId: number, content: string, attachments?: string): Promise<ApiResponse<TaskSubmissionResponse>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/submissions`, {
       method: 'POST',
@@ -1326,14 +1343,19 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async getTaskSubmissions(taskId: number): Promise<ApiResponse<any[]>> {
+  async getTaskSubmissions(taskId: number): Promise<ApiResponse<TaskSubmissionResponse[]>> {
     if (useMock) return Promise.resolve({ success: true, data: [] })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/submissions`, {
       headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
   },
-  async evaluateSubmission(submissionId: number, grade: number, feedback: string, status?: string): Promise<ApiResponse<any>> {
+  async evaluateSubmission(
+    submissionId: number,
+    grade: number,
+    feedback: string,
+    status?: EvaluateTaskRequest['status']
+  ): Promise<ApiResponse<TaskSubmissionResponse>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/submissions/${submissionId}/evaluate`, {
       method: 'POST',
@@ -1344,7 +1366,7 @@ export const workflowApi = {
   },
 
   // ── Task Extra ──
-  async assignTask(taskId: number, targetUserSso: string): Promise<ApiResponse<any>> {
+  async assignTask(taskId: number, targetUserSso: string): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/assign`, {
       method: 'POST',
@@ -1353,39 +1375,59 @@ export const workflowApi = {
     })
     return r.json()
   },
-  async addTaskDependency(taskId: number, dependsOnTaskId: number): Promise<ApiResponse<any>> {
+  async addTaskDependency(
+    taskId: number,
+    dependsOnTaskId: number,
+    dependencyType?: string
+  ): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
+    const body: AddTaskDependencyRequest = { dependsOnTaskId, dependencyType: dependencyType ?? null }
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/dependencies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ dependsOnTaskId }),
+      body: JSON.stringify(body),
     })
     return r.json()
   },
-  async addTaskComment(taskId: number, content: string): Promise<ApiResponse<any>> {
+  async addTaskComment(taskId: number, content: string, attachments?: string): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
+    const body: AddTaskCommentRequest = { content, attachments: attachments ?? null }
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
     })
     return r.json()
   },
-  async addTaskAttachment(taskId: number, title: string, url: string, attachmentType?: string): Promise<ApiResponse<any>> {
+  async addTaskAttachment(
+    taskId: number,
+    title: string,
+    url: string,
+    attachmentType?: string
+  ): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
+    const body: AddAttachmentRequest = { title, url, attachmentType: attachmentType ?? null }
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}/attachments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
-      body: JSON.stringify({ title, url, attachmentType }),
+      body: JSON.stringify(body),
     })
     return r.json()
   },
-  async updateTask(taskId: number, data: any): Promise<ApiResponse<any>> {
+  async updateTask(taskId: number, data: UpdateTaskRequest): Promise<ApiResponse<TaskDetailsResponse>> {
     if (useMock) return Promise.resolve({ success: true })
     const r = await fetch(`/api/v1/workflow/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getStoredToken()}` },
       body: JSON.stringify(data),
+    })
+    return r.json()
+  },
+  async deleteTask(taskId: number): Promise<ApiResponse<void>> {
+    if (useMock) return Promise.resolve({ success: true })
+    const r = await fetch(`/api/v1/workflow/tasks/${taskId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${getStoredToken()}` },
     })
     return r.json()
   },

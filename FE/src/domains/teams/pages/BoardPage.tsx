@@ -560,13 +560,38 @@ function TeamManagementContent({
   )
 }
 
-function scrumTaskToForEdit(t: any): TaskForEdit {
+function scrumTaskToForEdit(t: {
+  title?: string
+  description?: string | null
+  assignee?: string | null
+  assignees?: string[] | null
+  dueDate?: string | null
+  due?: string | null
+  duDate?: string | null
+  startDate?: string | null
+  completedAt?: string | null
+  completeAt?: string | null
+  status?: string | null
+  priority?: string | null
+  estimatedHours?: number | null
+  actualHours?: number | null
+  [key: string]: unknown
+}): TaskForEdit {
+  const dueDate = (t.dueDate || t.due || t.duDate || '') as string
+  const completedAt = (t.completedAt || t.completeAt) as string | null | undefined
   return {
     ...t,
+    title: t.title || '',
     desc: t.description || undefined,
-    assignee: t.assignee || '',
-    due: t.dueDate || t.due || t.duDate || '',
-    completed: t.completeAt ? new Date(t.completeAt).toISOString().split('T')[0] : (t.completedAt ? new Date(t.completedAt).toISOString().split('T')[0] : '')
+    description: t.description || undefined,
+    assignee: t.assignee || t.assignees?.[0] || '',
+    due: dueDate,
+    dueDate,
+    endDate: dueDate,
+    completed: completedAt ? new Date(completedAt).toISOString().split('T')[0] : '',
+    completedAt: completedAt || undefined,
+    estimatedHours: t.estimatedHours ?? null,
+    actualHours: t.actualHours != null ? Number(t.actualHours) : null,
   }
 }
 
@@ -654,19 +679,22 @@ function ScrumBoardContent({
   const handleSaveTask = async (updated: TaskForEdit) => {
     if (!selected || !projectId) return
     const { task } = selected
+    const isAssigned = !!(task.assignee || '').trim()
 
-    // Handle column movement
-    const targetCol = columns.find((c) => c.name === updated.status || String(c.columnId) === String(updated.status))
-    if (targetCol && String(targetCol.columnId) !== String(task.columnId)) {
-      try {
-        await workflowApi.moveTask(projectId, task.taskId, targetCol.columnId)
-      } catch (err) {
-        console.error(err)
+    // Khi đã giao: không đổi status qua move (kéo cột vẫn dùng board)
+    if (!isAssigned) {
+      const targetCol = columns.find((c) => c.name === updated.status || String(c.columnId) === String(updated.status))
+      if (targetCol && String(targetCol.columnId) !== String(task.columnId)) {
+        try {
+          await workflowApi.moveTask(projectId, task.taskId, targetCol.columnId)
+        } catch (err) {
+          console.error(err)
+        }
       }
     }
 
-    // Handle assignee update
-    if (updated.assignee !== task.assignee) {
+    // Handle assignee update — chỉ OWNER được giao task
+    if (isOwner && updated.assignee !== task.assignee) {
       try {
         await workflowApi.assignTask(task.taskId, updated.assignee || '')
       } catch (err) {
@@ -674,17 +702,20 @@ function ScrumBoardContent({
       }
     }
 
-    // Handle general task update (dates, title, description, priority)
+    // Handle general task update
     try {
-      await workflowApi.updateTask(task.taskId, {
+      const payload: Record<string, unknown> = {
         title: updated.title,
         description: updated.desc,
-        priority: updated.priority || 'Medium',
-        startDate: updated.startDate || null,
-        dueDate: updated.due || updated.endDate || null,
-        completedAt: updated.completed ? new Date(updated.completed).toISOString() : null,
-        status: updated.status
-      })
+      }
+      if (!isAssigned) {
+        payload.priority = updated.priority || 'Medium'
+        payload.startDate = updated.startDate || null
+        payload.dueDate = updated.due || updated.endDate || null
+        payload.status = updated.status
+        payload.completedAt = updated.completed ? new Date(updated.completed).toISOString() : null
+      }
+      await workflowApi.updateTask(task.taskId, payload as any)
     } catch (err) {
       console.error(err)
     }
@@ -862,6 +893,10 @@ function ScrumBoardContent({
               onWorkflowChange={() => {
                 loadBoard()
                 setSelected(null)
+              }}
+              onDeleted={() => {
+                setSelected(null)
+                loadBoard()
               }}
             />
           </Card>

@@ -21,7 +21,7 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public List<NotificationDto> getMyNotifications() {
         String userSso = SecurityUtils.requireCurrentUserSso();
-        return notificationRepository.findByUserSso(userSso).stream()
+        return notificationRepository.findByUserSsoOrderByCreatedAtDesc(userSso).stream()
                 .map(notificationMapper::toDto)
                 .toList();
     }

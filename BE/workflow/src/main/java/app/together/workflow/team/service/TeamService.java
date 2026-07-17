@@ -14,6 +14,7 @@ import app.together.common.workflow.entity.TeamMemberId;
 import app.together.common.workflow.repository.TeamMemberRepository;
 import app.together.common.workflow.repository.TeamRepository;
 import app.together.workflow.payment.service.FeatureUsageService;
+import app.together.workflow.personal.service.NotificationPublisher;
 import app.together.workflow.team.dto.TeamDtos.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +37,7 @@ public class TeamService {
     private final PermissionCheckService permissionCheckService;
     private final UserRepository userRepository;
     private final FeatureUsageService featureUsageService;
+    private final NotificationPublisher notificationPublisher;
 
     // ── Tạo Team mới ──
 
@@ -190,10 +193,28 @@ public class TeamService {
         member.setUpdatedBy(userSso);
 
         TeamMember saved = teamMemberRepository.save(member);
+
+        // Notify team owners that someone joined via invite code
+        String joinerName = resolveDisplayName(userSso);
+        List<String> owners = teamMemberRepository.findByTeamId(team.getTeamId()).stream()
+                .filter(m -> m.getLeftAt() == null && TeamRole.OWNER.equals(m.getRole()))
+                .map(TeamMember::getUserSso)
+                .filter(sso -> sso != null && !sso.equals(userSso))
+                .toList();
+        if (!owners.isEmpty()) {
+            notificationPublisher.notifyUsers(
+                    owners,
+                    NotificationPublisher.TYPE_TEAM_JOIN,
+                    "Thành viên mới: " + team.getName(),
+                    String.format("%s đã tham gia nhóm \"%s\" bằng mã mời.", joinerName, team.getName()),
+                    NotificationPublisher.LINK_TEAM,
+                    team.getTeamId(),
+                    Instant.now().plus(7, ChronoUnit.DAYS)
+            );
+        }
+
         return toMemberResponse(saved);
     }
-
-    // ── Thêm thành viên vào nhóm (bởi OWNER) ──
 
     public TeamMemberResponse addMember(Long teamId, String ownerSso, AddMemberRequest request) {
         findActiveTeam(teamId);
@@ -220,10 +241,21 @@ public class TeamService {
         member.setUpdatedBy(ownerSso);
 
         TeamMember saved = teamMemberRepository.save(member);
+
+        Team team = findActiveTeam(teamId);
+        String ownerName = resolveDisplayName(ownerSso);
+        notificationPublisher.notifyUser(
+                request.userSso().trim(),
+                NotificationPublisher.TYPE_TEAM_INVITE,
+                "Lời mời vào nhóm",
+                String.format("%s đã thêm bạn vào nhóm \"%s\".", ownerName, team.getName()),
+                NotificationPublisher.LINK_TEAM,
+                teamId,
+                Instant.now().plus(14, ChronoUnit.DAYS)
+        );
+
         return toMemberResponse(saved);
     }
-
-    // ── Xóa (kick) thành viên khỏi nhóm ──
 
     public void removeMember(Long teamId, String ownerSso, String targetUserSso) {
         findActiveTeam(teamId);
@@ -311,6 +343,20 @@ public class TeamService {
 
     private String generateInviteCode() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+    }
+
+    private String resolveDisplayName(String userSso) {
+        return userRepository.findByUserSso(userSso)
+                .map(user -> {
+                    if (user.getFullName() != null && !user.getFullName().isBlank()) {
+                        return user.getFullName();
+                    }
+                    if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                        return user.getEmail().split("@")[0];
+                    }
+                    return userSso;
+                })
+                .orElse(userSso);
     }
 
     private TeamResponse toTeamResponse(Team team, int memberCount) {

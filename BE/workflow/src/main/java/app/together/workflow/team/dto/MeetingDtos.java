@@ -23,7 +23,9 @@ public final class MeetingDtos {
             Instant actualStart,
             Instant actualEnd,
             String recordingUrl,
-            String transcriptUrl
+            String transcriptUrl,
+            /** Current caller's team role (OWNER / MEMBER), when known. */
+            String currentUserRole
     ) {
     }
 

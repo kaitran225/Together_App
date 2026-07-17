@@ -80,14 +80,25 @@ function AdminRoute({ element }: { element: ReactElement }) {
 
 export default function App() {
   const location = useLocation()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isAuthReady, user } = useAuth()
   const isStandalone = STANDALONE_PATHS.includes(location.pathname)
   const defaultAuthedRoute = user?.systemRole === 'ADMIN' ? '/admin' : '/dashboard'
 
   return (
     <div className={isStandalone ? 'min-h-screen' : ''}>
       <Routes>
-        <Route path="/" element={<Navigate to={isAuthenticated ? defaultAuthedRoute : '/welcome'} replace />} />
+        <Route
+          path="/"
+          element={
+            !isAuthReady ? (
+              <div className="min-h-[40vh] w-full flex items-center justify-center text-sm text-neutral-500">
+                Loading...
+              </div>
+            ) : (
+              <Navigate to={isAuthenticated ? defaultAuthedRoute : '/welcome'} replace />
+            )
+          }
+        />
         <Route path="/login" element={<Navigate to="/welcome" replace />} />
         <Route path="/callback" element={<main className="p-3 md:p-4 md:py-6 max-w-[1200px] mx-auto min-h-[calc(100vh-4rem)]"><Callback /></main>} />
         <Route path="/welcome" element={<AuthLayout><Welcome /></AuthLayout>} />

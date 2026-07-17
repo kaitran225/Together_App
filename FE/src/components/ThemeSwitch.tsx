@@ -1,4 +1,5 @@
 import { useTheme } from '../contexts/ThemeContext'
+import { useTranslation } from '../contexts/LanguageContext'
 
 function SunIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -19,6 +20,7 @@ function MoonIcon({ className = 'w-4 h-4' }: { className?: string }) {
 
 export function ThemeSwitch() {
   const { theme, toggleTheme } = useTheme()
+  const { t } = useTranslation()
 
   return (
     <button
@@ -26,11 +28,11 @@ export function ThemeSwitch() {
       onClick={toggleTheme}
       className="flex items-center gap-2 px-3 py-2 rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)] text-neutral-900 text-sm font-semibold hover:bg-neutral-300 dark:hover:bg-neutral-300 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[var(--color-background)]"
       aria-pressed={theme === 'dark'}
-      aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-      title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+      aria-label={theme === 'dark' ? t('theme.toLight') : t('theme.toDark')}
+      title={theme === 'dark' ? t('theme.light') : t('theme.dark')}
     >
       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-      <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+      <span className="hidden sm:inline">{theme === 'dark' ? t('theme.light') : t('theme.dark')}</span>
     </button>
   )
 }

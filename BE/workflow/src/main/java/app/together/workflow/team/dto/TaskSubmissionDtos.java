@@ -5,7 +5,7 @@ import java.time.Instant;
 
 public final class TaskSubmissionDtos {
 
-    public TaskSubmissionDtos() {
+    private TaskSubmissionDtos() {
     }
 
     public record TaskSubmissionResponse(
@@ -23,14 +23,14 @@ public final class TaskSubmissionDtos {
 
     public record SubmitTaskRequest(
             String content,
-            String attachments // JSON danh sách tệp đính kèm
+            String attachments // JSON danh sách tệp đính kèm
     ) {
     }
 
     public record EvaluateTaskRequest(
-            BigDecimal grade, // điểm sô
-            String feedback, // nhận xét
-            String status // trạng thái sau khi đánh giá (ví dụ: "GRADED", "REJECTED", "NEEDS_REVISION"
+            BigDecimal grade,
+            String feedback,
+            String status // PENDING | APPROVED | REJECTED
     ) {
     }
 }

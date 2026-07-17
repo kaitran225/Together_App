@@ -5,8 +5,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-import org.springframework.cglib.core.Local;
-
 public final class TaskDtos {
 
     private TaskDtos() {}
@@ -25,10 +23,10 @@ public final class TaskDtos {
         BigDecimal actualHours,
         LocalDate startDate,
         LocalDate dueDate,
-        Instant completeAt,
+        Instant completedAt,
         Long columnId,
         Long sprintId,
-        List<String> assigness,
+        List<String> assignees,
         List<TaskDependencyResponse> dependencies,
         List<TaskCommentResponse> comments,
         List<TaskAttachmentResponse> attachments
@@ -47,7 +45,7 @@ public final class TaskDtos {
         String content,
         String attachments,
         Instant createdAt
-    ){
+    ) {
     }
 
     public record TaskAttachmentResponse(
@@ -87,7 +85,7 @@ public final class TaskDtos {
     public record AddTaskCommentRequest(
         String content,
         String attachments
-    ){
+    ) {
     }
 
     public record AddAttachmentRequest(

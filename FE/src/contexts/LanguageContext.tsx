@@ -1,18 +1,17 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 
 export type Language = 'en' | 'vi'
 
 interface LanguageContextType {
   language: Language
   setLanguage: (lang: Language) => void
-  t: (key: string) => string
+  t: (key: string, params?: Record<string, string | number>) => string
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
 const translations: Record<Language, Record<string, string>> = {
   en: {
-    // Header & Sidebar
     'nav.home': 'Home',
     'nav.profile': 'Profile',
     'nav.studyRooms': 'Study Rooms',
@@ -36,8 +35,73 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.admin.billing': 'Billing',
     'nav.collapse': 'Collapse',
     'nav.expand': 'Expand',
+    'nav.notifications': 'Notifications',
 
-    // Dashboard
+    'theme.light': 'Light',
+    'theme.dark': 'Dark',
+    'theme.toLight': 'Switch to light theme',
+    'theme.toDark': 'Switch to dark theme',
+    'lang.switchToVi': 'Switch to Vietnamese',
+    'lang.switchToEn': 'Switch to English',
+    'lang.en': 'EN',
+    'lang.vi': 'VN',
+
+    'common.close': 'Close',
+    'common.delete': 'Delete',
+    'common.save': 'Save',
+    'common.cancel': 'Cancel',
+    'common.loading': 'Loading...',
+    'common.refresh': 'Refresh',
+    'common.you': 'YOU',
+    'common.profile': 'Profile',
+    'common.logout': 'Logout',
+    'common.search': 'Search...',
+    'common.welcomeTo': 'Welcome to',
+
+    'crumb.dashboard': 'Dashboard',
+    'crumb.profile': 'Profile',
+    'crumb.studyRooms': 'Study Rooms',
+    'crumb.createRoom': 'Create Room',
+    'crumb.createNewRoom': 'Create New Room',
+    'crumb.recommend': 'Recommend matching',
+    'crumb.studyRoom': 'Study room',
+    'crumb.myRooms': 'My rooms',
+    'crumb.teams': 'Teams',
+    'crumb.teamManagement': 'Team management',
+    'crumb.calendar': 'Calendar',
+    'crumb.subscription': 'Subscription',
+    'crumb.shop': 'Shop',
+    'crumb.meetAi': 'Meet AI',
+    'crumb.aiSupport': 'AI Support',
+    'crumb.quiz': 'Quiz',
+    'crumb.quizResult': 'Quiz result',
+    'crumb.focusRoom': 'Focus room',
+    'crumb.notifications': 'Notifications',
+    'crumb.transactions': 'Transactions',
+    'crumb.personalize': 'Personalize',
+    'crumb.meetings': 'Meetings',
+    'crumb.inMeeting': 'In meeting',
+    'crumb.board': 'Board',
+    'crumb.members': 'Members',
+    'crumb.admin': 'Admin',
+    'crumb.account': 'Account',
+    'crumb.home': 'Home',
+
+    'page.home': 'Home',
+    'page.homeSubtitle': 'You have deadlines today — get started!',
+    'page.profile': 'Profile',
+    'page.studyRooms': 'Study Rooms',
+    'page.meetings': 'Meetings',
+    'page.teams': 'Teams',
+    'page.board': 'Board',
+    'page.calendar': 'Calendar',
+    'page.subscription': 'Subscription',
+    'page.shop': 'Shop',
+    'page.togetherAi': 'Together AI',
+    'page.notifications': 'Notifications',
+    'page.adminHome': 'Admin Home',
+    'page.adminAccount': 'Admin Account',
+
     'dashboard.welcome': 'Welcome back',
     'dashboard.subWelcome': 'Keep your streak alive. Check your teams and study rooms below.',
     'dashboard.experiencePoints': 'Experience points',
@@ -59,7 +123,6 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.noteDetails': 'Note Details',
     'dashboard.close': 'Close',
 
-    // Profile & Settings
     'profile.title': 'Profile',
     'profile.statistics': 'Statistics',
     'profile.studyTime': 'Focused study time',
@@ -70,7 +133,6 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.nextReward': 'Next reward',
     'profile.levelReward': 'Lv. {level} Reward',
 
-    // Shop & Billing
     'shop.title': 'Buy Coins',
     'shop.subtitle': 'Boost your learning experience with additional coins.',
     'shop.buy': 'Buy',
@@ -80,9 +142,75 @@ const translations: Record<Language, Record<string, string>> = {
     'shop.support': 'Support',
     'shop.securePayment': 'Secure payment',
     'shop.history': 'Transaction history',
+
+    'meetings.heroTitle': 'Meeting Rooms',
+    'meetings.heroSubtitle': 'Start a team call or join with a meeting ID.',
+    'meetings.activeNow': 'Active now',
+    'meetings.studyTeams': 'Study teams',
+    'meetings.dailyGoal': 'Daily goal',
+    'meetings.createTitle': 'Create a new meeting',
+    'meetings.createDesc': 'Start a room for your team and connect instantly.',
+    'meetings.selectTeam': 'Select study team',
+    'meetings.selectTeamPlaceholder': '-- Select team --',
+    'meetings.selectProject': 'Select project (optional)',
+    'meetings.noProject': '-- No project link --',
+    'meetings.meetingTitle': 'Meeting title',
+    'meetings.meetingTitlePlaceholder': 'e.g. Sprint 1 — tech discussion',
+    'meetings.agenda': 'Agenda',
+    'meetings.agendaPlaceholder': 'e.g. 1. Progress review; 2. Assign tasks; 3. Set deadlines',
+    'meetings.start': 'Start meeting',
+    'meetings.creating': 'Creating...',
+    'meetings.tipsTitle': 'Quick meeting tips',
+    'meetings.tip1': 'Share a clear agenda before the call for better focus.',
+    'meetings.tip2': 'Mute when not speaking to reduce noise.',
+    'meetings.tip3': 'Use Quick Note to capture action items live.',
+    'meetings.joinTitle': 'Join with meeting ID',
+    'meetings.joinPlaceholder': 'Enter meeting ID',
+    'meetings.join': 'Join',
+    'meetings.errorSelectTeam': 'Please select a team to start the meeting.',
+    'meetings.errorTitle': 'Please enter a meeting title.',
+    'meetings.errorCreate': 'Could not create the meeting.',
+    'meetings.errorServer': 'Server connection error.',
+    'meetings.errorIdNumber': 'Meeting code must be a numeric ID.',
+    'meetings.recordingLive': 'Recording Live',
+    'meetings.micOn': 'Microphone: ON',
+    'meetings.micOff': 'Microphone: OFF',
+    'meetings.cameraOn': 'Camera: ON',
+    'meetings.cameraOff': 'Camera: OFF',
+    'meetings.cameraOffLabel': 'Camera Off',
+    'meetings.chat': 'Chat',
+    'meetings.quickNote': 'Quick Note',
+    'meetings.liveChat': 'Live Chat',
+    'meetings.endMeeting': 'End Meeting',
+    'meetings.leaveMeeting': 'Leave Meeting',
+    'meetings.finished': 'Meeting Finished',
+    'meetings.totalDuration': 'Total Duration',
+    'meetings.expEarned': 'Exp Earned',
+    'meetings.return': 'Return to Meetings',
+    'meetings.aiAnalysis': 'AI Post-Meeting Analysis',
+    'meetings.downloadRecording': 'Download Recording',
+    'meetings.generatingRecord': 'Generating Record...',
+    'meetings.chatPlaceholder': 'Type message...',
+    'meetings.notePlaceholder': 'Jot down important notes here...',
+    'meetings.saveNote': 'Save Note',
+    'meetings.noDescription': 'No description provided.',
+    'meetings.executiveSummary': 'Executive Summary',
+    'meetings.keyPoints': 'Key Points',
+    'meetings.actionItems': 'Suggested Action Items',
+
+    'notif.title': 'Notification Board',
+    'notif.subtitle': "Don't miss study announcements and group activities.",
+    'notif.markAllRead': 'Mark all as read',
+    'notif.loading': 'Loading notifications…',
+    'notif.empty': 'No notifications yet.',
+    'notif.refresh': 'Refresh notifications',
+    'notif.priority': 'Priority',
+    'notif.settings': 'Notification settings',
+    'notif.tab.all': 'All',
+    'notif.tab.upcoming': 'Upcoming',
+    'notif.tab.teams': 'Teams',
   },
   vi: {
-    // Header & Sidebar
     'nav.home': 'Trang chủ',
     'nav.profile': 'Cá nhân',
     'nav.studyRooms': 'Phòng học',
@@ -106,8 +234,73 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.admin.billing': 'Thanh toán',
     'nav.collapse': 'Thu gọn',
     'nav.expand': 'Mở rộng',
+    'nav.notifications': 'Thông báo',
 
-    // Dashboard
+    'theme.light': 'Sáng',
+    'theme.dark': 'Tối',
+    'theme.toLight': 'Chuyển sang giao diện sáng',
+    'theme.toDark': 'Chuyển sang giao diện tối',
+    'lang.switchToVi': 'Chuyển sang tiếng Việt',
+    'lang.switchToEn': 'Switch to English',
+    'lang.en': 'EN',
+    'lang.vi': 'VN',
+
+    'common.close': 'Đóng',
+    'common.delete': 'Xóa',
+    'common.save': 'Lưu',
+    'common.cancel': 'Hủy',
+    'common.loading': 'Đang tải...',
+    'common.refresh': 'Làm mới',
+    'common.you': 'BẠN',
+    'common.profile': 'Hồ sơ',
+    'common.logout': 'Đăng xuất',
+    'common.search': 'Tìm kiếm...',
+    'common.welcomeTo': 'Chào mừng đến',
+
+    'crumb.dashboard': 'Trang chủ',
+    'crumb.profile': 'Cá nhân',
+    'crumb.studyRooms': 'Phòng học',
+    'crumb.createRoom': 'Tạo phòng',
+    'crumb.createNewRoom': 'Tạo phòng mới',
+    'crumb.recommend': 'Gợi ý phù hợp',
+    'crumb.studyRoom': 'Phòng học',
+    'crumb.myRooms': 'Phòng của tôi',
+    'crumb.teams': 'Đội nhóm',
+    'crumb.teamManagement': 'Quản lý nhóm',
+    'crumb.calendar': 'Lịch',
+    'crumb.subscription': 'Gói đăng ký',
+    'crumb.shop': 'Cửa hàng',
+    'crumb.meetAi': 'Meet AI',
+    'crumb.aiSupport': 'Hỗ trợ AI',
+    'crumb.quiz': 'Quiz',
+    'crumb.quizResult': 'Kết quả quiz',
+    'crumb.focusRoom': 'Phòng tập trung',
+    'crumb.notifications': 'Thông báo',
+    'crumb.transactions': 'Giao dịch',
+    'crumb.personalize': 'Cá nhân hóa',
+    'crumb.meetings': 'Cuộc họp',
+    'crumb.inMeeting': 'Đang họp',
+    'crumb.board': 'Bảng công việc',
+    'crumb.members': 'Thành viên',
+    'crumb.admin': 'Admin',
+    'crumb.account': 'Tài khoản',
+    'crumb.home': 'Trang chủ',
+
+    'page.home': 'Trang chủ',
+    'page.homeSubtitle': 'Hôm nay có hạn cần làm — bắt đầu ngay!',
+    'page.profile': 'Cá nhân',
+    'page.studyRooms': 'Phòng học',
+    'page.meetings': 'Cuộc họp',
+    'page.teams': 'Đội nhóm',
+    'page.board': 'Bảng công việc',
+    'page.calendar': 'Lịch',
+    'page.subscription': 'Gói đăng ký',
+    'page.shop': 'Cửa hàng',
+    'page.togetherAi': 'Trợ lý AI',
+    'page.notifications': 'Thông báo',
+    'page.adminHome': 'Admin',
+    'page.adminAccount': 'Tài khoản Admin',
+
     'dashboard.welcome': 'Chào mừng bạn quay trở lại',
     'dashboard.subWelcome': 'Hãy giữ vững phong độ. Kiểm tra đội nhóm và phòng học của bạn bên dưới.',
     'dashboard.experiencePoints': 'Điểm kinh nghiệm',
@@ -129,7 +322,6 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.noteDetails': 'Chi tiết ghi chú',
     'dashboard.close': 'Đóng',
 
-    // Profile & Settings
     'profile.title': 'Trang cá nhân',
     'profile.statistics': 'Số liệu thống kê',
     'profile.studyTime': 'Thời gian học tập',
@@ -140,7 +332,6 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.nextReward': 'Phần thưởng tiếp theo',
     'profile.levelReward': 'Phần thưởng Cấp {level}',
 
-    // Shop & Billing
     'shop.title': 'Mua xu',
     'shop.subtitle': 'Nâng cao trải nghiệm học tập của bạn bằng cách mua thêm xu.',
     'shop.buy': 'Mua',
@@ -150,12 +341,80 @@ const translations: Record<Language, Record<string, string>> = {
     'shop.support': 'Hỗ trợ',
     'shop.securePayment': 'Thanh toán bảo mật',
     'shop.history': 'Lịch sử giao dịch',
-  }
+
+    'meetings.heroTitle': 'Phòng họp',
+    'meetings.heroSubtitle': 'Bắt đầu cuộc gọi nhóm hoặc tham gia bằng mã cuộc họp.',
+    'meetings.activeNow': 'Đang diễn ra',
+    'meetings.studyTeams': 'Nhóm học tập',
+    'meetings.dailyGoal': 'Mục tiêu ngày',
+    'meetings.createTitle': 'Tạo cuộc họp mới',
+    'meetings.createDesc': 'Khởi tạo phòng họp cho nhóm và kết nối tức thì.',
+    'meetings.selectTeam': 'Chọn nhóm học tập',
+    'meetings.selectTeamPlaceholder': '-- Chọn nhóm --',
+    'meetings.selectProject': 'Chọn dự án (tùy chọn)',
+    'meetings.noProject': '-- Không liên kết dự án --',
+    'meetings.meetingTitle': 'Tiêu đề cuộc họp',
+    'meetings.meetingTitlePlaceholder': 'Ví dụ: Họp Sprint 1 - Thảo luận công nghệ',
+    'meetings.agenda': 'Chương trình họp / Agenda',
+    'meetings.agendaPlaceholder': 'Ví dụ: 1. Xem lại tiến trình; 2. Phân chia task; 3. Chốt deadline',
+    'meetings.start': 'Bắt đầu cuộc họp',
+    'meetings.creating': 'Đang tạo...',
+    'meetings.tipsTitle': 'Mẹo nhỏ khi họp',
+    'meetings.tip1': 'Chia sẻ Agenda rõ ràng trước buổi họp để đạt hiệu quả cao.',
+    'meetings.tip2': 'Tắt mic khi không nói để giảm tạp âm.',
+    'meetings.tip3': 'Dùng Quick Note để ghi lại việc cần làm ngay trong họp.',
+    'meetings.joinTitle': 'Tham gia bằng mã cuộc họp',
+    'meetings.joinPlaceholder': 'Nhập ID cuộc họp',
+    'meetings.join': 'Tham gia',
+    'meetings.errorSelectTeam': 'Vui lòng chọn một nhóm để bắt đầu cuộc họp.',
+    'meetings.errorTitle': 'Vui lòng nhập tiêu đề cuộc họp.',
+    'meetings.errorCreate': 'Không thể tạo cuộc họp.',
+    'meetings.errorServer': 'Lỗi kết nối máy chủ.',
+    'meetings.errorIdNumber': 'Mã cuộc họp phải là số ID.',
+    'meetings.recordingLive': 'Đang ghi',
+    'meetings.micOn': 'Mic: BẬT',
+    'meetings.micOff': 'Mic: TẮT',
+    'meetings.cameraOn': 'Camera: BẬT',
+    'meetings.cameraOff': 'Camera: TẮT',
+    'meetings.cameraOffLabel': 'Camera tắt',
+    'meetings.chat': 'Chat',
+    'meetings.quickNote': 'Ghi chú nhanh',
+    'meetings.liveChat': 'Chat trực tiếp',
+    'meetings.endMeeting': 'Kết thúc họp',
+    'meetings.leaveMeeting': 'Rời cuộc họp',
+    'meetings.finished': 'Cuộc họp đã kết thúc',
+    'meetings.totalDuration': 'Tổng thời lượng',
+    'meetings.expEarned': 'EXP nhận được',
+    'meetings.return': 'Về danh sách họp',
+    'meetings.aiAnalysis': 'Phân tích AI sau họp',
+    'meetings.downloadRecording': 'Tải bản ghi',
+    'meetings.generatingRecord': 'Đang tạo bản ghi...',
+    'meetings.chatPlaceholder': 'Nhập tin nhắn...',
+    'meetings.notePlaceholder': 'Ghi nhanh nội dung quan trọng...',
+    'meetings.saveNote': 'Lưu ghi chú',
+    'meetings.noDescription': 'Chưa có mô tả.',
+    'meetings.executiveSummary': 'Tóm tắt',
+    'meetings.keyPoints': 'Điểm chính',
+    'meetings.actionItems': 'Gợi ý việc cần làm',
+
+    'notif.title': 'Bảng thông báo',
+    'notif.subtitle': 'Đừng bỏ lỡ thông báo học tập và hoạt động nhóm.',
+    'notif.markAllRead': 'Đánh dấu đã đọc tất cả',
+    'notif.loading': 'Đang tải thông báo…',
+    'notif.empty': 'Chưa có thông báo.',
+    'notif.refresh': 'Làm mới thông báo',
+    'notif.priority': 'Ưu tiên',
+    'notif.settings': 'Cài đặt thông báo',
+    'notif.tab.all': 'Tất cả',
+    'notif.tab.upcoming': 'Sắp tới',
+    'notif.tab.teams': 'Nhóm',
+  },
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
-    return (localStorage.getItem('language') as Language) || 'vi'
+    const stored = localStorage.getItem('language') as Language | null
+    return stored === 'en' || stored === 'vi' ? stored : 'vi'
   })
 
   const setLanguage = (lang: Language) => {
@@ -163,8 +422,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('language', lang)
   }
 
-  const t = (key: string): string => {
-    return translations[language][key] || key
+  useEffect(() => {
+    document.documentElement.lang = language === 'vi' ? 'vi' : 'en'
+  }, [language])
+
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let text = translations[language][key] ?? translations.en[key] ?? key
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+      })
+    }
+    return text
   }
 
   return (

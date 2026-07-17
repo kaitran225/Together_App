@@ -101,13 +101,30 @@ public class RoomService {
     }
 
     public RoomResponse leaveRoom(Long roomId, String userSso) {
-        permissionCheckService.requireSystemPermission(Permission.ROOM_CHAT);
+        // ROOM_JOIN is a system-level permission (any logged-in user).
+        // Do NOT use ROOM_CHAT here — it requires a room role and fails when checked as system-only.
+        permissionCheckService.requireSystemPermission(Permission.ROOM_JOIN);
         roomValidator.validateRoomAction(roomId, userSso);
 
         Room room = roomGuardService.requireRoom(roomId);
-        roomGuardService.requireRoomOpenOrFull(room);
 
-        RoomMember member = roomGuardService.requireActiveMember(roomId, userSso);
+        // Idempotent leave: already closed / already inactive → just return current state
+        if (!RoomStatus.OPEN.name().equals(room.getStatus()) && !RoomStatus.FULL.name().equals(room.getStatus())) {
+            return toRoomResponse(room);
+        }
+
+        RoomMember member = roomMemberRepository.findById(new RoomMemberId(roomId, userSso))
+                .orElse(null);
+        if (member == null || !Boolean.TRUE.equals(member.getIsActive())) {
+            // Still close empty social rooms in case this was a stale reconnect leave
+            long activeLeft = roomMemberRepository.countByRoomIdAndIsActiveTrue(roomId);
+            if (activeLeft == 0 && app.together.common.workflow.enums.RoomType.SOCIAL.equals(room.getRoomType())) {
+                Instant now = Instant.now();
+                roomStateService.closeRoom(room, "SYSTEM", now);
+                roomValidator.releaseSlot(room.getCreatedBy() != null ? room.getCreatedBy() : userSso);
+            }
+            return toRoomResponse(room);
+        }
 
         Instant now = Instant.now();
         long durationMinutes = 0;
@@ -119,34 +136,32 @@ public class RoomService {
         roomMemberRepository.save(member);
         roomStateService.syncRoomCapacityStatus(room);
 
-        // Nếu user rời đi là host
-        if (RoomRole.HOST.equals(member.getRole())) {
-            List<RoomMember> otherActiveMembers = roomMemberRepository.findByRoomId(roomId).stream()
-                    .filter(m -> Boolean.TRUE.equals(m.getIsActive()) && !m.getUserSso().equals(userSso))
-                    .collect(java.util.stream.Collectors.toList());
+        List<RoomMember> otherActiveMembers = roomMemberRepository.findByRoomId(roomId).stream()
+                .filter(m -> Boolean.TRUE.equals(m.getIsActive()) && !m.getUserSso().equals(userSso))
+                .collect(java.util.stream.Collectors.toList());
 
-            if (!otherActiveMembers.isEmpty()) {
-                // Tự động chuyển host sang member active lâu nhất (joinedAt sớm nhất)
-                RoomMember newHost = otherActiveMembers.stream()
-                        .min(java.util.Comparator.comparing(RoomMember::getJoinedAt))
-                        .orElse(otherActiveMembers.get(0));
+        // Nếu user rời đi là host và còn người khác → chuyển host
+        if (RoomRole.HOST.equals(member.getRole()) && !otherActiveMembers.isEmpty()) {
+            RoomMember newHost = otherActiveMembers.stream()
+                    .min(java.util.Comparator.comparing(RoomMember::getJoinedAt,
+                            java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                    .orElse(otherActiveMembers.get(0));
 
-                member.setRole(RoomRole.PARTICIPANT);
-                newHost.setRole(RoomRole.HOST);
-                roomMemberRepository.save(newHost);
-                roomMemberRepository.save(member);
+            member.setRole(RoomRole.PARTICIPANT);
+            newHost.setRole(RoomRole.HOST);
+            roomMemberRepository.save(newHost);
+            roomMemberRepository.save(member);
 
-                room.setExpiresAt(null);
-                roomRepository.save(room);
+            room.setExpiresAt(null);
+            roomRepository.save(room);
 
-                roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_HOST_TRANSFERRED, userSso, newHost.getUserSso());
-            } else {
-                // Không có ai khác trong phòng, nếu là SOCIAL room, set expiresAt sau 1 tiếng
-                if (app.together.common.workflow.enums.RoomType.SOCIAL.equals(room.getRoomType())) {
-                    room.setExpiresAt(now.plus(1, java.time.temporal.ChronoUnit.HOURS));
-                    roomRepository.save(room);
-                }
-            }
+            roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_HOST_TRANSFERRED, userSso, newHost.getUserSso());
+        } else if (otherActiveMembers.isEmpty()
+                && app.together.common.workflow.enums.RoomType.SOCIAL.equals(room.getRoomType())) {
+            // Không còn ai trong phòng → đóng ngay (không chờ expiresAt)
+            roomStateService.closeRoom(room, "SYSTEM", now);
+            roomValidator.releaseSlot(room.getCreatedBy() != null ? room.getCreatedBy() : userSso);
+            log.info("Social room {} closed immediately after last member left", roomId);
         }
 
         roomEventHandler.record(roomId, MessageConstants.MESSAGE_ROOM_MEMBER_LEFT, userSso, member.getUserSso());

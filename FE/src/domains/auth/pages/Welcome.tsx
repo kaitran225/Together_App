@@ -1,14 +1,37 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { Button, Card, Input } from '../../../components/common'
 import { useAuth } from '../../../contexts/AuthContext'
+import { getReturnToPath } from '../../../components/auth/RequireAuth'
 
 export default function Welcome() {
   const navigate = useNavigate()
-  const { login, loginWithGoogle, user, isAuthenticated } = useAuth()
+  const location = useLocation()
+  const { login, loginWithGoogle, user, isAuthenticated, isAuthReady } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+
+  const resolvePostLoginPath = (role?: string | null) => {
+    const fallback = role === 'ADMIN' ? '/admin' : '/dashboard'
+    const fromState = (location.state as { from?: string } | null)?.from
+    if (fromState && fromState.startsWith('/') && !fromState.startsWith('//')) {
+      if (
+        !fromState.startsWith('/welcome') &&
+        !fromState.startsWith('/sign-up') &&
+        !fromState.startsWith('/login') &&
+        !fromState.startsWith('/callback')
+      ) {
+        try {
+          sessionStorage.removeItem('auth_return_to')
+        } catch {
+          // ignore
+        }
+        return fromState
+      }
+    }
+    return getReturnToPath(fallback)
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,17 +42,17 @@ export default function Welcome() {
         setError(result.error ?? 'Login failed.')
         return
       }
-      const role = result.user?.systemRole
-      navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+      navigate(resolvePostLoginPath(result.user?.systemRole), { replace: true })
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred.')
     }
   }
 
   useEffect(() => {
-    if (!isAuthenticated) return
-    navigate(user?.systemRole === 'ADMIN' ? '/admin' : '/dashboard')
-  }, [isAuthenticated, navigate, user?.systemRole])
+    if (!isAuthReady || !isAuthenticated) return
+    navigate(resolvePostLoginPath(user?.systemRole), { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthReady, isAuthenticated, navigate, user?.systemRole])
 
   useEffect(() => {
     const handleGoogleCredential = async (response: any) => {
@@ -40,8 +63,7 @@ export default function Welcome() {
           return
         }
         setError('')
-        const role = result.user?.systemRole
-        navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+        navigate(resolvePostLoginPath(result.user?.systemRole), { replace: true })
       } catch (err: any) {
         setError(err.message || 'An unexpected error occurred during Google Login.')
       }
@@ -72,6 +94,7 @@ export default function Welcome() {
     }, 500)
 
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loginWithGoogle, navigate])
 
   return (
@@ -86,10 +109,6 @@ export default function Welcome() {
         </div>
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div id="google-btn" className="w-full flex justify-center min-h-[44px]"></div>
-          {/* <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
-            <span className="text-[#1877F2] font-bold">f</span>
-            <span>Continue with Facebook</span>
-          </Button> */}
           <div className="relative py-2">
             <hr className="border-t border-[var(--color-border)]" />
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--color-surface)] px-3 text-sm text-neutral-500">or</span>
