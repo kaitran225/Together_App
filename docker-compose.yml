@@ -15,9 +15,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-    # Uncomment to reach Postgres from the host (e.g. a DB GUI tool):
-    # ports:
-    #   - "127.0.0.1:5432:5432"
+    # Host tools (DBeaver/pgAdmin): localhost:5433 → container 5432
+    # (5432 is often reserved on Windows Hyper-V)
+    ports:
+      - "127.0.0.1:5433:5432"
 
   auth:
     build:
@@ -92,15 +93,9 @@ services:
       UNDERTOW_WORKER_THREADS: 32
       UNDERTOW_MAX_HTTP_POST_SIZE: 10485760
       LOGGING_LEVEL_SPRING_SECURITY: WARN
-      # WebRTC / STUN / TURN — must be reachable by the BROWSER, so these are public, not docker-internal hostnames.
-      # TEMPORARY: using Google's public STUN because our own coturn (${DOMAIN}:3478) isn't reachable
-      # from the internet yet (router UDP forwarding pending). Direct P2P will work for most home/4G
-      # NATs; only peers needing TURN relay will fail until this is switched back. To restore once the
-      # router forwards 3478/5349/49152-49252 (TCP+UDP) to this machine: change WEBRTC_STUN_URLS back to
-      # stun:${DOMAIN}:3478 and restart with `docker compose up -d workflow`. WEBRTC_TURN_URLS is left
-      # pointed at our own coturn already — it just won't be used successfully until that port is open.
-      WEBRTC_STUN_URLS: stun:stun.l.google.com:19302
-      WEBRTC_TURN_URLS: turn:${DOMAIN}:3478
+      # WebRTC — browser reaches coturn on the VPS public IP (see WEBRTC_* in .env).
+      WEBRTC_STUN_URLS: ${WEBRTC_STUN_URLS:-stun:103.20.97.225:3478}
+      WEBRTC_TURN_URLS: ${WEBRTC_TURN_URLS:-turn:103.20.97.225:3478}
       WEBRTC_TURN_USERNAME: ${TURN_USERNAME}
       WEBRTC_TURN_CREDENTIAL: ${TURN_CREDENTIAL}
       AI_SERVICE_URL: ${AI_SERVICE_URL:-https://dev-together-ai-gateway.onrender.com/}
@@ -209,6 +204,28 @@ services:
       EMAIL_SERVICE_INTERNAL_API_KEY: ${EMAIL_SERVICE_INTERNAL_API_KEY}
     networks: [together-net]
 
+  # Single public entry for VPS nginx → Tailscale → this host:8890.
+  # Auth/workflow/read stay on the internal Docker network only.
+  gateway:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.gateway
+    container_name: together-gateway
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - workflow
+      - read
+    ports:
+      - "8890:8890"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8890
+      AUTH_URI: http://auth:8880
+      WORKFLOW_URI: http://workflow:8881
+      READ_URI: http://read:8882
+    networks: [together-net]
+
   frontend:
     build:
       context: ./FE
@@ -269,7 +286,8 @@ services:
     environment:
       DUCKDNS_SUBDOMAIN: ${DUCKDNS_SUBDOMAIN}
       DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
-    entrypoint: /bin/sh -c "apk add --no-cache curl >/dev/null; while :; do [ -n \"$$DUCKDNS_SUBDOMAIN\" ] && curl -fsS \"https://www.duckdns.org/update?domains=$$DUCKDNS_SUBDOMAIN&token=$$DUCKDNS_TOKEN&ip=\" || true; sleep 300; done"
+      DUCKDNS_IP: ${DUCKDNS_IP:-103.20.97.225}
+    entrypoint: /bin/sh -c "apk add --no-cache curl >/dev/null; while :; do [ -n \"$$DUCKDNS_SUBDOMAIN\" ] && curl -fsS \"https://www.duckdns.org/update?domains=$$DUCKDNS_SUBDOMAIN&token=$$DUCKDNS_TOKEN&ip=$$DUCKDNS_IP\" || true; sleep 300; done"
 
 networks:
   together-net:

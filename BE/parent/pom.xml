@@ -24,6 +24,7 @@
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <springdoc.version>2.8.6</springdoc.version>
         <spring-ai.version>1.0.0-M5</spring-ai.version>
+        <spring-cloud.version>2024.0.2</spring-cloud.version>
     </properties>
 
 <repositories>
@@ -48,8 +49,20 @@
                 <scope>import</scope>
             </dependency>
             <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>com.project.exe</groupId>
                 <artifactId>common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.project.exe</groupId>
+                <artifactId>gateway</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

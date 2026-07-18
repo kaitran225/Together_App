@@ -1,0 +1,30 @@
+# API Gateway — single Tailscale entry for home BE stack.
+# Root Directory: BE | Dockerfile Path: render/Dockerfile.gateway
+# Health: /actuator/health
+
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /src
+RUN apk add --no-cache bash
+
+COPY mvnw mvnw
+COPY .mvn .mvn
+COPY parent/pom.xml parent/
+COPY gateway/pom.xml gateway/
+COPY gateway/src gateway/src
+RUN chmod +x mvnw
+
+RUN ./mvnw -B -q -f parent/pom.xml install -DskipTests \
+    && ./mvnw -B -q -f gateway/pom.xml package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+COPY --from=builder /src/gateway/target/*.jar /app/app.jar
+
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport"
+
+EXPOSE 8890
+
+CMD ["/bin/sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar --server.port=${PORT}"]

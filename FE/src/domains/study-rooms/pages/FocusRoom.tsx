@@ -210,10 +210,6 @@ export default function FocusRoom() {
       }
     }
 
-    const interval = setInterval(() => {
-      setSeconds((prev) => prev + 1)
-    }, 1000)
-
     loadNotes()
     loadTasks()
     initChat()

@@ -29,6 +29,9 @@ import java.time.Instant;
 @Transactional
 public class WalletService {
 
+    /** Soft-launch welcome coins so FREE users can try AI chat (25 coins / hour window). */
+    public static final int WELCOME_COINS = 100;
+
     private final UserRepository userRepository;
     private final UserWalletRepository userWalletRepository;
     private final UserMasterDataRepository userMasterDataRepository;
@@ -36,15 +39,40 @@ public class WalletService {
 
     public UserWallet getOrCreateWallet(User user) {
         return userWalletRepository.findByUserId(user.getUserId())
-                .orElseGet(() -> userWalletRepository.save(UserWallet.builder()
-                        .userId(user.getUserId())
-                        .balance(0)
-                        .bonusBalance(0)
-                        .pendingBalance(0)
-                        .lifetimeEarned(0)
-                        .lifetimeSpent(0)
-                        .status(WalletStatus.ACTIVE)
-                        .build()));
+                .map(existing -> grantWelcomeIfEmpty(existing, user))
+                .orElseGet(() -> {
+                    UserWallet created = userWalletRepository.save(UserWallet.builder()
+                            .userId(user.getUserId())
+                            .balance(WELCOME_COINS)
+                            .bonusBalance(0)
+                            .pendingBalance(0)
+                            .lifetimeEarned(WELCOME_COINS)
+                            .lifetimeSpent(0)
+                            .status(WalletStatus.ACTIVE)
+                            .build());
+                    recordWelcome(user);
+                    return created;
+                });
+    }
+
+    private UserWallet grantWelcomeIfEmpty(UserWallet wallet, User user) {
+        int balance = wallet.getBalance() != null ? wallet.getBalance() : 0;
+        int earned = wallet.getLifetimeEarned() != null ? wallet.getLifetimeEarned() : 0;
+        int spent = wallet.getLifetimeSpent() != null ? wallet.getLifetimeSpent() : 0;
+        if (balance == 0 && earned == 0 && spent == 0) {
+            wallet.setBalance(WELCOME_COINS);
+            wallet.setLifetimeEarned(WELCOME_COINS);
+            userWalletRepository.save(wallet);
+            recordWelcome(user);
+        }
+        return wallet;
+    }
+
+    private void recordWelcome(User user) {
+        if (user.getUserSso() != null && !user.getUserSso().isBlank()) {
+            recordTransaction(user.getUserSso(), WELCOME_COINS, TransactionType.EARN.name(),
+                    "WELCOME", "Coin chào mừng");
+        }
     }
 
     public void credit(String userSso, int amount, String category, String description) {

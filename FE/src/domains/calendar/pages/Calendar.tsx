@@ -163,8 +163,9 @@ export default function Calendar() {
     try {
       const res = await workflowApi.assistSchedule(text)
       if (res.success && res.data?.reply) {
-        setChatMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }])
-        if (res.data.created) {
+        const data = res.data
+        setChatMessages((prev) => [...prev, { role: 'ai', text: data.reply }])
+        if (data.created) {
           fetchSchedules()
         }
         return
@@ -208,7 +209,8 @@ export default function Calendar() {
     try {
       const res = await workflowApi.assistSchedule(text)
       if (res.success && res.data?.reply) {
-        setChatMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }])
+        const reply = res.data.reply
+        setChatMessages((prev) => [...prev, { role: 'ai', text: reply }])
         return
       }
     } catch {
@@ -229,7 +231,8 @@ export default function Calendar() {
     try {
       const res = await workflowApi.assistSchedule(text)
       if (res.success && res.data?.reply) {
-        setChatMessages((prev) => [...prev, { role: 'ai', text: res.data.reply }])
+        const reply = res.data.reply
+        setChatMessages((prev) => [...prev, { role: 'ai', text: reply }])
         return
       }
     } catch {

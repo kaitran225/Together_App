@@ -134,8 +134,10 @@ public class NoteAndSessionService {
     @Transactional(readOnly = true)
     public List<Double> getWeeklyStudyHours(String userSso) {
         requireUserSso(userSso);
-        UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
-                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
+        UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso).orElse(null);
+        if (masterData == null) {
+            return List.of(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        }
 
         List<StudySession> sessions = studySessionRepository.findByUserMasterDataId(masterData.getMasterDataId());
         

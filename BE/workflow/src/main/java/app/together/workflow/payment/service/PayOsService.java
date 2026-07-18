@@ -220,13 +220,14 @@ public class PayOsService {
                         saved.getAmount(),
                         saved.getCoinsAmount());
             } else {
+                log.error("PayOS rejected payment request: {}", payosResponse);
                 throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
             }
 
         } catch (BadRequestException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Failed to connect to PayOS gateway: {}", e.getMessage());
+            log.error("Failed to connect to PayOS gateway: {}", e.getMessage(), e);
             throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
         }
     }
@@ -402,8 +403,10 @@ public class PayOsService {
     @Transactional(readOnly = true)
     public List<PaymentDtos.TransactionResponse> getMyTransactions(String userSso) {
         requireUserSso(userSso);
-        UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso)
-                .orElseGet(() -> userMasterDataRepository.save(UserMasterData.builder().userSso(userSso).build()));
+        UserMasterData masterData = userMasterDataRepository.findByUserSso(userSso).orElse(null);
+        if (masterData == null) {
+            return List.of();
+        }
 
         return transactionRepository.findByUserMasterDataIdOrderByCreatedAtDesc(masterData.getMasterDataId())
                 .stream()

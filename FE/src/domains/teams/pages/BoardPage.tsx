@@ -580,7 +580,6 @@ function scrumTaskToForEdit(t: {
   const dueDate = (t.dueDate || t.due || t.duDate || '') as string
   const completedAt = (t.completedAt || t.completeAt) as string | null | undefined
   return {
-    ...t,
     title: t.title || '',
     desc: t.description || undefined,
     description: t.description || undefined,
@@ -588,8 +587,11 @@ function scrumTaskToForEdit(t: {
     due: dueDate,
     dueDate,
     endDate: dueDate,
+    startDate: t.startDate ?? undefined,
     completed: completedAt ? new Date(completedAt).toISOString().split('T')[0] : '',
     completedAt: completedAt || undefined,
+    status: t.status ?? undefined,
+    priority: t.priority ?? undefined,
     estimatedHours: t.estimatedHours ?? null,
     actualHours: t.actualHours != null ? Number(t.actualHours) : null,
   }
