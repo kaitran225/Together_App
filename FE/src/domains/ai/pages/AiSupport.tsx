@@ -328,9 +328,9 @@ export default function AiSupport() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] min-h-[520px]">
-      <div className="flex-1 grid grid-cols-[20fr_50fr_30fr] min-h-0 rounded-2xl border-2 border-neutral-200 bg-[var(--color-surface)] shadow-sm overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-[20fr_50fr_30fr] min-h-0 rounded-2xl border-2 border-neutral-200 bg-[var(--color-surface)] shadow-sm overflow-y-auto md:overflow-hidden">
         {/* Left: 20% */}
-        <aside className="min-w-0 flex flex-col border-r-2 border-neutral-200 bg-neutral-50/80">
+        <aside className="order-2 md:order-1 min-w-0 flex flex-col border-b md:border-b-0 md:border-r-2 border-neutral-200 bg-neutral-50/80 max-h-56 md:max-h-none">
           <div className="p-3 border-b border-neutral-200">
             <Button
               variant="primary"
@@ -444,7 +444,7 @@ export default function AiSupport() {
         </aside>
 
         {/* Center: 50% — Focus Room layout */}
-        <main className="min-w-0 flex flex-col p-6 gap-4 overflow-y-auto bg-[var(--color-surface)] border-r-2 border-neutral-200">
+        <main className="order-1 md:order-2 min-w-0 flex flex-col p-4 md:p-6 gap-4 overflow-y-auto bg-[var(--color-surface)] border-b md:border-b-0 md:border-r-2 border-neutral-200 min-h-[50vh] md:min-h-0">
           <section>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">Summary</h2>
             <Card className="p-4 min-h-[120px] border-2 border-neutral-200 text-neutral-500 text-sm">
@@ -547,7 +547,7 @@ export default function AiSupport() {
         </main>
 
         {/* Right: 30% — Conversation chat */}
-        <aside className="min-w-0 flex flex-col border-l-2 border-neutral-200 bg-[var(--color-surface)]">
+        <aside className="order-3 min-w-0 flex flex-col border-t md:border-t-0 md:border-l-2 border-neutral-200 bg-[var(--color-surface)] max-h-[28rem] md:max-h-none min-h-[20rem] md:min-h-0">
           <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-neutral-200">
             <AiBotIcon className="w-7 h-7" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-700 dark:text-accent">

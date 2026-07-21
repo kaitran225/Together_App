@@ -62,7 +62,9 @@ const MessageRenderer = ({ text }: { text: string }) => {
 
 export default function MeetAi() {
   const { user } = useAuth()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false,
+  )
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file: File }[]>([])
   const [conversations, setConversations] = useState<any[]>([])
@@ -220,14 +222,22 @@ export default function MeetAi() {
   const displayName = user?.fullName?.split(' ')[0] || 'bạn'
 
   return (
-    <div className="-m-3 md:-m-4 md:-my-6 flex h-[calc(100vh-3.5rem)] min-h-[560px] overflow-hidden rounded-none bg-[var(--color-surface)] md:rounded-2xl md:border md:border-[var(--color-border)]">
-      {/* Sidebar */}
+    <div className="-m-2 sm:-m-3 md:-m-4 md:-my-6 flex h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] min-h-[480px] overflow-hidden rounded-none bg-[var(--color-surface)] relative md:rounded-2xl md:border md:border-[var(--color-border)]">
+      {/* Sidebar — overlay on mobile when open */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="md:hidden absolute inset-0 z-10 bg-black/30"
+          aria-label="Close sidebar"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       <aside
         className={`${
-          sidebarOpen ? 'w-[260px]' : 'w-0'
-        } shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-neutral-50 transition-[width] duration-200 ease-out`}
+          sidebarOpen ? 'w-[min(260px,85vw)]' : 'w-0'
+        } shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-neutral-50 transition-[width] duration-200 ease-out absolute md:static inset-y-0 left-0 z-20 md:z-auto`}
       >
-        <div className="flex h-full w-[260px] flex-col">
+        <div className="flex h-full w-[min(260px,85vw)] md:w-[260px] flex-col">
           <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-3">
             <Button variant="secondary" size="sm" className="flex-1 justify-start gap-2 rounded-xl" onClick={handleNewChat}>
               <span className="text-base leading-none">+</span>

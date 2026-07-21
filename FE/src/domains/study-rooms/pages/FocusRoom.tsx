@@ -512,10 +512,10 @@ export default function FocusRoom() {
         </div>
       </header>
 
-      {/* Main: 3 columns 20% | 60% | 20% */}
-      <div className="flex-1 grid grid-cols-[20fr_60fr_20fr] min-h-0 bg-[var(--color-background)]">
+      {/* Main: 3 columns on md+; stacked on mobile with center first */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-[20fr_60fr_20fr] min-h-0 bg-[var(--color-background)] overflow-y-auto md:overflow-hidden">
         {/* Left sidebar */}
-        <aside className="min-w-0 flex flex-col gap-4 p-4 border-r border-[var(--color-border)] bg-[var(--color-surface)] overflow-y-auto">
+        <aside className="order-2 md:order-1 min-w-0 flex flex-col gap-4 p-4 border-b md:border-b-0 md:border-r border-[var(--color-border)] bg-[var(--color-surface)] overflow-y-auto max-h-72 md:max-h-none">
           <Card className="p-4 border border-[var(--color-border)] shadow-none">
             <div className="flex items-center gap-2 text-neutral-800 dark:text-highlight mb-1">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -601,7 +601,7 @@ export default function FocusRoom() {
         </aside>
 
         {/* Center: AI Assistant & Tools */}
-        <main className="min-w-0 flex flex-col p-6 gap-4 bg-[var(--color-surface)] border-r border-[var(--color-border)] h-[calc(100vh-4.5rem)] overflow-hidden">
+        <main className="order-1 md:order-2 min-w-0 flex flex-col p-4 md:p-6 gap-4 bg-[var(--color-surface)] border-b md:border-b-0 md:border-r border-[var(--color-border)] min-h-[55vh] md:min-h-0 md:h-[calc(100vh-4.5rem)] overflow-hidden">
           {/* Top section: AI tools */}
           <div className="flex flex-col gap-3 shrink-0">
             <div className="flex items-center justify-between">
@@ -832,7 +832,7 @@ export default function FocusRoom() {
         </main>
 
         {/* Right Sidebar: Quick Notes */}
-        <aside className="min-w-0 flex flex-col p-4 border-l border-[var(--color-border)] bg-[var(--color-surface)] h-[calc(100vh-4.5rem)] overflow-hidden">
+        <aside className="order-3 min-w-0 flex flex-col p-4 border-t md:border-t-0 md:border-l border-[var(--color-border)] bg-[var(--color-surface)] max-h-80 md:max-h-none md:h-[calc(100vh-4.5rem)] overflow-hidden">
           <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-700 dark:text-accent mb-3 shrink-0">Quick Notes</h2>
           
           {/* Notes list */}

@@ -696,9 +696,9 @@ export default function MainMeetingBoard() {
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0 gap-3 mt-3">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 gap-3 mt-3 relative">
         {/* Left Area: Video Grid (Meet-style scaling) */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-[40vh] md:min-h-0">
           <div className="flex-1 min-h-0 overflow-auto border-2 border-neutral-300 rounded-xl bg-white p-4 shadow-md flex items-center justify-center">
             {/* Hidden audio elements so remote mic is heard even when camera is off */}
             {Object.entries(remoteStreams).map(([sso, stream]) => (
@@ -780,9 +780,15 @@ export default function MainMeetingBoard() {
           </div>
         </div>
 
-        {/* Right Sidebar: Chat & Notes */}
+        {/* Right Sidebar: Chat & Notes — full-width sheet on mobile */}
         {activeTab && (
-          <aside className="w-[340px] shrink-0 flex flex-col gap-3 min-h-0 transition-all">
+          <aside className="fixed inset-x-2 bottom-2 top-28 z-40 flex flex-col gap-3 min-h-0 md:static md:inset-auto md:z-auto md:w-[340px] md:shrink-0 transition-all">
+            <button
+              type="button"
+              className="md:hidden absolute inset-0 -z-10 bg-black/40 rounded-xl"
+              aria-label="Close panel"
+              onClick={() => setActiveTab(null)}
+            />
             <div className="flex-1 flex flex-col bg-white rounded-xl border-2 border-neutral-300 overflow-hidden shadow-md min-h-0">
                <div className="p-3 border-b-2 border-neutral-200 bg-neutral-50 flex justify-between items-center flex-shrink-0">
                  <h3 className="text-xs font-bold uppercase text-neutral-800">

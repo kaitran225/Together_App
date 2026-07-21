@@ -740,9 +740,9 @@ export default function StudyRoom() {
       </header>
 
       {/* Main: video grid + chat sidebar — white panels on darker background */}
-      <div className="flex-1 flex min-h-0 gap-3 overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 gap-3 overflow-hidden">
         {/* Video grid — white card with stronger border/shadow */}
-        <main className="flex-1 min-w-0 p-4 flex flex-col gap-3 items-center justify-center bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-300 dark:border-[var(--color-border)] shadow-md overflow-auto">
+        <main className="flex-1 min-w-0 min-h-[40vh] md:min-h-0 p-4 flex flex-col gap-3 items-center justify-center bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-300 dark:border-[var(--color-border)] shadow-md overflow-auto">
           {(() => {
             const visible = participants.slice(0, 9)
             const { gridClass, tileClass } = getGridLayout(visible.length)
@@ -824,8 +824,8 @@ export default function StudyRoom() {
           })()}
         </main>
 
-        {/* Right: Chat — white card with stronger border */}
-        <aside className="w-80 shrink-0 flex flex-col overflow-hidden bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-300 dark:border-[var(--color-border)] shadow-md">
+        {/* Right: Chat — stacked under video on mobile */}
+        <aside className="h-72 md:h-auto w-full md:w-80 shrink-0 flex flex-col overflow-hidden bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-300 dark:border-[var(--color-border)] shadow-md">
           <div className="flex items-center justify-between gap-2 pb-1.5 mb-0 pt-4 px-4 border-b-2 border-neutral-300">
             <h2 className="text-sm font-semibold text-neutral-900">Conversation</h2>
           </div>

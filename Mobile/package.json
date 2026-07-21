@@ -1,0 +1,26 @@
+{
+  "name": "together-mobile",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Capacitor shell for Together — wraps FE/dist without modifying the web app",
+  "scripts": {
+    "build:web": "npm --prefix ../FE run build -- --base=./",
+    "copy:web": "node scripts/copy-web.mjs",
+    "prepare:web": "npm run build:web && npm run copy:web",
+    "sync": "npm run prepare:web && npx cap sync",
+    "sync:android": "npm run prepare:web && npx cap sync android",
+    "open:android": "npx cap open android",
+    "run:android": "npm run sync:android && npx cap run android",
+    "add:android": "npx cap add android",
+    "add:ios": "npx cap add ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.2",
+    "@capacitor/core": "^7.4.2",
+    "@capacitor/ios": "^7.4.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.2",
+    "typescript": "^7.0.2"
+  }
+}

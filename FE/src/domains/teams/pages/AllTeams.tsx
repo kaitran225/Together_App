@@ -265,20 +265,20 @@ export default function AllTeams() {
           <div className="flex items-center justify-between gap-2 pb-2 pt-4 px-4 border-b border-[var(--color-border)]">
             <h2 className="text-sm font-semibold text-neutral-900">Quick actions</h2>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 min-h-0 flex flex-col gap-4">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0 flex flex-col gap-2 sm:gap-3">
             <button
               onClick={() => { setError(''); setCreateOpen(true); }}
-              className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-6 sm:py-8 px-4 shadow-none"
+              className="flex flex-row items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-2.5 px-3 sm:py-3 shadow-none"
             >
-              <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-primary/20 text-neutral-900 text-xl font-bold leading-tight">+</span>
-              <span className="text-sm font-bold mt-2">Create new team</span>
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-neutral-900 text-lg font-bold leading-tight shrink-0">+</span>
+              <span className="text-sm font-semibold">Create new team</span>
             </button>
             <button
               onClick={() => { setError(''); setJoinOpen(true); }}
-              className="flex flex-col items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-6 sm:py-8 px-4 shadow-none"
+              className="flex flex-row items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-2.5 px-3 sm:py-3 shadow-none"
             >
-              <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-primary/20 text-neutral-900 text-xl font-bold leading-tight">→</span>
-              <span className="text-sm font-bold mt-2">Join team by code</span>
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-neutral-900 text-lg font-bold leading-tight shrink-0">→</span>
+              <span className="text-sm font-semibold">Join team by code</span>
             </button>
           </div>
         </aside>
