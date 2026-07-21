@@ -7,6 +7,7 @@ import { FlashcardModal } from '../../../components/FlashcardModal'
 import { ACCEPT_FILES, MAX_FILE_SIZE_MB } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 const MessageRenderer = ({ text }: { text: string }) => {
   try {
@@ -53,6 +54,7 @@ const MessageRenderer = ({ text }: { text: string }) => {
 export default function FocusRoom() {
   const navigate = useNavigate()
   const { user, refreshProfile } = useAuth()
+  const { t } = useTranslation()
   const [showEndModal, setShowEndModal] = useState(false)
   const [notes, setNotes] = useState('')
   const [savedNotes, setSavedNotes] = useState<any[]>([])
@@ -270,11 +272,11 @@ export default function FocusRoom() {
     try {
       const res = await workflowApi.getFocusRoomTasks()
       if (res.success && res.data) {
-        const mapped = res.data.map((t: any) => ({
-          id: t.id,
-          title: t.title,
-          due: t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'Personal Task',
-          isCompleted: t.isCompleted
+        const mapped = res.data.map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          due: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : t('focusRoom.personalTask'),
+          isCompleted: task.isCompleted
         }))
         const sorted = [...mapped].sort((a: any, b: any) => {
           if (a.isCompleted !== b.isCompleted) {
@@ -366,7 +368,7 @@ export default function FocusRoom() {
     const tempUserMsg = {
       messageId: Date.now() + Math.random(),
       sender: 'USER',
-      messageText: text.trim() || `[Đã gửi ${currentAttachments.length} tệp]`,
+      messageText: text.trim() || t('focusRoom.sentFiles', { count: currentAttachments.length }),
       sentAt: new Date().toISOString()
     }
     setMessages(prev => [...prev, tempUserMsg])
@@ -376,7 +378,7 @@ export default function FocusRoom() {
         setMessages(prev => [...prev, {
           messageId: Date.now() + Math.random(),
           sender: 'ASSISTANT',
-          messageText: `Đã tải lên ${currentAttachments.length} file. Hệ thống đang tiến hành xử lý ngầm (trích xuất văn bản, tạo Mindmap, tạo 10 câu hỏi Flashcard). Quá trình này có thể mất vài phút. Bạn có thể nhấn 'Refresh Quizzes' sau đó để tải lại danh sách.`,
+          messageText: t('focusRoom.fileUploading', { count: currentAttachments.length }),
           sentAt: new Date().toISOString()
         }])
         for (const att of currentAttachments) {
@@ -404,7 +406,7 @@ export default function FocusRoom() {
 
   const handleDeleteDocument = async (e: React.MouseEvent, docId: number) => {
     e.stopPropagation()
-    if (!confirm('Are you sure you want to delete this document?')) return
+    if (!confirm(t('focusRoom.deleteDocConfirm'))) return
     
     try {
       const res = await workflowApi.deleteDocument(docId)
@@ -414,11 +416,11 @@ export default function FocusRoom() {
           setLastUploadedDocumentId(undefined)
         }
       } else {
-        alert('Failed to delete document.')
+        alert(t('focusRoom.deleteDocFailed'))
       }
     } catch (err) {
       console.error(err)
-      alert('Error deleting document.')
+      alert(t('focusRoom.deleteDocError'))
     }
   }
 
@@ -489,7 +491,7 @@ export default function FocusRoom() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
             </svg>
           </span>
-          <h1 className="text-xl font-bold text-neutral-900 uppercase tracking-wide">Focus Room</h1>
+          <h1 className="text-xl font-bold text-neutral-900 uppercase tracking-wide">{t('focusRoom.title')}</h1>
         </div>
         <div className="flex items-center gap-3">
           <ThemeSwitch />
@@ -506,51 +508,51 @@ export default function FocusRoom() {
               setShowEndModal(true)
             }}
           >
-            End
+            {t('focusRoom.end')}
           </Button>
           <span className="w-9 h-9 rounded-full bg-[var(--color-charcoal)] border border-[var(--color-border)]" aria-hidden />
         </div>
       </header>
 
-      {/* Main: 3 columns 20% | 60% | 20% */}
-      <div className="flex-1 grid grid-cols-[20fr_60fr_20fr] min-h-0 bg-[var(--color-background)]">
+      {/* Main: 3 columns on md+; stacked on mobile with center first */}
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-[20fr_60fr_20fr] min-h-0 bg-[var(--color-background)] overflow-y-auto md:overflow-hidden">
         {/* Left sidebar */}
-        <aside className="min-w-0 flex flex-col gap-4 p-4 border-r border-[var(--color-border)] bg-[var(--color-surface)] overflow-y-auto">
+        <aside className="order-2 md:order-1 min-w-0 flex flex-col gap-4 p-4 border-b md:border-b-0 md:border-r border-[var(--color-border)] bg-[var(--color-surface)] overflow-y-auto max-h-72 md:max-h-none">
           <Card className="p-4 border border-[var(--color-border)] shadow-none">
             <div className="flex items-center gap-2 text-neutral-800 dark:text-highlight mb-1">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
                 <path d="M12 23c-.2 0-.4-.1-.5-.2-.3-.2-7.5-5.2-9.2-6.4-.4-.3-.5-.8-.2-1.2.3-.4.8-.5 1.2-.2 1.5 1 7.3 5 8.7 5.9.4.2.6.6.6 1.1 0 .5-.2.9-.6 1.1l-1.2.8c-.3.2-.7.2-1 .1l-1.2-.6c-.2-.1-.4-.3-.5-.5l-.6-1.2c-.2-.3-.1-.7.1-1l.8-1.2c.2-.4.2-.9-.1-1.3-.6-.8-1.4-1.5-2.2-2.1-1.2-.9-2.5-1.6-3.8-2.1-.4-.2-.9-.1-1.2.2l-1 1.2c-.2.3-.2.7 0 1l.6 1.2c.1.2.3.4.5.5l1.2.6c.3.1.7.1 1-.1l1.2-.8c.4-.2.9-.2 1.3.1.8.6 1.6 1.3 2.2 2.1.2.4.2.9-.1 1.3l-.8 1.2c-.2.3-.2.7-.1 1l.6 1.2c.1.2.3.4.5.5l1.2.6c.3.1.7.2 1-.1l1.2-.8c.5-.3 1.1-.2 1.4.3.2.3.2.7.1 1.1-1.7 1.2-9.2 6.4-9.2 6.4-.2.1-.3.2-.5.2z" />
               </svg>
-              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-400">Current streak</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-400">{t('focusRoom.currentStreak')}</span>
             </div>
-            <p className="text-2xl font-bold text-neutral-900 dark:text-highlight">{user?.streak ?? 0} Days</p>
+            <p className="text-2xl font-bold text-neutral-900 dark:text-highlight">{t('focusRoom.daysSuffix', { count: user?.streak ?? 0 })}</p>
           </Card>
           
           <Card className="p-4 border border-[var(--color-border)] shadow-none flex-1 min-h-0 flex flex-col rounded-2xl">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-700 dark:text-accent mb-3">Today's work</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-700 dark:text-accent mb-3">{t('focusRoom.todaysWork')}</h2>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5">
               {isLoadingTasks ? (
-                <p className="text-xs text-neutral-500">Loading tasks...</p>
+                <p className="text-xs text-neutral-500">{t('focusRoom.tasksLoading')}</p>
               ) : tasks.length === 0 ? (
-                <p className="text-xs text-neutral-500">No tasks assigned today.</p>
+                <p className="text-xs text-neutral-500">{t('focusRoom.tasksEmpty')}</p>
               ) : (
-                tasks.map((t) => (
-                  <div key={t.id} className={`flex items-center gap-3 bg-[var(--color-background)] border p-2.5 rounded-xl group transition-all duration-200 ${
-                    t.isCompleted 
+                tasks.map((task) => (
+                  <div key={task.id} className={`flex items-center gap-3 bg-[var(--color-background)] border p-2.5 rounded-xl group transition-all duration-200 ${
+                    task.isCompleted 
                       ? 'border-[var(--color-border)] opacity-60' 
                       : 'border-[var(--color-border)] hover:border-primary hover:shadow-sm'
                   }`}>
                     <button
                       type="button"
-                      onClick={() => handleToggleTaskCompletion(t)}
+                      onClick={() => handleToggleTaskCompletion(task)}
                       className={`w-6 h-6 rounded-full border shrink-0 flex items-center justify-center transition-all ${
-                        t.isCompleted
+                        task.isCompleted
                           ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
                           : 'border-neutral-450 hover:bg-primary/10 hover:border-primary'
                       }`}
-                      title={t.isCompleted ? "Mark as uncompleted" : "Mark as completed"}
+                      title={task.isCompleted ? t('focusRoom.markUncompleted') : t('focusRoom.markCompleted')}
                     >
-                      {t.isCompleted ? (
+                      {task.isCompleted ? (
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
@@ -560,17 +562,17 @@ export default function FocusRoom() {
                     </button>
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-semibold truncate transition-all ${
-                        t.isCompleted ? 'text-neutral-450 line-through' : 'text-neutral-900 dark:text-neutral-100'
-                      }`}>{t.title}</p>
+                        task.isCompleted ? 'text-neutral-450 line-through' : 'text-neutral-900 dark:text-neutral-100'
+                      }`}>{task.title}</p>
                       <p className={`text-[10px] truncate transition-all ${
-                        t.isCompleted ? 'text-neutral-450 line-through' : 'text-neutral-500'
-                      }`}>{t.due}</p>
+                        task.isCompleted ? 'text-neutral-450 line-through' : 'text-neutral-500'
+                      }`}>{task.due}</p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleDeleteTask(t.id)}
+                      onClick={() => handleDeleteTask(task.id)}
                       className="opacity-0 group-hover:opacity-100 text-neutral-450 hover:text-error ml-auto shrink-0 transition-all p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
-                      title="Delete task"
+                      title={t('focusRoom.deleteTask')}
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -586,12 +588,12 @@ export default function FocusRoom() {
               className="mt-3 w-full border border-[var(--color-border)] text-xs rounded-xl"
               onClick={() => setShowAddTaskModal(true)}
             >
-              + Add Task
+              {t('focusRoom.addTask')}
             </Button>
           </Card>
 
           <Card className="p-4 border border-[var(--color-border)] shadow-none">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-400 mb-3">Achievements</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-700 dark:text-neutral-400 mb-3">{t('focusRoom.achievements')}</h2>
             <div className="flex gap-2">
               {[1, 2, 3].map((i) => (
                 <span key={i} className="w-10 h-10 rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)]" aria-hidden />
@@ -601,11 +603,11 @@ export default function FocusRoom() {
         </aside>
 
         {/* Center: AI Assistant & Tools */}
-        <main className="min-w-0 flex flex-col p-6 gap-4 bg-[var(--color-surface)] border-r border-[var(--color-border)] h-[calc(100vh-4.5rem)] overflow-hidden">
+        <main className="order-1 md:order-2 min-w-0 flex flex-col p-4 md:p-6 gap-4 bg-[var(--color-surface)] border-b md:border-b-0 md:border-r border-[var(--color-border)] min-h-[55vh] md:min-h-0 md:h-[calc(100vh-4.5rem)] overflow-hidden">
           {/* Top section: AI tools */}
           <div className="flex flex-col gap-3 shrink-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-extrabold uppercase tracking-widest text-neutral-800 dark:text-neutral-400">AI Study Assistant</h2>
+              <h2 className="text-xs font-extrabold uppercase tracking-widest text-neutral-800 dark:text-neutral-400">{t('focusRoom.aiAssistant')}</h2>
               <div className="flex gap-2">
                 <Button
                   variant={showQuizSection ? "secondary" : "primary"}
@@ -615,10 +617,10 @@ export default function FocusRoom() {
                     if (!showQuizSection) fetchQuizSets()
                   }}
                 >
-                 {showQuizSection ? 'Hide Quizzes' : 'Show Quizzes'}
+                 {showQuizSection ? t('focusRoom.hideQuizzes') : t('focusRoom.showQuizzes')}
                 </Button>
-                <Button variant="secondary" size="sm" onClick={loadSummaries}>Summary</Button>
-                <Button variant="secondary" size="sm" onClick={loadMindmaps}>Mindmaps</Button>
+                <Button variant="secondary" size="sm" onClick={loadSummaries}>{t('focusRoom.summary')}</Button>
+                <Button variant="secondary" size="sm" onClick={loadMindmaps}>{t('focusRoom.mindmaps')}</Button>
               </div>
             </div>
             
@@ -626,7 +628,7 @@ export default function FocusRoom() {
             {sessionDocuments.length > 0 && (
               <div className="mb-2 shrink-0">
                 <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-2">
-                  Select Context for Chat Q&A
+                  {t('focusRoom.selectContext')}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {sessionDocuments.map(doc => (
@@ -638,7 +640,7 @@ export default function FocusRoom() {
                           ? 'bg-primary text-white border-primary shadow-sm hover:opacity-90'
                           : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'
                       }`}
-                      title={`${doc.name} (Trạng thái: ${doc.status || 'PROCESSING'})`}
+                      title={`${doc.name} (${t('focusRoom.docStatus', { status: doc.status || 'PROCESSING' })})`}
                     >
                       <span className="truncate max-w-[120px]">{doc.name}</span>
                       
@@ -651,7 +653,7 @@ export default function FocusRoom() {
                       )}
 
                       {doc.status === 'FAILED' && (
-                        <span className="text-red-500 shrink-0" title="Xử lý lỗi ⚠️">⚠️</span>
+                        <span className="text-red-500 shrink-0" title={`${t('focusRoom.processingError')} ⚠️`}>⚠️</span>
                       )}
 
                       {doc.status === 'COMPLETED' && lastUploadedDocumentId === doc.id && (
@@ -678,7 +680,7 @@ export default function FocusRoom() {
                        onClick={() => setLastUploadedDocumentId(undefined)}
                        className="px-2 py-1.5 rounded-xl text-[10px] font-medium border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
                      >
-                       Clear Context
+                       {t('focusRoom.clearContext')}
                      </button>
                   )}
                 </div>
@@ -707,13 +709,13 @@ export default function FocusRoom() {
                           ? 'bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-200'
                           : 'bg-primary/10 text-primary'
                       }`}>
-                        {isFlashcardSet ? '🃏 Flashcard' : '📝 Quiz'}
+                        {isFlashcardSet ? `🃏 ${t('focusRoom.flashcardBadge')}` : `📝 ${t('focusRoom.quizBadge')}`}
                       </span>
                     </div>
                     <p className="text-[9px] font-bold text-neutral-800 dark:text-neutral-100 leading-tight line-clamp-2 min-h-[26px]">
                       {card.title}
                     </p>
-                    <p className="text-[8px] text-neutral-500">{card.questionCount} câu</p>
+                    <p className="text-[8px] text-neutral-500">{t('focusRoom.questionCount', { count: card.questionCount })}</p>
                   </div>
                   <div className="flex gap-1.5 mt-1.5 w-full">
                     {isFlashcardSet ? (
@@ -723,7 +725,7 @@ export default function FocusRoom() {
                         className="flex-1 text-[9px] font-semibold py-1 rounded-xl transition-all duration-200 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:shadow-sm whitespace-nowrap px-0 !bg-amber-500 !border-amber-500 hover:!bg-amber-600"
                         onClick={() => setSelectedFlashcardQuizId(card.id)}
                       >
-                        Open Flashcards
+                        {t('focusRoom.openFlashcards')}
                       </Button>
                     ) : (
                       <>
@@ -736,7 +738,7 @@ export default function FocusRoom() {
                             setShowQuizModal(true)
                           }}
                         >
-                          Start Quiz
+                          {t('focusRoom.startQuiz')}
                         </Button>
                         
                         <Button
@@ -745,7 +747,7 @@ export default function FocusRoom() {
                           className="flex-1 text-[9px] font-semibold py-1 rounded-xl transition-all duration-200 ease-in-out hover:scale-[1.03] active:scale-[0.98] hover:bg-neutral-100 dark:hover:bg-neutral-800 whitespace-nowrap px-0"
                           onClick={() => setSelectedFlashcardQuizId(card.id)}
                         >
-                          Flashcards
+                          {t('focusRoom.flashcards')}
                         </Button>
                       </>
                     )}
@@ -757,7 +759,7 @@ export default function FocusRoom() {
             ) : (
               <Card className="p-3 border border-[var(--color-border)] bg-[var(--color-accent-muted)] rounded-2xl flex items-center justify-center text-center">
                 <div className="text-xs text-neutral-600 dark:text-neutral-450 font-medium">
-                  ⚡ Use the AI tools above to generate interactive study sets, flashcards, or mindmaps!
+                  ⚡ {t('focusRoom.quizEmptyHint')}
                 </div>
               </Card>
             ))}
@@ -768,10 +770,10 @@ export default function FocusRoom() {
             <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-charcoal)] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-bold text-neutral-800 dark:text-neutral-300">AI Chat Help</span>
+                <span className="text-xs font-bold text-neutral-800 dark:text-neutral-300">{t('focusRoom.chatTitle')}</span>
               </div>
               <Button variant="ghost" size="sm" className="text-[10px] h-6 py-0 px-2" onClick={handleNewChatSession}>
-                New Session
+                {t('focusRoom.newSession')}
               </Button>
             </div>
             
@@ -780,8 +782,8 @@ export default function FocusRoom() {
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 text-neutral-500">
                   <AiBotIcon className="w-10 h-10 text-neutral-300 mb-2" />
-                  <p className="text-sm font-semibold">Welcome to your Focus Room!</p>
-                  <p className="text-xs max-w-xs mt-1">Ask questions or paste content to get detailed explanations from your AI assistant.</p>
+                  <p className="text-sm font-semibold">{t('focusRoom.welcomeTitle')}</p>
+                  <p className="text-xs max-w-xs mt-1">{t('focusRoom.welcomeDesc')}</p>
                 </div>
               ) : (
                 messages.map((m, i) => {
@@ -803,7 +805,7 @@ export default function FocusRoom() {
                         >
                           {!isAi && (
                             <p className="text-[9px] font-bold opacity-75 mb-0.5">
-                              You
+                              {t('focusRoom.chatYou')}
                             </p>
                           )}
                           <MessageRenderer text={m.messageText || m.text} />
@@ -824,7 +826,7 @@ export default function FocusRoom() {
                 onSend={() => handleSendMessage(input)}
                 onFileChange={handleFileChange}
                 acceptFiles={ACCEPT_FILES}
-                placeholder="Ask your AI assistant..."
+                placeholder={t('focusRoom.chatPlaceholder')}
                 attachmentCount={attachments.length}
               />
             </div>
@@ -832,14 +834,14 @@ export default function FocusRoom() {
         </main>
 
         {/* Right Sidebar: Quick Notes */}
-        <aside className="min-w-0 flex flex-col p-4 border-l border-[var(--color-border)] bg-[var(--color-surface)] h-[calc(100vh-4.5rem)] overflow-hidden">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-700 dark:text-accent mb-3 shrink-0">Quick Notes</h2>
+        <aside className="order-3 min-w-0 flex flex-col p-4 border-t md:border-t-0 md:border-l border-[var(--color-border)] bg-[var(--color-surface)] max-h-80 md:max-h-none md:h-[calc(100vh-4.5rem)] overflow-hidden">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-neutral-700 dark:text-accent mb-3 shrink-0">{t('focusRoom.quickNotes')}</h2>
           
           {/* Notes list */}
           <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1">
             {savedNotes.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-4 text-neutral-500">
-                <p className="text-xs">No saved notes yet.</p>
+                <p className="text-xs">{t('focusRoom.notesEmpty')}</p>
               </div>
             ) : (
               savedNotes.map((note) => (
@@ -850,7 +852,7 @@ export default function FocusRoom() {
                     onClick={() => handleDeleteNote(note.noteId)}
                     className="text-error hover:text-error/80 text-[10px] font-extrabold shrink-0 ml-1"
                   >
-                    Delete
+                    {t('common.delete')}
                   </button>
                 </div>
               ))
@@ -860,23 +862,23 @@ export default function FocusRoom() {
           {/* Note Input */}
           <div className="mt-auto shrink-0 border-t border-[var(--color-border)] pt-3 bg-[var(--color-surface)]">
             <Textarea
-              placeholder="Start typing notes..."
+              placeholder={t('focusRoom.notesPlaceholder')}
               className="w-full min-h-[90px] resize-none border border-[var(--color-border)] text-xs py-2 px-3 rounded-xl focus:ring-1 focus:ring-primary bg-[var(--color-background)]"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
-            <Button variant="tonal" size="sm" className="w-full mt-2 rounded-xl" onClick={handleAddNote}>Save Note</Button>
+            <Button variant="tonal" size="sm" className="w-full mt-2 rounded-xl" onClick={handleAddNote}>{t('focusRoom.saveNote')}</Button>
           </div>
         </aside>
       </div>
 
-      <Modal open={summarizeOpen} onClose={() => setSummarizeOpen(false)} title="Summarize">
-        <p className="text-sm text-neutral-600 mb-4">Summarize feature — coming soon.</p>
-        <Button variant="primary" size="sm" onClick={() => setSummarizeOpen(false)}>Close</Button>
+      <Modal open={summarizeOpen} onClose={() => setSummarizeOpen(false)} title={t('focusRoom.summarizeTitle')}>
+        <p className="text-sm text-neutral-600 mb-4">{t('focusRoom.summarizeComingSoon')}</p>
+        <Button variant="primary" size="sm" onClick={() => setSummarizeOpen(false)}>{t('common.close')}</Button>
       </Modal>
-      <Modal open={dialogOpen} onClose={() => setDialogOpen(false)} title="Open chat in popup">
-        <p className="text-sm text-neutral-600 mb-4">Chat popup — coming soon.</p>
-        <Button variant="primary" size="sm" onClick={() => setDialogOpen(false)}>Close</Button>
+      <Modal open={dialogOpen} onClose={() => setDialogOpen(false)} title={t('focusRoom.chatPopupTitle')}>
+        <p className="text-sm text-neutral-600 mb-4">{t('focusRoom.chatPopupComingSoon')}</p>
+        <Button variant="primary" size="sm" onClick={() => setDialogOpen(false)}>{t('common.close')}</Button>
       </Modal>
 
       {showQuizModal && (
@@ -884,10 +886,10 @@ export default function FocusRoom() {
       )}
 
       {/* Summary Modal */}
-      <Modal open={showSummaryModal} onClose={() => setShowSummaryModal(false)} title="Document Summaries">
+      <Modal open={showSummaryModal} onClose={() => setShowSummaryModal(false)} title={t('focusRoom.summariesTitle')}>
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {summaries.length === 0 ? (
-            <p className="text-sm text-neutral-500">No summaries found.</p>
+            <p className="text-sm text-neutral-500">{t('focusRoom.summariesEmpty')}</p>
           ) : (
             summaries.map((s, idx) => (
               <div key={idx} className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
@@ -900,10 +902,10 @@ export default function FocusRoom() {
       </Modal>
 
       {/* Mindmaps Modal */}
-      <Modal open={showMindmapModal} onClose={() => setShowMindmapModal(false)} title="Document Mindmaps">
+      <Modal open={showMindmapModal} onClose={() => setShowMindmapModal(false)} title={t('focusRoom.mindmapsTitle')}>
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {mindmaps.length === 0 ? (
-            <p className="text-sm text-neutral-500">No mindmaps found.</p>
+            <p className="text-sm text-neutral-500">{t('focusRoom.mindmapsEmpty')}</p>
           ) : (
             mindmaps.map((m, idx) => (
               <div key={idx} className="p-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
@@ -927,20 +929,20 @@ export default function FocusRoom() {
         </div>
       </Modal>
 
-      <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title="Create Personal Task">
+      <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title={t('focusRoom.createTaskTitle')}>
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1">Task Title</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1">{t('focusRoom.taskTitleLabel')}</label>
             <input
               type="text"
-              placeholder="What needs to be done?"
+              placeholder={t('focusRoom.taskTitlePlaceholder')}
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               className="w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl text-sm px-3 py-2 text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1">Due Date (Optional)</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1">{t('focusRoom.dueDateLabel')}</label>
             <input
               type="date"
               value={newTaskDueDate}
@@ -949,8 +951,8 @@ export default function FocusRoom() {
             />
           </div>
           <div className="flex gap-2 justify-end pt-2 border-t border-[var(--color-border)]">
-            <Button variant="secondary" size="sm" onClick={() => setShowAddTaskModal(false)}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={handleAddTask} disabled={!newTaskTitle.trim()}>Create Task</Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowAddTaskModal(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" size="sm" onClick={handleAddTask} disabled={!newTaskTitle.trim()}>{t('focusRoom.createTask')}</Button>
           </div>
         </div>
       </Modal>
@@ -966,28 +968,28 @@ export default function FocusRoom() {
           }
         }} 
         size={isEnded ? "max-w-xl" : "max-w-md"} 
-        title={isEnded ? "Session Completed!" : "End Study Session"}
+        title={isEnded ? t('focusRoom.sessionCompleted') : t('focusRoom.endStudySession')}
       >
         <div className="w-full rounded-[var(--radius-card)] bg-[var(--color-surface)] shadow-none border border-[var(--color-border)] overflow-hidden">
           {!isEnded ? (
             <>
               <div className="bg-[var(--color-accent-muted)] px-8 pt-10 pb-12">
                 <p className="text-xl font-bold text-neutral-900 text-center mb-6">
-                  Are you sure you want to end your study session?
+                  {t('focusRoom.endConfirm')}
                 </p>
                 <div className="flex justify-center">
                   <div className="rounded-2xl bg-[var(--color-charcoal)] border border-[var(--color-border)] px-6 py-5 text-center min-w-[180px]">
                     <p className="text-3xl font-bold text-neutral-900 tabular-nums">{formatTime(seconds)}</p>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-500 uppercase tracking-wide mt-1.5">Time studied</p>
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-500 uppercase tracking-wide mt-1.5">{t('focusRoom.timeStudied')}</p>
                   </div>
                 </div>
               </div>
               <div className="flex gap-3 p-6 border-t border-[var(--color-border)] bg-[var(--color-background)]">
                 <Button variant="secondary" size="md" className="flex-1" onClick={() => setShowEndModal(false)}>
-                  Continue study
+                  {t('focusRoom.continueStudy')}
                 </Button>
                 <Button variant="primary" size="md" className="flex-1 !bg-error !border-error hover:!opacity-90" onClick={handleEndSession}>
-                  End Session
+                  {t('focusRoom.endSession')}
                 </Button>
               </div>
             </>
@@ -995,22 +997,22 @@ export default function FocusRoom() {
             <>
               <div className="bg-[var(--color-accent-muted)] px-8 pt-10 pb-12">
                 <p className="text-2xl md:text-3xl font-extrabold text-neutral-900 text-center mb-10 uppercase tracking-wide">
-                  Done! You did well today.
+                  {t('focusRoom.doneTitle')}
                 </p>
                 <div className="flex justify-center gap-4 md:gap-8">
                   <div className="flex-1 max-w-[140px] rounded-2xl bg-[var(--color-charcoal)] border border-[var(--color-border)] px-4 py-5 text-center shadow-none">
                     <p className="text-2xl md:text-3xl font-bold text-neutral-900 tabular-nums">{formatTime(seconds)}</p>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-500 uppercase tracking-wide mt-1.5">Time studied</p>
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-500 uppercase tracking-wide mt-1.5">{t('focusRoom.timeStudied')}</p>
                   </div>
                   <div className="flex-1 max-w-[140px] rounded-2xl bg-[var(--color-charcoal)] border border-[var(--color-border)] px-4 py-5 text-center shadow-none">
                     <p className="text-2xl md:text-3xl font-bold text-neutral-900 tabular-nums">+{expEarned}</p>
-                    <p className="text-[11px] text-neutral-600 dark:text-neutral-500 uppercase tracking-wide mt-1.5">Exp Earned</p>
+                    <p className="text-[11px] text-neutral-600 dark:text-neutral-500 uppercase tracking-wide mt-1.5">{t('focusRoom.expEarned')}</p>
                   </div>
                 </div>
               </div>
               <div className="flex gap-3 p-6 border-t border-[var(--color-border)] bg-[var(--color-background)]">
                 <Button variant="primary" size="md" className="w-full" onClick={() => navigate('/dashboard')}>
-                  Go to Dashboard
+                  {t('focusRoom.goToDashboard')}
                 </Button>
               </div>
             </>

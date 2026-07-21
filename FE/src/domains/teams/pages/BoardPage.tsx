@@ -10,8 +10,10 @@ import {
 } from '../../../mocks'
 import { workflowApi, authApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function BoardPage() {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = (searchParams.get('tab') as TabId) || 'management'
@@ -24,7 +26,7 @@ export default function BoardPage() {
   const teamIdStr = searchParams.get('teamId')
   const teamId = teamIdStr ? Number(teamIdStr) : null
 
-  const [teamName, setTeamName] = useState('Loading Team...')
+  const [teamName, setTeamName] = useState(t('teams.loadingTeam'))
   const [inviteCode, setInviteCode] = useState('')
   const [teamObj, setTeamObj] = useState<any | null>(null)
   const [members, setMembers] = useState<any[]>([])
@@ -70,7 +72,9 @@ export default function BoardPage() {
                 name: displayName,
                 role: m.role,
                 avatarUrl: m.avatarUrl || userInfo?.avatarUrl,
-                skills: m.role === 'OWNER' ? ['Product', 'Strategy'] : ['Contributor'],
+                skills: m.role === 'OWNER'
+                  ? [t('teams.skillProduct'), t('teams.skillStrategy')]
+                  : [t('teams.skillContributor')],
                 code: displayName.slice(0, 2).toUpperCase()
               }
             }))
@@ -100,7 +104,7 @@ export default function BoardPage() {
     if (teamId) {
       loadTeamData()
     } else {
-      setTeamName('Mock Team')
+      setTeamName(t('teams.mockTeam'))
       setMembers(TEAM_MEMBERS)
     }
   }, [teamId])
@@ -137,13 +141,13 @@ export default function BoardPage() {
                 <h2 className="text-lg font-bold text-neutral-900">{teamName}</h2>
                 {inviteCode && (
                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-mono font-semibold bg-[var(--color-charcoal)] border border-[var(--color-border)] rounded-md text-neutral-850">
-                    Code: {inviteCode}
+                    {t('teams.codeLabel', { code: inviteCode })}
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(inviteCode);
-                        alert('Copied invite code: ' + inviteCode);
+                        alert(t('teams.copiedInviteCode', { code: inviteCode }));
                       }}
-                      title="Copy Code"
+                      title={t('teams.copyCode')}
                       className="text-neutral-500 hover:text-neutral-950 font-sans ml-0.5 text-[10px]"
                     >
                       📋
@@ -153,7 +157,7 @@ export default function BoardPage() {
               </div>
               {selectedProjectId ? (
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-neutral-500">Project:</span>
+                  <span className="text-xs text-neutral-500">{t('teams.project')}</span>
                   <select
                     value={selectedProjectId || ''}
                     onChange={(e) => setSelectedProjectId(Number(e.target.value))}
@@ -165,12 +169,12 @@ export default function BoardPage() {
                   </select>
                 </div>
               ) : (
-                <span className="text-xs text-neutral-500">No projects created yet.</span>
+                <span className="text-xs text-neutral-500">{t('teams.noProjects')}</span>
               )}
             </div>
           </div>
           <Button variant="primary" size="sm" onClick={() => setCreateProjectOpen(true)}>
-            + New Project
+            {t('teams.newProject')}
           </Button>
         </div>
       )}
@@ -179,7 +183,10 @@ export default function BoardPage() {
         <SegmentedControl
           value={tab}
           onChange={(next) => setTab(next as TabId)}
-          options={TEAM_TABS.map((t) => ({ value: t.id, label: t.label }))}
+          options={TEAM_TABS.map((tabDef) => ({
+            value: tabDef.id,
+            label: tabDef.id === 'management' ? t('teams.tabManagement') : t('teams.tabScrum'),
+          }))}
         />
       </div>
 
@@ -196,7 +203,7 @@ export default function BoardPage() {
           <ScrumBoardContent
             projectId={selectedProjectId}
             teamMembers={members}
-            projectName={projects.find(p => p.projectId === selectedProjectId)?.name || 'Project Board'}
+            projectName={projects.find(p => p.projectId === selectedProjectId)?.name || t('teams.projectBoard')}
             isOwner={isOwner}
             currentUserSso={user?.userSso}
           />
@@ -204,27 +211,27 @@ export default function BoardPage() {
       </div>
 
       {/* Create Project Modal */}
-      <Modal open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} size="max-w-md" title="Create New Project">
+      <Modal open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} size="max-w-md" title={t('teams.createProjectTitle')}>
         <Card className="p-5 w-full">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Create New Project</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.createProjectTitle')}</h3>
           <div className="flex flex-col gap-4 mb-4">
             <Input
-              label="Project Name"
-              placeholder="e.g. Sprint Phase 1"
+              label={t('teams.projectName')}
+              placeholder={t('teams.projectNamePlaceholder')}
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               required
             />
             <Input
-              label="Description"
-              placeholder="What is this project about?"
+              label={t('teams.description')}
+              placeholder={t('teams.projectDescPlaceholder')}
               value={newProjectDesc}
               onChange={(e) => setNewProjectDesc(e.target.value)}
             />
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setCreateProjectOpen(false)}>Cancel</Button>
-            <Button variant="primary" className="flex-1" onClick={handleCreateProject}>Create</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setCreateProjectOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" className="flex-1" onClick={handleCreateProject}>{t('teams.create')}</Button>
           </div>
         </Card>
       </Modal>
@@ -243,6 +250,7 @@ function TeamManagementContent({
   teamObj: any | null
   onTeamUpdated: () => void
 }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const isOwner = members.some((m) => m.id === user?.userSso && m.role === 'OWNER')
@@ -288,7 +296,7 @@ function TeamManagementContent({
     e.preventDefault()
     if (!teamId) return
     if (!meetingTitle.trim()) {
-      setError('Vui lòng nhập tiêu đề cuộc họp.')
+      setError(t('teams.meetingTitleRequired'))
       return
     }
     setLoading(true)
@@ -304,11 +312,11 @@ function TeamManagementContent({
         await workflowApi.joinMeeting(res.data.meetingId)
         navigate(`/meetings/room?meetingId=${res.data.meetingId}`)
       } else {
-        setError(res.message || 'Không thể tạo cuộc họp.')
+        setError(res.message || t('teams.meetingCreateFailed'))
       }
     } catch (err) {
       console.error(err)
-      setError('Lỗi kết nối máy chủ.')
+      setError(t('teams.serverError'))
     } finally {
       setLoading(false)
     }
@@ -330,10 +338,10 @@ function TeamManagementContent({
         setEditOpen(false)
         onTeamUpdated()
       } else {
-        setError(res.message || 'Không thể cập nhật thông tin nhóm.')
+        setError(res.message || t('teams.updateFailed'))
       }
     } catch (err: any) {
-      setError(err.message || 'Lỗi kết nối máy chủ.')
+      setError(err.message || t('teams.serverError'))
     } finally {
       setLoading(false)
     }
@@ -341,7 +349,7 @@ function TeamManagementContent({
 
   const handleKickMember = async (memberSso: string) => {
     if (!teamId) return
-    if (!window.confirm('Bạn có chắc chắn muốn mời thành viên này rời khỏi nhóm?')) return
+    if (!window.confirm(t('teams.kickConfirm'))) return
     setLoading(true)
     setError('')
     try {
@@ -349,10 +357,10 @@ function TeamManagementContent({
       if (res.success) {
         onTeamUpdated()
       } else {
-        setError(res.message || 'Không thể xóa thành viên.')
+        setError(res.message || t('teams.removeMemberFailed'))
       }
     } catch (err: any) {
-      setError(err.message || 'Lỗi kết nối máy chủ.')
+      setError(err.message || t('teams.serverError'))
     } finally {
       setLoading(false)
     }
@@ -370,31 +378,31 @@ function TeamManagementContent({
             </div>
           )}
           <div>
-            <h1 className="text-xl font-bold text-neutral-900">Team management</h1>
+            <h1 className="text-xl font-bold text-neutral-900">{t('teams.managementTitle')}</h1>
             {teamObj?.description && <p className="text-xs text-neutral-500 mt-0.5">{teamObj.description}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
           {isOwner && (
             <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)} className="flex items-center gap-1 font-bold">
-              ⚙️ Chỉnh sửa nhóm
+              ⚙️ {t('teams.editTeam')}
             </Button>
           )}
           {teamId && (
             activeMeeting ? (
               <Button variant="primary" size="sm" onClick={() => navigate(`/meetings/room?meetingId=${activeMeeting.meetingId}`)} className="flex items-center gap-1.5 font-bold shadow-none !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600">
-                🟢 Tham gia ngay
+                🟢 {t('teams.joinNow')}
               </Button>
             ) : (
               <Button variant="primary" size="sm" onClick={() => setCreateMeetingOpen(true)} className="flex items-center gap-1.5 font-bold shadow-none">
-                🎥 Tạo cuộc họp mới
+                🎥 {t('teams.createMeeting')}
               </Button>
             )
           )}
         </div>
       </div>
       
-      <Card heading="Members" className="border border-[var(--color-border)] shadow-none">
+      <Card heading={t('teams.members')} className="border border-[var(--color-border)] shadow-none">
         {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
         <ul className="space-y-0">
           {members.map((m, i) => (
@@ -428,7 +436,7 @@ function TeamManagementContent({
                   className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 font-bold"
                   disabled={loading}
                 >
-                  Kick
+                  {t('teams.kick')}
                 </Button>
               )}
             </li>
@@ -436,28 +444,28 @@ function TeamManagementContent({
         </ul>
       </Card>
 
-      <Modal open={createMeetingOpen} onClose={() => setCreateMeetingOpen(false)} size="max-w-md" title="Tạo cuộc họp mới">
+      <Modal open={createMeetingOpen} onClose={() => setCreateMeetingOpen(false)} size="max-w-md" title={t('teams.createMeetingModalTitle')}>
         <Card className="p-5 w-full border-0 bg-transparent shadow-none">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Tạo cuộc họp nhóm</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.createTeamMeeting')}</h3>
           {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
           <form onSubmit={handleCreateMeeting} className="flex flex-col gap-4">
             <Input
-              label="Tiêu đề cuộc họp"
-              placeholder="e.g. Họp thảo luận nhóm"
+              label={t('teams.meetingTitle')}
+              placeholder={t('teams.meetingTitlePlaceholder')}
               value={meetingTitle}
               onChange={(e) => setMeetingTitle(e.target.value)}
               required
             />
             <Input
-              label="Chương trình họp (Agenda)"
-              placeholder="e.g. Báo cáo tiến trình, phân chia task"
+              label={t('teams.meetingAgenda')}
+              placeholder={t('teams.meetingAgendaPlaceholder')}
               value={meetingAgenda}
               onChange={(e) => setMeetingAgenda(e.target.value)}
             />
             <div className="flex gap-3 mt-2">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCreateMeetingOpen(false)}>Hủy</Button>
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCreateMeetingOpen(false)}>{t('common.cancel')}</Button>
               <Button type="submit" variant="primary" className="flex-1" disabled={loading}>
-                {loading ? 'Đang tạo...' : 'Bắt đầu ngay'}
+                {loading ? t('teams.starting') : t('teams.startNow')}
               </Button>
             </div>
           </form>
@@ -465,32 +473,32 @@ function TeamManagementContent({
       </Modal>
 
       {/* Edit Team Modal */}
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} size="max-w-md" title="Chỉnh Sửa Thông Tin Nhóm">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} size="max-w-md" title={t('teams.editTeamModalTitle')}>
         <Card className="p-5 w-full border-0 bg-transparent shadow-none">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Chỉnh sửa thông tin nhóm</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.editTeamHeading')}</h3>
           {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
           <div className="flex flex-col gap-4 mb-4">
             <Input
-              label="Tên nhóm"
-              placeholder="e.g. Science Study Group"
+              label={t('teams.teamNameLabel')}
+              placeholder={t('teams.teamNamePlaceholder')}
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               required
             />
             <Input
-              label="Mô tả"
-              placeholder="Mô tả nhóm học tập này..."
+              label={t('teams.descLabel')}
+              placeholder={t('teams.editDescPlaceholder')}
               value={editDesc}
               onChange={(e) => setEditDesc(e.target.value)}
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-neutral-700">Ảnh đại diện nhóm</label>
+              <label className="text-xs font-semibold text-neutral-700">{t('teams.teamAvatarLabel')}</label>
               <div className="flex items-center gap-3">
                 {editAvatar ? (
-                  <img src={editAvatar} alt="Team Preview" className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
+                  <img src={editAvatar} alt={t('teams.teamPreviewAlt')} className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
                 ) : (
                   <div className="w-12 h-12 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] flex items-center justify-center text-neutral-400 font-bold text-xs uppercase">
-                    No avt
+                    {t('teams.noAvatar')}
                   </div>
                 )}
                 <div className="flex-1">
@@ -503,7 +511,7 @@ function TeamManagementContent({
                       const file = e.target.files?.[0]
                       if (file) {
                         if (file.size > 2 * 1024 * 1024) {
-                          setError('Kích thước ảnh phải nhỏ hơn 2MB')
+                          setError(t('teams.imageTooLarge'))
                           return
                         }
                         const reader = new FileReader()
@@ -519,7 +527,7 @@ function TeamManagementContent({
                     htmlFor="team-edit-avatar-upload"
                     className="inline-flex items-center justify-center px-3 py-1.5 border border-[var(--color-border)] rounded-md text-xs font-semibold text-neutral-800 bg-[var(--color-charcoal)] hover:bg-[var(--color-border)] cursor-pointer transition-colors"
                   >
-                    Tải ảnh lên
+                    {t('teams.uploadAvatar')}
                   </label>
                   {editAvatar && (
                     <button
@@ -527,14 +535,14 @@ function TeamManagementContent({
                       onClick={() => setEditAvatar('')}
                       className="ml-2 text-xs text-red-600 hover:text-red-700 font-semibold"
                     >
-                      Xóa ảnh
+                      {t('teams.clearAvatar')}
                     </button>
                   )}
                 </div>
               </div>
             </div>
             <Input
-              label="Số lượng thành viên tối đa"
+              label={t('teams.maxMembersLabel')}
               type="number"
               min={1}
               value={editMaxMembers}
@@ -542,16 +550,16 @@ function TeamManagementContent({
             />
             <div className="flex items-center gap-2 py-1">
               <Checkbox
-                label="Nhóm riêng tư (Private Team)"
+                label={t('teams.privateTeamCheckbox')}
                 checked={editIsPrivate}
                 onChange={(e) => setEditIsPrivate(e.target.checked)}
               />
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setEditOpen(false)}>Hủy</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setEditOpen(false)}>{t('common.cancel')}</Button>
             <Button variant="primary" className="flex-1" onClick={handleUpdateTeam} disabled={loading}>
-              {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+              {loading ? t('teams.saving') : t('teams.saveChanges')}
             </Button>
           </div>
         </Card>
@@ -628,6 +636,8 @@ function ScrumBoardContent({
   isOwner?: boolean
   currentUserSso?: string
 }) {
+  const { t, language } = useTranslation()
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US'
   const [columns, setColumns] = useState<any[]>([])
   const [selected, setSelected] = useState<{ task: any; columnId: string } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -652,13 +662,13 @@ function ScrumBoardContent({
       setColumns(SCRUM_COLUMNS_INIT.map((col, cIdx) => ({
         columnId: cIdx + 1,
         name: col.title,
-        tasks: col.tasks.map((t, tIdx) => ({
+        tasks: col.tasks.map((task, tIdx) => ({
           taskId: (cIdx + 1) * 100 + tIdx,
-          title: t.title,
-          description: t.startDate ? `Starts ${t.startDate}` : '',
+          title: task.title,
+          description: task.startDate ? `Starts ${task.startDate}` : '',
           status: col.title,
-          priority: t.priority || 'MEDIUM',
-          assignee: t.assignee
+          priority: task.priority || 'MEDIUM',
+          assignee: task.assignee
         }))
       })))
       return
@@ -793,13 +803,13 @@ function ScrumBoardContent({
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div className="flex items-center gap-2">
           <h2 className="text-base font-bold text-neutral-900">{projectName}</h2>
-          {loading && <span className="text-xs text-neutral-500">Loading...</span>}
+          {loading && <span className="text-xs text-neutral-500">{t('common.loading')}</span>}
           <Button variant="secondary" size="sm" onClick={() => setAddColumnOpen(true)}>
-            + Add Column
+            {t('teams.addColumn')}
           </Button>
           {projectId && (
             <Button variant="tonal" size="sm" onClick={handleExportReport} className="text-xs font-bold gap-1">
-              📥 Export Report
+              📥 {t('teams.exportReport')}
             </Button>
           )}
         </div>
@@ -830,19 +840,19 @@ function ScrumBoardContent({
                   <div className="mt-1 flex flex-wrap gap-1 items-center">
                     {(task.dueDate || task.duDate) && (
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] border ${getDueDateBadgeClass(task.dueDate || task.duDate, col.name.toUpperCase() === 'DONE')}`}>
-                        📅 Due: {task.dueDate || task.duDate}
+                        📅 {t('teams.due', { date: task.dueDate || task.duDate })}
                       </span>
                     )}
                     {(task.completedAt || task.completeAt) && col.name.toUpperCase() === 'DONE' && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] bg-green-50 text-green-600 border border-green-200 font-semibold">
-                        ✅ Completed: {new Date(task.completedAt || task.completeAt).toLocaleDateString('vi-VN')}
+                        ✅ {t('teams.completed', { date: new Date(task.completedAt || task.completeAt).toLocaleDateString(locale) })}
                       </span>
                     )}
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 min-w-0">
                     {(() => {
                       const m = teamMembers.find((mem) => mem.id === task.assignee)
-                      const name = m ? m.name : (task.assignee || 'Unassigned')
+                      const name = m ? m.name : (task.assignee || t('teams.unassigned'))
                       const code = m ? m.code : (task.assignee ? task.assignee.slice(0, 2).toUpperCase() : 'UN')
                       return (
                         <>
@@ -872,7 +882,7 @@ function ScrumBoardContent({
                   setAddTaskOpen(true)
                 }}
               >
-                + Add Task
+                {t('teams.addTask')}
               </Button>
             )}
           </div>
@@ -880,7 +890,7 @@ function ScrumBoardContent({
       </div>
 
       {/* Task Details Popup Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} size="max-w-lg" title="Chi tiết Task">
+      <Modal open={!!selected} onClose={() => setSelected(null)} size="max-w-lg" title={t('teams.taskDetailTitle')}>
         {selected && (
           <Card className="p-5 w-full border-0 bg-transparent shadow-none">
             <TaskEditSidebar
@@ -906,43 +916,43 @@ function ScrumBoardContent({
       </Modal>
 
       {/* Add Task Modal */}
-      <Modal open={addTaskOpen} onClose={() => setAddTaskOpen(false)} size="max-w-md" title="Add New Task">
+      <Modal open={addTaskOpen} onClose={() => setAddTaskOpen(false)} size="max-w-md" title={t('teams.addTaskTitle')}>
         <Card className="p-5 w-full bg-[var(--color-surface)] border border-[var(--color-border)] shadow-xl rounded-2xl">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Add New Task</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.addTaskTitle')}</h3>
           <div className="flex flex-col gap-4 mb-5">
             <Input
-              label="Task Title"
-              placeholder="e.g. Design UI components"
+              label={t('teams.taskTitle')}
+              placeholder={t('teams.taskTitlePlaceholder')}
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               required
             />
             <Input
-              label="Description"
-              placeholder="Details of the task"
+              label={t('teams.description')}
+              placeholder={t('teams.taskDescPlaceholder')}
               value={newTaskDesc}
               onChange={(e) => setNewTaskDesc(e.target.value)}
             />
             
             {/* Priority Selector */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-neutral-500">Priority</label>
+              <label className="text-xs font-semibold text-neutral-500">{t('teams.priority')}</label>
               <select
                 className="w-full h-10 px-3 border border-[var(--color-border)] rounded-xl bg-white text-neutral-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 value={newTaskPriority}
                 onChange={(e) => setNewTaskPriority(e.target.value)}
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
+                <option value="Low">{t('teams.priorityLow')}</option>
+                <option value="Medium">{t('teams.priorityMedium')}</option>
+                <option value="High">{t('teams.priorityHigh')}</option>
               </select>
             </div>
 
             {/* Estimated Hours */}
             <Input
-              label="Estimated Hours"
+              label={t('teams.estimatedHours')}
               type="number"
-              placeholder="e.g. 5"
+              placeholder={t('teams.estimatedHoursPlaceholder')}
               value={newTaskEstHours}
               onChange={(e) => setNewTaskEstHours(e.target.value)}
             />
@@ -950,13 +960,13 @@ function ScrumBoardContent({
             {/* Start Date and Due Date */}
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Start Date"
+                label={t('teams.startDate')}
                 type="date"
                 value={newTaskStartDate}
                 onChange={(e) => setNewTaskStartDate(e.target.value)}
               />
               <Input
-                label="Due Date"
+                label={t('teams.dueDate')}
                 type="date"
                 value={newTaskDueDate}
                 onChange={(e) => setNewTaskDueDate(e.target.value)}
@@ -964,33 +974,31 @@ function ScrumBoardContent({
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setAddTaskOpen(false)}>Cancel</Button>
-            <Button variant="primary" className="flex-1" onClick={handleAddTask}>Add Task</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setAddTaskOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" className="flex-1" onClick={handleAddTask}>{t('teams.addTaskButton')}</Button>
           </div>
         </Card>
       </Modal>
 
       {/* Add Column Modal */}
-      <Modal open={addColumnOpen} onClose={() => setAddColumnOpen(false)} size="max-w-md" title="Add Board Column">
+      <Modal open={addColumnOpen} onClose={() => setAddColumnOpen(false)} size="max-w-md" title={t('teams.addColumnTitle')}>
         <Card className="p-5 w-full">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Add Board Column</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.addColumnTitle')}</h3>
           <div className="flex flex-col gap-4 mb-4">
             <Input
-              label="Column Name"
-              placeholder="e.g. Code Review"
+              label={t('teams.columnName')}
+              placeholder={t('teams.columnNamePlaceholder')}
               value={newColumnName}
               onChange={(e) => setNewColumnName(e.target.value)}
               required
             />
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setAddColumnOpen(false)}>Cancel</Button>
-            <Button variant="primary" className="flex-1" onClick={handleCreateColumn}>Create Column</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setAddColumnOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" className="flex-1" onClick={handleCreateColumn}>{t('teams.createColumn')}</Button>
           </div>
         </Card>
       </Modal>
     </div>
   )
 }
-
-

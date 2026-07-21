@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 function FeatureItem({ text }: { text: string }) {
   return (
@@ -12,6 +13,7 @@ function FeatureItem({ text }: { text: string }) {
 }
 
 export default function Subscription() {
+  const { t } = useTranslation()
   const [plans, setPlans] = useState<any[]>([])
   const [checkingOutPlanId, setCheckingOutPlanId] = useState<number | null>(null)
   const [message, setMessage] = useState('')
@@ -31,10 +33,10 @@ export default function Subscription() {
         window.location.href = res.data.checkoutUrl
         return
       }
-      setMessage(res.message || 'Không tạo được link thanh toán. Vui lòng thử lại.')
+      setMessage(res.message || t('subscription.checkoutLinkError'))
     } catch (e) {
       console.error(e)
-      setMessage('Có lỗi xảy ra khi thanh toán gói.')
+      setMessage(t('subscription.checkoutError'))
     } finally {
       setCheckingOutPlanId(null)
     }
@@ -44,10 +46,10 @@ export default function Subscription() {
     <div className="mx-auto flex w-full max-w-[1160px] flex-col px-4 py-4 sm:px-6">
       <div className="flex flex-col items-center gap-3 pb-6 sm:gap-4 sm:pb-8 md:gap-5 md:pb-10">
         <h1 className="text-center text-xl font-bold uppercase tracking-tight text-neutral-900 sm:text-2xl md:text-3xl md:leading-tight">
-          Gói đăng ký
+          {t('subscription.title')}
         </h1>
         <p className="w-full max-w-[28rem] text-center text-sm leading-6 text-neutral-700 sm:max-w-[672px] sm:text-base sm:leading-7">
-          Chọn gói phù hợp — thanh toán bằng tiền Việt (VND) qua PayOS.
+          {t('subscription.subtitle')}
         </p>
         {message && <p className="text-sm font-medium text-accent">{message}</p>}
       </div>
@@ -71,7 +73,7 @@ export default function Subscription() {
               {/* Nhãn nổi bật cho gói Popular */}
               {isPopular && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow whitespace-nowrap">
-                  Phổ biến nhất
+                  {t('shop.mostPopular')}
                 </span>
               )}
 
@@ -82,7 +84,7 @@ export default function Subscription() {
                     <span className="text-3xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">
                       {priceVnd.toLocaleString('vi-VN')}₫
                     </span>
-                    <span className="text-sm text-neutral-500">/ {days} ngày</span>
+                    <span className="text-sm text-neutral-500">{t('subscription.perDays', { days })}</span>
                   </div>
                   <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">{plan.description}</p>
                 </div>
@@ -101,13 +103,13 @@ export default function Subscription() {
                 disabled={checkingOutPlanId === plan.planId}
                 onClick={() => handleCheckout(plan.planId)}
               >
-                {checkingOutPlanId === plan.planId ? 'Đang chuyển tới thanh toán...' : 'Thanh toán'}
+                {checkingOutPlanId === plan.planId ? t('subscription.redirecting') : t('subscription.pay')}
               </Button>
             </div>
           )
         })}
         {plans.length === 0 && (
-          <p className="col-span-full text-center text-sm text-neutral-500">Chưa có gói đăng ký nào khả dụng.</p>
+          <p className="col-span-full text-center text-sm text-neutral-500">{t('subscription.empty')}</p>
         )}
       </div>
     </div>

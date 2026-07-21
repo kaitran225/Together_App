@@ -1,4 +1,5 @@
 import { AdminStatusBadge } from './AdminStatusBadge'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export type SupportChatUser = {
   id: string
@@ -15,9 +16,10 @@ interface SupportChatListProps {
 }
 
 export function SupportChatList({ users, selectedId, onSelect }: SupportChatListProps) {
+  const { t } = useTranslation()
   return (
     <aside className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-      <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-neutral-700">User Chats</h3>
+      <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-neutral-700">{t('admin.support.userChats')}</h3>
       <ul className="space-y-2">
         {users.map((u) => (
           <li key={u.id}>
@@ -43,4 +45,3 @@ export function SupportChatList({ users, selectedId, onSelect }: SupportChatList
     </aside>
   )
 }
-

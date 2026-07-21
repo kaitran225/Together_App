@@ -4,6 +4,7 @@ import type { SupportChatUser } from '../components/SupportChatList'
 import type { SupportMessage } from '../components/SupportChatWindow'
 import { useAdminActions } from '../hooks/useAdminActions'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 function formatTime(iso?: string): string {
   if (!iso) return ''
@@ -11,6 +12,7 @@ function formatTime(iso?: string): string {
 }
 
 export default function AdminSupport() {
+  const { t } = useTranslation()
   const [conversations, setConversations] = useState<SupportChatUser[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [messagesByUser, setMessagesByUser] = useState<Record<string, SupportMessage[]>>({})
@@ -27,7 +29,7 @@ export default function AdminSupport() {
         const mapped: SupportChatUser[] = res.data.map((c: any) => ({
           id: c.userSso,
           name: c.userName || c.userSso,
-          plan: c.userPlan || 'Basic plan',
+          plan: c.userPlan || t('admin.support.basicPlan'),
           status: c.userStatus === 'BANNED' ? 'Banned' : 'Active',
           preview: c.lastMessagePreview || '',
         }))
@@ -74,22 +76,22 @@ export default function AdminSupport() {
             { id: `local-${Date.now()}`, sender: 'admin', text: text.trim(), at: formatTime(new Date().toISOString()) },
           ],
         }))
-        showToast(`Reply sent to ${selectedUser.name}`, 'success')
+        showToast(t('admin.support.replySent', { name: selectedUser.name }), 'success')
       } else {
-        showToast(res.message || 'Failed to send reply', 'error')
+        showToast(res.message || t('admin.support.replyFailed'), 'error')
       }
     } catch {
-      showToast('Error sending reply', 'error')
+      showToast(t('admin.support.replyError'), 'error')
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <AdminPageSection title="Support" subtitle="Respond to user issues in real-time chat">
+      <AdminPageSection title={t('admin.support.title')} subtitle={t('admin.support.subtitle')}>
         {loading ? (
-          <p className="text-sm text-neutral-600">Loading conversations…</p>
+          <p className="text-sm text-neutral-600">{t('admin.support.loading')}</p>
         ) : conversations.length === 0 ? (
-          <p className="text-sm text-neutral-600">No support messages yet.</p>
+          <p className="text-sm text-neutral-600">{t('admin.support.empty')}</p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
             <SupportChatList users={conversations} selectedId={selectedUser?.id ?? ''} onSelect={setSelectedId} />

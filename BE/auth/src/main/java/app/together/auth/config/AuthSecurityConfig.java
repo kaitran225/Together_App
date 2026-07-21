@@ -57,6 +57,7 @@ public class AuthSecurityConfig {
     @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5174/callback}")
     private String redirectUris;
 
+    @SuppressWarnings("removal")
     @Bean
     @Order(1)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {

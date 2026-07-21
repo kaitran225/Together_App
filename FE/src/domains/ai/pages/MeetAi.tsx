@@ -3,6 +3,7 @@ import { AiBotIcon, Button, CloseIcon, IconButton } from '../../../components/co
 import { QUICK_PROMPTS, MAX_FILE_SIZE_MB, ACCEPT_FILES } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 type ChatMessage = {
   messageId: number | string
@@ -13,6 +14,7 @@ type ChatMessage = {
 }
 
 const MessageRenderer = ({ text }: { text: string }) => {
+  const { t } = useTranslation()
   try {
     let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '')
     const firstBrace = cleanText.indexOf('{')
@@ -29,7 +31,7 @@ const MessageRenderer = ({ text }: { text: string }) => {
               </p>
             )}
             <div className="mt-1 rounded-xl border border-neutral-200 bg-neutral-50/80 p-4 text-sm">
-              <p className="font-semibold mb-3 text-neutral-900">{parsed.title || 'Mindmap'}</p>
+              <p className="font-semibold mb-3 text-neutral-900">{parsed.title || t('ai.mindmapFallback')}</p>
               <ul className="pl-2 space-y-2 border-l-2 border-neutral-300 ml-1">
                 {parsed.nodes.map((node: any) => (
                   <li key={node.id}>
@@ -62,7 +64,10 @@ const MessageRenderer = ({ text }: { text: string }) => {
 
 export default function MeetAi() {
   const { user } = useAuth()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const { t } = useTranslation()
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false,
+  )
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file: File }[]>([])
   const [conversations, setConversations] = useState<any[]>([])
@@ -154,7 +159,7 @@ export default function MeetAi() {
     let convId = activeConversationId
     if (!convId) {
       try {
-        const title = text.slice(0, 48) || `Chat ${new Date().toLocaleDateString('vi-VN')}`
+        const title = text.slice(0, 48) || t('ai.chatTitleFallback', { date: new Date().toLocaleDateString() })
         const res = await workflowApi.createConversation(title)
         if (res.success && res.data) {
           convId = res.data.conversationId
@@ -179,7 +184,7 @@ export default function MeetAi() {
     const tempUserMsg: ChatMessage = {
       messageId: `temp-${Date.now()}`,
       sender: 'USER',
-      messageText: text || `[Đã gửi ${currentAttachments.length} tệp]`,
+      messageText: text || t('ai.sentFiles', { count: currentAttachments.length }),
       sentAt: new Date().toISOString(),
     }
     setMessages((prev) => [...prev, tempUserMsg])
@@ -207,7 +212,7 @@ export default function MeetAi() {
         {
           messageId: `err-${Date.now()}`,
           sender: 'ASSISTANT',
-          messageText: 'Xin lỗi, đã có lỗi khi gửi tin nhắn. Vui lòng thử lại.',
+          messageText: t('ai.sendError'),
           sentAt: new Date().toISOString(),
         },
       ])
@@ -217,27 +222,35 @@ export default function MeetAi() {
   }
 
   const hasChat = messages.length > 0 || sending
-  const displayName = user?.fullName?.split(' ')[0] || 'bạn'
+  const displayName = user?.fullName?.split(' ')[0] || t('ai.defaultUserName')
 
   return (
-    <div className="-m-3 md:-m-4 md:-my-6 flex h-[calc(100vh-3.5rem)] min-h-[560px] overflow-hidden rounded-none bg-[var(--color-surface)] md:rounded-2xl md:border md:border-[var(--color-border)]">
-      {/* Sidebar */}
+    <div className="-m-2 sm:-m-3 md:-m-4 md:-my-6 flex h-[calc(100dvh-8rem)] md:h-[calc(100vh-3.5rem)] min-h-[480px] overflow-hidden rounded-none bg-[var(--color-surface)] relative md:rounded-2xl md:border md:border-[var(--color-border)]">
+      {/* Sidebar — overlay on mobile when open */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="md:hidden absolute inset-0 z-10 bg-black/30"
+          aria-label={t('ai.closeSidebar')}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       <aside
         className={`${
-          sidebarOpen ? 'w-[260px]' : 'w-0'
-        } shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-neutral-50 transition-[width] duration-200 ease-out`}
+          sidebarOpen ? 'w-[min(260px,85vw)]' : 'w-0'
+        } shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-neutral-50 transition-[width] duration-200 ease-out absolute md:static inset-y-0 left-0 z-20 md:z-auto`}
       >
-        <div className="flex h-full w-[260px] flex-col">
+        <div className="flex h-full w-[min(260px,85vw)] md:w-[260px] flex-col">
           <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-3">
             <Button variant="secondary" size="sm" className="flex-1 justify-start gap-2 rounded-xl" onClick={handleNewChat}>
               <span className="text-base leading-none">+</span>
-              New chat
+              {t('ai.newChat')}
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            <p className="px-2 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Chats</p>
+            <p className="px-2 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">{t('ai.chats')}</p>
             {conversations.length === 0 ? (
-              <p className="px-2 text-xs text-neutral-400">Chưa có hội thoại.</p>
+              <p className="px-2 text-xs text-neutral-400">{t('ai.noConversations')}</p>
             ) : (
               <ul className="space-y-0.5">
                 {conversations.map((c) => {
@@ -256,7 +269,7 @@ export default function MeetAi() {
                         <svg className="h-4 w-4 shrink-0 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        <span className="min-w-0 flex-1 truncate">{c.title || 'Untitled'}</span>
+                        <span className="min-w-0 flex-1 truncate">{c.title || t('ai.untitled')}</span>
                       </button>
                     </li>
                   )
@@ -274,7 +287,7 @@ export default function MeetAi() {
             type="button"
             size="sm"
             variant="ghost"
-            label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            label={sidebarOpen ? t('ai.hideSidebar') : t('ai.showSidebar')}
             onClick={() => setSidebarOpen((v) => !v)}
             className="rounded-lg text-neutral-600"
             icon={
@@ -284,7 +297,7 @@ export default function MeetAi() {
             }
           />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold text-neutral-900">Together AI</h1>
+            <h1 className="truncate text-sm font-semibold text-neutral-900">{t('ai.brandName')}</h1>
           </div>
         </header>
 
@@ -296,10 +309,10 @@ export default function MeetAi() {
                   <AiBotIcon className="h-10 w-10" />
                 </div>
                 <h2 className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-                  Xin chào, {displayName}
+                  {t('ai.greeting', { name: displayName })}
                 </h2>
                 <p className="max-w-md text-sm text-neutral-500">
-                  Hỏi bất cứ điều gì về học tập — giải thích khái niệm, tóm tắt ghi chú, hoặc luyện bài tập.
+                  {t('ai.welcomeHint')}
                 </p>
               </div>
 
@@ -330,7 +343,7 @@ export default function MeetAi() {
                       )}
                       <div className={`max-w-[min(100%,42rem)] ${isUser ? '' : 'min-w-0 flex-1'}`}>
                         {!isUser && (
-                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">Together AI</p>
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('ai.brandName')}</p>
                         )}
                         <div
                           className={
@@ -382,7 +395,7 @@ export default function MeetAi() {
                       type="button"
                       size="sm"
                       variant="ghost"
-                      label={`Remove ${file.name}`}
+                      label={t('ai.removeAttachment', { name: file.name })}
                       onClick={() => removeAttachment(id)}
                       className="!min-h-0 !p-0 text-neutral-500"
                       icon={<CloseIcon className="h-3.5 w-3.5" />}
@@ -400,13 +413,13 @@ export default function MeetAi() {
                 accept={ACCEPT_FILES}
                 className="hidden"
                 onChange={handleFileChange}
-                aria-label="Attach file"
+                aria-label={t('ai.attachFile')}
               />
               <IconButton
                 type="button"
                 size="sm"
                 variant="ghost"
-                label="Attach file"
+                label={t('ai.attachFile')}
                 onClick={() => fileInputRef.current?.click()}
                 className="mb-0.5 shrink-0 rounded-full text-neutral-600"
                 icon={
@@ -426,9 +439,9 @@ export default function MeetAi() {
                     void handleSend()
                   }
                 }}
-                placeholder="Nhắn tin cho Together AI..."
+                placeholder={t('ai.inputPlaceholder')}
                 className="max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-neutral-900 outline-none placeholder:text-neutral-400"
-                aria-label="Message"
+                aria-label={t('ai.messageAria')}
               />
               <Button
                 variant="primary"
@@ -436,7 +449,7 @@ export default function MeetAi() {
                 className="mb-0.5 h-9 w-9 shrink-0 rounded-full !px-0"
                 disabled={sending || (!input.trim() && attachments.length === 0)}
                 onClick={() => void handleSend()}
-                aria-label="Send"
+                aria-label={t('ai.send')}
               >
                 <svg className="mx-auto h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.25}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-7.5-15-7.5v6l10 1.5-10 1.5v6z" />
@@ -444,7 +457,7 @@ export default function MeetAi() {
               </Button>
             </div>
             <p className="mt-2 text-center text-[11px] text-neutral-400">
-              Together AI có thể sai. Hãy kiểm tra thông tin quan trọng.
+              {t('ai.disclaimer')}
             </p>
           </div>
         </div>

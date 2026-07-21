@@ -104,11 +104,27 @@
     color: var(--color-neutral-900);
     margin: 0;
     min-height: 100vh;
+    min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   #root {
     min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+  }
+  @media (max-width: 767px) {
+    :root {
+      --radius-card: 1.25rem;
+      --spacing-section: 0.75rem;
+      --spacing-container: 0.75rem;
+    }
   }
   /* Smooth scrolling for overflow areas */
   .scroll-smooth {

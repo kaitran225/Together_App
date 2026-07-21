@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Badge, Button, Card, Textarea } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 type Message = {
   id: string
@@ -15,6 +16,7 @@ function formatTime(iso?: string): string {
 }
 
 export default function ContactSupport() {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState<Message[]>([])
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
@@ -64,17 +66,17 @@ export default function ContactSupport() {
   return (
     <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full">
       <div>
-        <Badge variant="milestone" className="mb-2 normal-case tracking-normal">We're here to help</Badge>
-        <h1 className="text-2xl font-bold text-neutral-900 uppercase tracking-tight">Contact support</h1>
-        <p className="text-sm text-neutral-600 mt-1">Send us a message and our team will reply here.</p>
+        <Badge variant="milestone" className="mb-2 normal-case tracking-normal">{t('support.contact.badge')}</Badge>
+        <h1 className="text-2xl font-bold text-neutral-900 uppercase tracking-tight">{t('support.contact.title')}</h1>
+        <p className="text-sm text-neutral-600 mt-1">{t('support.contact.subtitle')}</p>
       </div>
 
       <Card className="flex flex-col min-h-[480px]">
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {loading ? (
-            <p className="text-sm text-neutral-500">Loading…</p>
+            <p className="text-sm text-neutral-500">{t('common.loading')}</p>
           ) : messages.length === 0 ? (
-            <p className="text-sm text-neutral-500">No messages yet. Send us a message below to get started.</p>
+            <p className="text-sm text-neutral-500">{t('support.contact.empty')}</p>
           ) : (
             messages.map((m) => (
               <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -93,13 +95,13 @@ export default function ContactSupport() {
         <div className="border-t border-neutral-200 p-3 flex gap-2 items-end">
           <Textarea
             rows={2}
-            placeholder="Describe your issue..."
+            placeholder={t('support.contact.placeholder')}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             className="flex-1"
           />
           <Button variant="primary" onClick={handleSend} disabled={sending || !draft.trim()}>
-            {sending ? 'Sending...' : 'Send'}
+            {sending ? t('common.sending') : t('common.send')}
           </Button>
         </div>
       </Card>

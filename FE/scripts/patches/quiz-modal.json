@@ -1,0 +1,42 @@
+{
+  "en": {
+    "ai.quiz.loading": "Loading quiz content...",
+    "ai.quiz.timeLabel": "Time {time}",
+    "ai.quiz.exit": "Exit",
+    "ai.quiz.analysisResults": "Analysis results",
+    "ai.quiz.wrongQuestions": "Questions you got wrong",
+    "ai.quiz.allCorrect": "None — all correct!",
+    "ai.quiz.wrongInQuestions": "Wrong in questions {numbers}",
+    "ai.quiz.suggestedTopics": "Suggested topics",
+    "ai.quiz.score": "Score",
+    "ai.quiz.correct": "Correct",
+    "ai.quiz.timeSpent": "Time spent",
+    "ai.quiz.questionProgress": "Question {current} / {total}",
+    "ai.quiz.topicLabel": "Topic: Quiz Study",
+    "ai.quiz.finish": "Finish",
+    "ai.quiz.next": "Next",
+    "ai.quiz.reviewTopic": "Review: {topic}",
+    "ai.quiz.reviewTopicTruncated": "Review: {topic}...",
+    "ai.quiz.generalKnowledgeGreat": "General knowledge (Great job!)"
+  },
+  "vi": {
+    "ai.quiz.loading": "Đang tải nội dung quiz...",
+    "ai.quiz.timeLabel": "Thời gian {time}",
+    "ai.quiz.exit": "Thoát",
+    "ai.quiz.analysisResults": "Kết quả phân tích",
+    "ai.quiz.wrongQuestions": "Câu bạn trả lời sai",
+    "ai.quiz.allCorrect": "Không có — tất cả đều đúng!",
+    "ai.quiz.wrongInQuestions": "Sai ở câu {numbers}",
+    "ai.quiz.suggestedTopics": "Chủ đề gợi ý",
+    "ai.quiz.score": "Điểm",
+    "ai.quiz.correct": "Đúng",
+    "ai.quiz.timeSpent": "Thời gian làm",
+    "ai.quiz.questionProgress": "Câu {current} / {total}",
+    "ai.quiz.topicLabel": "Chủ đề: Ôn tập Quiz",
+    "ai.quiz.finish": "Hoàn thành",
+    "ai.quiz.next": "Tiếp",
+    "ai.quiz.reviewTopic": "Ôn lại: {topic}",
+    "ai.quiz.reviewTopicTruncated": "Ôn lại: {topic}...",
+    "ai.quiz.generalKnowledgeGreat": "Kiến thức chung (Tuyệt vời!)"
+  }
+}

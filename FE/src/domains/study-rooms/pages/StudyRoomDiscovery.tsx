@@ -3,16 +3,17 @@ import { Link } from 'react-router-dom'
 import { Badge, Button, Card, Input, SegmentedControl } from '../../../components/common'
 import { FILTERS, FAKE_ROOMS, STUDY_ROOMS_TABS, type Room } from '../../../mocks'
 import { readApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 type TabKey = (typeof STUDY_ROOMS_TABS)[number]['key']
 
-function mapApiRoom(r: any): Room {
+function mapApiRoom(r: any, untitledLabel = 'Untitled room'): Room {
   const activeCount = r.members ? r.members.filter((m: any) => m.isActive).length : 0
   const validTopics = ['math', 'science', 'lang']
   const topic: Room['topic'] = validTopics.includes(r.topic) ? r.topic : 'other'
   return {
     id: String(r.roomId),
-    title: r.title || 'Untitled room',
+    title: r.title || untitledLabel,
     topic,
     tags: ['Study', topic.toUpperCase()],
     description: r.description || '',
@@ -33,6 +34,7 @@ function matchRoom(room: Room, query: string, category: string): boolean {
 }
 
 export default function StudyRoomDiscovery() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
   const [tab, setTab] = useState<TabKey>('explore')
@@ -53,15 +55,15 @@ export default function StudyRoomDiscovery() {
             : await readApi.getRooms()
 
       if (res.success && Array.isArray(res.data)) {
-        const mapped = res.data.map(mapApiRoom)
+        const mapped = res.data.map((r: any) => mapApiRoom(r, t('studyRooms.untitledRoom')))
         setRooms(mapped.length > 0 ? mapped : (isMock ? FAKE_ROOMS : []))
       } else {
         setRooms(isMock ? FAKE_ROOMS : [])
-        if (!isMock) setLoadError(res.message || 'Không tải được danh sách phòng.')
+        if (!isMock) setLoadError(res.message || t('studyRooms.errorLoadRooms'))
       }
     } catch {
       setRooms(isMock ? FAKE_ROOMS : [])
-      if (!isMock) setLoadError('Không kết nối được server phòng học. Hãy đảm bảo Workflow (và Read nếu cần) đang chạy.')
+      if (!isMock) setLoadError(t('studyRooms.errorConnectServer'))
     } finally {
       setLoading(false)
     }
@@ -80,23 +82,23 @@ export default function StudyRoomDiscovery() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 pb-4 border-b-2 border-neutral-200">
         <div>
-          <Badge variant="milestone" className="mb-2 normal-case tracking-normal">Find your best study vibe</Badge>
-          <h1 className="text-2xl font-bold text-neutral-900 mb-1 uppercase tracking-tight">Study rooms</h1>
-          <p className="text-sm text-neutral-600">Find a room or create your own to study with others.</p>
+          <Badge variant="milestone" className="mb-2 normal-case tracking-normal">{t('studyRooms.discoveryBadge')}</Badge>
+          <h1 className="text-2xl font-bold text-neutral-900 mb-1 uppercase tracking-tight">{t('studyRooms.discoveryTitle')}</h1>
+          <p className="text-sm text-neutral-600">{t('studyRooms.discoverySubtitle')}</p>
         </div>
         <div className="flex items-center gap-2 flex-nowrap">
           <Input
-            placeholder="Search..."
+            placeholder={t('studyRooms.searchPlaceholder')}
             className="w-40 sm:w-48 border-2 border-neutral-200 rounded-lg shrink-0"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search rooms"
+            aria-label={t('studyRooms.searchAria')}
           />
           <Link to="/study-rooms/recommend" className="shrink-0">
-            <Button variant="secondary" size="md" className="border-2 border-neutral-200">Find matching room</Button>
+            <Button variant="secondary" size="md" className="border-2 border-neutral-200">{t('studyRooms.findMatchingRoom')}</Button>
           </Link>
           <Link to="/study-rooms/create-new" className="shrink-0">
-            <Button variant="primary" size="md">+ Create room</Button>
+            <Button variant="primary" size="md">{t('studyRooms.createRoomBtn')}</Button>
           </Link>
         </div>
       </div>
@@ -108,7 +110,7 @@ export default function StudyRoomDiscovery() {
           options={STUDY_ROOMS_TABS.map((t) => ({ value: t.key, label: t.label }))}
         />
         <Link to="/study-rooms/recommend">
-          <Button variant="secondary" size="sm" className="border-2 border-neutral-200">Matching room</Button>
+          <Button variant="secondary" size="sm" className="border-2 border-neutral-200">{t('studyRooms.matchingRoom')}</Button>
         </Link>
       </div>
 
@@ -135,21 +137,21 @@ export default function StudyRoomDiscovery() {
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <Card variant="featured" className="col-span-full p-8 text-center">
-            <p className="text-sm text-neutral-600">Loading rooms…</p>
+            <p className="text-sm text-neutral-600">{t('studyRooms.loadingRooms')}</p>
           </Card>
         ) : roomsToShow.length === 0 ? (
           <Card variant="featured" className="col-span-full p-8 text-center">
-            <p className="text-sm font-semibold text-neutral-900 mb-1">No rooms found</p>
+            <p className="text-sm font-semibold text-neutral-900 mb-1">{t('studyRooms.noRoomsTitle')}</p>
             <p className="text-sm text-neutral-500">
               {loadError
                 ? loadError
                 : tab === 'my'
-                  ? 'You haven’t joined any rooms yet. Switch to Explore to find one.'
-                  : 'No rooms match this filter. Try different keywords or category.'}
+                  ? t('studyRooms.noRoomsMyTab')
+                  : t('studyRooms.noRoomsFilter')}
             </p>
             <div className="mt-4 flex justify-center gap-2">
-              <Button variant="tonal" size="sm" onClick={() => { setSearch(''); setCategory('all') }}>Reset filters</Button>
-              <Button variant="secondary" size="sm" onClick={() => void loadRooms(tab)}>Retry</Button>
+              <Button variant="tonal" size="sm" onClick={() => { setSearch(''); setCategory('all') }}>{t('studyRooms.resetFilters')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => void loadRooms(tab)}>{t('common.retry')}</Button>
             </div>
           </Card>
         ) : (
@@ -157,7 +159,7 @@ export default function StudyRoomDiscovery() {
             <Card key={room.id} className="cursor-pointer hover:shadow-md transition-shadow flex flex-col p-4 border-2 border-neutral-200">
               <h3 className="font-bold text-base mb-1">{room.title}</h3>
               <p className="text-xs text-neutral-500 mb-1.5">
-                {FILTERS.find((f) => f.key === room.topic)?.label ?? room.topic} · <span className="text-success font-medium">{room.membersCurrent} Active</span> · {room.membersMax} max
+                {FILTERS.find((f) => f.key === room.topic)?.label ?? room.topic} · <span className="text-success font-medium">{t('studyRooms.activeCount', { count: room.membersCurrent })}</span> · {t('studyRooms.maxMembers', { count: room.membersMax })}
               </p>
               <p className="text-xs text-neutral-700 mb-3 flex-1">{room.description}</p>
               {room.tags.length > 0 && (
@@ -170,7 +172,7 @@ export default function StudyRoomDiscovery() {
                 </div>
               )}
               <Link to={`/study-room?roomId=${room.id}`}>
-                <Button variant="secondary" size="sm" className="text-xs border-2 border-neutral-200">Join</Button>
+                <Button variant="secondary" size="sm" className="text-xs border-2 border-neutral-200">{t('common.join')}</Button>
               </Link>
             </Card>
           ))
