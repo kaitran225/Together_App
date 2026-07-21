@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "actionTypes": ["CREATION", "SUMMARIZE", "CHAT", "SEARCH"],
+  "tools": [
+    { "tool": "CREATE_QUIZ", "file": "create_quiz.template.json", "artifact": "QUIZ" },
+    { "tool": "CREATE_FLASHCARD", "file": "create_flashcard.template.json", "artifact": "FLASHCARD_DECK" },
+    { "tool": "CREATE_MINDMAP", "file": "create_mindmap.template.json", "artifact": "MINDMAP" },
+    { "tool": "CREATE_EVENT", "file": "create_event.template.json", "artifact": "SCHEDULE" },
+    { "tool": "MESSAGE_SUMMARIZE", "file": "message_summarize.template.json", "artifact": "SUMMARY" },
+    { "tool": "SEARCH", "file": "search.template.json", "artifact": "SEARCH" }
+  ]
+}

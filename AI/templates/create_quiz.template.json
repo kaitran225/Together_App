@@ -1,0 +1,42 @@
+{
+  "tool": "CREATE_QUIZ",
+  "version": "1",
+  "artifact": "QUIZ",
+  "llmInstructions": "Reply with ONLY one JSON object matching template. No markdown. Each question needs question, options (2+ strings), correctIndex (0-based).",
+  "template": {
+    "tool": "CREATE_QUIZ",
+    "quiz": {
+      "title": "",
+      "description": "",
+      "difficulty": "medium",
+      "timeLimitMinutes": 10,
+      "passingScore": 70,
+      "questions": [
+        {
+          "question": "",
+          "options": ["True", "False"],
+          "correctIndex": 0,
+          "explanation": ""
+        }
+      ]
+    }
+  },
+  "example": {
+    "tool": "CREATE_QUIZ",
+    "quiz": {
+      "title": "Photosynthesis basics",
+      "description": "True/False review",
+      "difficulty": "easy",
+      "timeLimitMinutes": 5,
+      "passingScore": 60,
+      "questions": [
+        {
+          "question": "Plants convert light energy into chemical energy.",
+          "options": ["True", "False"],
+          "correctIndex": 0,
+          "explanation": "Core definition of photosynthesis."
+        }
+      ]
+    }
+  }
+}

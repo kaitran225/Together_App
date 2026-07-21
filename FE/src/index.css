@@ -12,48 +12,48 @@
   --font-display: 'Roboto', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Liberation Mono', ui-monospace, monospace;
 
-  /* Neutral — softened light mode scale */
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
+  /* Neutral — requested scheme */
+  --color-neutral-50: #ffffff;
+  --color-neutral-100: #f7f7f7;
+  --color-neutral-200: #e1e1ff;
+  --color-neutral-300: #e1e1ff;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #737373;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
 
   /* Single prepared palette (liquorice/sunshine/cream/blossom/flame/orange/pear/sky/lilac) */
-  --pal-liquorice: #241C17;
-  --pal-sunshine: #FFC01D;
-  --pal-cream: #FCF3E3;
-  --pal-blossom: #F2A6A8;
-  --pal-flame: #DE6B38;
-  --pal-orange: #FF9947;
-  --pal-pear: #8FC766;
-  --pal-sky: #5CB5F2;
-  --pal-lilac: #A896F2;
-  --color-cream-100: #f1f3ec;
-  --color-cream-200: #e5e8de;
-  --color-cream-300: #d4d9cb;
+  --pal-liquorice: #171717;
+  --pal-sunshine: #ffb114;
+  --pal-cream: #ffffff;
+  --pal-blossom: #e1e1ff;
+  --pal-flame: #ff5c1c;
+  --pal-orange: #ffc757;
+  --pal-pear: #83f5a3;
+  --pal-sky: #85b8fd;
+  --pal-lilac: #e1e1ff;
+  --color-cream-100: #ffffff;
+  --color-cream-200: #f7f7f7;
+  --color-cream-300: #e1e1ff;
 
-  /* Semantic — bento / Gen Z solids */
-  --color-primary: #b9e600;
-  --color-primary-hover: #a8cf00;
-  --color-primary-foreground: #000000;
+  /* Semantic — requested scheme */
+  --color-primary: #9400d3;
+  --color-primary-hover: #7a00ad;
+  --color-primary-foreground: #ffffff;
   --color-accent: var(--pal-sky);
   --color-accent-muted: var(--color-cream-300);
   --color-surface: var(--color-cream-100);
   --color-background: var(--color-cream-200);
   --color-highlight: var(--pal-sunshine);
-  --color-highlight-hover: #f2b20f;
-  --color-focus-area: var(--pal-lilac);
+  --color-highlight-hover: #e89f00;
+  --color-focus-area: #191970;
   --color-success: var(--pal-pear);
   --color-warning: var(--pal-orange);
   --color-error: var(--pal-flame);
-  --color-border: rgba(15, 23, 42, 0.26);
-  --color-border-strong: rgba(15, 23, 42, 0.28);
+  --color-border: rgba(23, 23, 23, 0.14);
+  --color-border-strong: rgba(23, 23, 23, 0.22);
   --color-charcoal: var(--color-cream-300);
 
   /* Flat “gradient” tokens = solid (legacy class names only) */

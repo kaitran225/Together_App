@@ -1,0 +1,22 @@
+{
+  "tool": "CREATE_MINDMAP",
+  "version": "1",
+  "artifact": "MINDMAP",
+  "llmInstructions": "Reply with ONLY one JSON object. content may be markdown outline or nested nodes JSON string.",
+  "template": {
+    "tool": "CREATE_MINDMAP",
+    "mindmap": {
+      "title": "",
+      "content": "",
+      "thumbnailUrl": null
+    }
+  },
+  "example": {
+    "tool": "CREATE_MINDMAP",
+    "mindmap": {
+      "title": "Photosynthesis",
+      "content": "# Photosynthesis\n- Light reactions\n- Calvin cycle",
+      "thumbnailUrl": null
+    }
+  }
+}

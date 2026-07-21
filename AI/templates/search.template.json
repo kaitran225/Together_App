@@ -1,0 +1,16 @@
+{
+  "tool": "SEARCH",
+  "version": "1",
+  "artifact": "SEARCH",
+  "llmInstructions": "Reply with ONLY one JSON object suggesting a study search query and hints.",
+  "template": {
+    "tool": "SEARCH",
+    "query": "",
+    "hints": [""]
+  },
+  "example": {
+    "tool": "SEARCH",
+    "query": "photosynthesis light reactions",
+    "hints": ["review chapter 4", "practice quiz"]
+  }
+}

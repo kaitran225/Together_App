@@ -1,0 +1,63 @@
+# 2 on-device LLMs (llama.cpp) + thin gateway. Tuned for ~512MB Render free tier.
+# From repo root: docker compose -f AI/docker-compose.yml up --build
+
+services:
+  llm-smol:
+    build:
+      context: .
+      dockerfile: llm-smol/Dockerfile
+    ports:
+      - "8896:8080"
+    environment:
+      PORT: "8080"
+      LLAMA_CTX: "1024"
+      LLAMA_THREADS: "2"
+      LLAMA_BATCH: "512"
+      LLAMA_CACHE_TYPE_K: "q8_0"
+      LLAMA_CACHE_TYPE_V: "q8_0"
+      LLAMA_MLOCK: "1"
+    deploy:
+      resources:
+        limits:
+          memory: 480M
+
+  llm-qwen:
+    build:
+      context: .
+      dockerfile: llm-qwen/Dockerfile
+    ports:
+      - "8897:8080"
+    environment:
+      PORT: "8080"
+      LLAMA_CTX: "1024"
+      LLAMA_THREADS: "2"
+      LLAMA_BATCH: "256"
+      LLAMA_CACHE_TYPE_K: "q8_0"
+      LLAMA_CACHE_TYPE_V: "q8_0"
+    deploy:
+      resources:
+        limits:
+          memory: 480M
+
+  ai-gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8898:8080"
+    depends_on:
+      - llm-smol
+      - llm-qwen
+    environment:
+      PORT: "8080"
+      AI_SERVICE_INTERNAL_API_KEY: ${AI_SERVICE_INTERNAL_API_KEY:-dev-internal-ai-key}
+      LLM_SMOL_URL: http://llm-smol:8080
+      LLM_QWEN_URL: http://llm-qwen:8080
+      AI_DEFAULT_LLM: ${AI_DEFAULT_LLM:-smol}
+      AI_MAX_TOKENS: "512"
+      AI_TEMPERATURE: "0.7"
+      AI_REPEAT_PENALTY: "1.15"
+    deploy:
+      resources:
+        limits:
+          memory: 128M

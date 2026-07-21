@@ -1,0 +1,21 @@
+{
+  "tool": "CREATE_FLASHCARD",
+  "version": "1",
+  "artifact": "FLASHCARD_DECK",
+  "llmInstructions": "Reply with ONLY one JSON object. Each card needs non-empty front and back.",
+  "template": {
+    "tool": "CREATE_FLASHCARD",
+    "deckTitle": "",
+    "cards": [
+      { "front": "", "back": "" }
+    ]
+  },
+  "example": {
+    "tool": "CREATE_FLASHCARD",
+    "deckTitle": "Biology terms",
+    "cards": [
+      { "front": "Chlorophyll", "back": "Green pigment that absorbs light for photosynthesis" },
+      { "front": "Stomata", "back": "Pores on leaves for gas exchange" }
+    ]
+  }
+}
