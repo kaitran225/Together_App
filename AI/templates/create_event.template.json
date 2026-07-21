@@ -1,0 +1,30 @@
+{
+  "tool": "CREATE_EVENT",
+  "version": "1",
+  "artifact": "SCHEDULE",
+  "llmInstructions": "Reply with ONLY one JSON object. Use ISO-8601 UTC for startTime and endTime.",
+  "template": {
+    "tool": "CREATE_EVENT",
+    "event": {
+      "title": "",
+      "description": "",
+      "location": "",
+      "startTime": "",
+      "endTime": "",
+      "isAllDay": false,
+      "timezone": "UTC"
+    }
+  },
+  "example": {
+    "tool": "CREATE_EVENT",
+    "event": {
+      "title": "Biology review session",
+      "description": "Review photosynthesis flashcards",
+      "location": "Library",
+      "startTime": "2026-06-01T14:00:00Z",
+      "endTime": "2026-06-01T15:00:00Z",
+      "isAllDay": false,
+      "timezone": "UTC"
+    }
+  }
+}
