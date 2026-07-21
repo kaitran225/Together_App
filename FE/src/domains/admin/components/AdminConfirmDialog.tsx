@@ -1,4 +1,5 @@
 import { Button, Modal } from '../../../components/common'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 interface AdminConfirmDialogProps {
   open: boolean
@@ -13,22 +14,22 @@ export function AdminConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   onConfirm,
   onCancel,
 }: AdminConfirmDialogProps) {
+  const { t } = useTranslation()
   return (
     <Modal open={open} onClose={onCancel} title={title}>
       <p className="mb-4 text-sm text-neutral-700">{message}</p>
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" size="sm" onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? t('common.confirm')}
         </Button>
       </div>
     </Modal>
   )
 }
-

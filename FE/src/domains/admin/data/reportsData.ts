@@ -1,7 +1,7 @@
 export const reportsKpis = [
-  { label: 'New Users', value: '1,284', hint: '+12% vs last month' },
-  { label: 'New Subscriptions', value: '638', hint: '+8% vs last month' },
-  { label: 'Cancelled Subscriptions', value: '142', hint: '-3% vs last month' },
+  { labelKey: 'admin.reports.kpiNewUsers', value: '1,284', hintKey: 'admin.reports.kpiNewUsersHint' },
+  { labelKey: 'admin.reports.kpiNewSubs', value: '638', hintKey: 'admin.reports.kpiNewSubsHint' },
+  { labelKey: 'admin.reports.kpiCancelled', value: '142', hintKey: 'admin.reports.kpiCancelledHint' },
 ]
 
 export const newUsersByMonth = [
@@ -21,4 +21,3 @@ export const subscriptionsVsCancellation = [
   { label: 'May', series: { subscriptions: 350, cancellations: 43 } },
   { label: 'Jun', series: { subscriptions: 390, cancellations: 37 } },
 ]
-

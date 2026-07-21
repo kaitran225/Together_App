@@ -3,6 +3,7 @@ import { Button, Card, Input, Modal, Select, Switch, Table, TableBody, TableCell
 import { AdminActionToast, AdminPageSection } from '../components'
 import { useAdminActions } from '../hooks/useAdminActions'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 type CoinPackageForm = {
   packageId?: number
@@ -16,7 +17,6 @@ const initialCoinPackageForm: CoinPackageForm = {
   packageName: '', coinsAmount: '', priceVnd: '', isActive: true,
 }
 
-// 1. Cập nhật Type PlanForm để thêm isPopular
 type PlanForm = {
   planId?: number
   tierCode: string
@@ -29,19 +29,19 @@ type PlanForm = {
   features: string
 }
 
-// 2. Cập nhật initialPlanForm để khởi tạo giá trị cho isPopular
 const initialPlanForm: PlanForm = {
   tierCode: 'PRO', name: '', description: '', priceVnd: '', durationDays: '30', isActive: true, isPopular: false, features: '',
 }
 
 const tierOptions = [
-  {value: 'FREE', label: 'FREE'},
+  { value: 'FREE', label: 'FREE' },
   { value: 'PERSONAL', label: 'PLUS' },
   { value: 'TEAMS', label: 'TEAM' },
   { value: 'COMBO', label: 'COMBO' },
 ]
 
 export default function AdminBilling() {
+  const { t } = useTranslation()
   const { toast, showToast, closeToast } = useAdminActions()
 
   const [coinPackages, setCoinPackages] = useState<any[]>([])
@@ -83,7 +83,7 @@ export default function AdminBilling() {
   const handleSaveCoin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!coinForm.packageName.trim() || !coinForm.coinsAmount || !coinForm.priceVnd) {
-      showToast('Please complete name, coins and price.', 'error')
+      showToast(t('admin.billing.completeCoinFields'), 'error')
       return
     }
     setSavingCoin(true)
@@ -103,22 +103,21 @@ export default function AdminBilling() {
         ? await workflowApi.updateCoinPackage(coinForm.packageId, payload)
         : await workflowApi.createCoinPackage(payload)
       if (res.success) {
-        showToast(coinForm.packageId ? 'Coin package updated.' : 'Coin package created.', 'success')
+        showToast(coinForm.packageId ? t('admin.billing.coinUpdated') : t('admin.billing.coinCreated'), 'success')
         setShowCoinModal(false)
         await loadCoinPackages()
       } else {
-        showToast(res.message || 'Failed to save coin package.', 'error')
+        showToast(res.message || t('admin.billing.coinSaveFailed'), 'error')
       }
     } catch {
-      showToast('Error saving coin package.', 'error')
+      showToast(t('admin.billing.coinSaveError'), 'error')
     } finally {
       setSavingCoin(false)
     }
   }
 
   const openCreatePlan = () => { setPlanForm(initialPlanForm); setShowPlanModal(true) }
-  
-  // 3. Cập nhật openEditPlan để lấy giá trị isPopular từ dữ liệu trả về
+
   const openEditPlan = (p: any) => {
     setPlanForm({
       planId: p.planId,
@@ -134,11 +133,10 @@ export default function AdminBilling() {
     setShowPlanModal(true)
   }
 
-  // 4. Cập nhật handleSavePlan để gửi giá trị isPopular lên API
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!planForm.name.trim() || !planForm.priceVnd || !planForm.durationDays) {
-      showToast('Please complete name, price (VND) and duration days.', 'error')
+      showToast(t('admin.billing.completePlanFields'), 'error')
       return
     }
     setSavingPlan(true)
@@ -158,14 +156,14 @@ export default function AdminBilling() {
         ? await workflowApi.updateSubscriptionPlan(planForm.planId, payload)
         : await workflowApi.createSubscriptionPlan(payload)
       if (res.success) {
-        showToast(planForm.planId ? 'Subscription plan updated.' : 'Subscription plan created.', 'success')
+        showToast(planForm.planId ? t('admin.billing.planUpdated') : t('admin.billing.planCreated'), 'success')
         setShowPlanModal(false)
         await loadPlans()
       } else {
-        showToast(res.message || 'Failed to save plan.', 'error')
+        showToast(res.message || t('admin.billing.planSaveFailed'), 'error')
       }
     } catch {
-      showToast('Error saving plan.', 'error')
+      showToast(t('admin.billing.planSaveError'), 'error')
     } finally {
       setSavingPlan(false)
     }
@@ -174,32 +172,32 @@ export default function AdminBilling() {
   return (
     <div className="flex flex-col gap-4">
       <AdminPageSection
-        title="Coin Packages"
-        subtitle="Gói nạp coin (VND → coin). Chỉnh name, số coin nhận, giá, status."
-        action={<Button variant="primary" size="sm" onClick={openCreateCoin}>+ Create package</Button>}
+        title={t('admin.billing.coinPackages')}
+        subtitle={t('admin.billing.coinPackagesSubtitle')}
+        action={<Button variant="primary" size="sm" onClick={openCreateCoin}>{t('admin.billing.createPackage')}</Button>}
       >
         <Card className="p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell>Name</TableHeaderCell>
-                  <TableHeaderCell>Coins nhận</TableHeaderCell>
-                  <TableHeaderCell>Price (VND)</TableHeaderCell>
-                  <TableHeaderCell>Status</TableHeaderCell>
-                  <TableHeaderCell className="text-right">Actions</TableHeaderCell>
+                  <TableHeaderCell>{t('common.name')}</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.billing.coinsReceived')}</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.billing.priceVnd')}</TableHeaderCell>
+                  <TableHeaderCell>{t('common.status')}</TableHeaderCell>
+                  <TableHeaderCell className="text-right">{t('common.actions')}</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {coinPackages.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-neutral-500">No coin packages yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-6 text-sm text-neutral-500">{t('admin.billing.noCoinPackages')}</TableCell></TableRow>
                 ) : coinPackages.map((p) => (
                   <TableRow key={p.packageId}>
                     <TableCell>{p.packageName}</TableCell>
                     <TableCell>{p.coinsAmount}</TableCell>
                     <TableCell>{Number(p.priceVnd ?? 0).toLocaleString('vi-VN')}</TableCell>
-                    <TableCell>{p.isActive === false ? 'Inactive' : 'Active'}</TableCell>
-                    <TableCell className="text-right"><Button size="sm" variant="secondary" onClick={() => openEditCoin(p)}>Edit</Button></TableCell>
+                    <TableCell>{p.isActive === false ? t('common.inactive') : t('common.active')}</TableCell>
+                    <TableCell className="text-right"><Button size="sm" variant="secondary" onClick={() => openEditCoin(p)}>{t('common.edit')}</Button></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -209,40 +207,40 @@ export default function AdminBilling() {
       </AdminPageSection>
 
       <AdminPageSection
-        title="Subscription Plans"
-        subtitle="Gói đăng ký thanh toán bằng VND (PayOS). Chỉnh tier, name, description, số ngày, giá VND, features, status."
-        action={<Button variant="primary" size="sm" onClick={openCreatePlan}>+ Create plan</Button>}
+        title={t('admin.billing.subscriptionPlans')}
+        subtitle={t('admin.billing.subscriptionPlansSubtitle')}
+        action={<Button variant="primary" size="sm" onClick={openCreatePlan}>{t('admin.billing.createPlan')}</Button>}
       >
         <Card className="p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell>Tier</TableHeaderCell>
-                  <TableHeaderCell>Name</TableHeaderCell>
-                  <TableHeaderCell>Days</TableHeaderCell>
-                  <TableHeaderCell>Price (VND)</TableHeaderCell>
-                  <TableHeaderCell>Status</TableHeaderCell>
-                  <TableHeaderCell className="text-right">Actions</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.billing.tier')}</TableHeaderCell>
+                  <TableHeaderCell>{t('common.name')}</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.billing.days')}</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.billing.priceVnd')}</TableHeaderCell>
+                  <TableHeaderCell>{t('common.status')}</TableHeaderCell>
+                  <TableHeaderCell className="text-right">{t('common.actions')}</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {plans.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-6 text-sm text-neutral-500">No subscription plans yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-6 text-sm text-neutral-500">{t('admin.billing.noPlans')}</TableCell></TableRow>
                 ) : plans.map((p) => (
                   <TableRow key={p.planId}>
                     <TableCell>{p.tierCode}</TableCell>
                     <TableCell>
                       <div className="font-medium flex items-center gap-2">
                         {p.name}
-                        {p.isPopular && <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-1.5 py-0.5 rounded">Popular</span>}
+                        {p.isPopular && <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-1.5 py-0.5 rounded">{t('common.popular')}</span>}
                       </div>
                       {p.description && <div className="text-xs text-neutral-500 mt-0.5 line-clamp-1">{p.description}</div>}
                     </TableCell>
                     <TableCell>{p.durationDays ?? 30}</TableCell>
                     <TableCell>{Number(p.priceVnd ?? 0).toLocaleString('vi-VN')}</TableCell>
-                    <TableCell>{p.isActive === false ? 'Inactive' : 'Active'}</TableCell>
-                    <TableCell className="text-right"><Button size="sm" variant="secondary" onClick={() => openEditPlan(p)}>Edit</Button></TableCell>
+                    <TableCell>{p.isActive === false ? t('common.inactive') : t('common.active')}</TableCell>
+                    <TableCell className="text-right"><Button size="sm" variant="secondary" onClick={() => openEditPlan(p)}>{t('common.edit')}</Button></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -251,52 +249,44 @@ export default function AdminBilling() {
         </Card>
       </AdminPageSection>
 
-      <Modal open={showCoinModal} onClose={() => setShowCoinModal(false)} title={coinForm.packageId ? 'Edit coin package' : 'Create coin package'}>
+      <Modal open={showCoinModal} onClose={() => setShowCoinModal(false)} title={coinForm.packageId ? t('admin.billing.editCoinPackage') : t('admin.billing.createCoinPackage')}>
         <form onSubmit={handleSaveCoin} className="space-y-4">
-          <Input label="Name" value={coinForm.packageName} onChange={(e) => setCoinForm((p) => ({ ...p, packageName: e.target.value }))} />
-          <Input label="Số lượng coin nhận" type="number" value={coinForm.coinsAmount} onChange={(e) => setCoinForm((p) => ({ ...p, coinsAmount: e.target.value }))} />
-          <Input label="Price (VND)" type="number" value={coinForm.priceVnd} onChange={(e) => setCoinForm((p) => ({ ...p, priceVnd: e.target.value }))} />
-          <div className="flex items-center gap-2"><Switch checked={coinForm.isActive} onChange={(v) => setCoinForm((p) => ({ ...p, isActive: v }))} /><span className="text-sm">Active</span></div>
-          <Button type="submit" variant="primary" className="w-full" disabled={savingCoin}>{savingCoin ? 'Saving...' : 'Save'}</Button>
+          <Input label={t('common.name')} value={coinForm.packageName} onChange={(e) => setCoinForm((p) => ({ ...p, packageName: e.target.value }))} />
+          <Input label={t('admin.billing.coinsAmount')} type="number" value={coinForm.coinsAmount} onChange={(e) => setCoinForm((p) => ({ ...p, coinsAmount: e.target.value }))} />
+          <Input label={t('admin.billing.priceVnd')} type="number" value={coinForm.priceVnd} onChange={(e) => setCoinForm((p) => ({ ...p, priceVnd: e.target.value }))} />
+          <div className="flex items-center gap-2"><Switch checked={coinForm.isActive} onChange={(v) => setCoinForm((p) => ({ ...p, isActive: v }))} /><span className="text-sm">{t('common.active')}</span></div>
+          <Button type="submit" variant="primary" className="w-full" disabled={savingCoin}>{savingCoin ? t('common.saving') : t('common.save')}</Button>
         </form>
       </Modal>
 
-      {/* 5. Cập nhật giao diện Modal của Plan */}
-      <Modal open={showPlanModal} onClose={() => setShowPlanModal(false)} title={planForm.planId ? 'Edit subscription plan' : 'Create subscription plan'}>
+      <Modal open={showPlanModal} onClose={() => setShowPlanModal(false)} title={planForm.planId ? t('admin.billing.editPlan') : t('admin.billing.createPlanTitle')}>
         <form onSubmit={handleSavePlan} className="space-y-4">
-          <Select label="Tier" options={tierOptions} value={planForm.tierCode} onChange={(e) => setPlanForm((p) => ({ ...p, tierCode: e.target.value }))} />
-          <Input label="Name" value={planForm.name} onChange={(e) => setPlanForm((p) => ({ ...p, name: e.target.value }))} />
-          
-          <Input label="Description" value={planForm.description} onChange={(e) => setPlanForm((p) => ({ ...p, description: e.target.value }))} />
-          
+          <Select label={t('admin.billing.tier')} options={tierOptions} value={planForm.tierCode} onChange={(e) => setPlanForm((p) => ({ ...p, tierCode: e.target.value }))} />
+          <Input label={t('common.name')} value={planForm.name} onChange={(e) => setPlanForm((p) => ({ ...p, name: e.target.value }))} />
+          <Input label={t('common.description')} value={planForm.description} onChange={(e) => setPlanForm((p) => ({ ...p, description: e.target.value }))} />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Số ngày của gói" type="number" value={planForm.durationDays} onChange={(e) => setPlanForm((p) => ({ ...p, durationDays: e.target.value }))} />
-            <Input label="Price (VND)" type="number" value={planForm.priceVnd} onChange={(e) => setPlanForm((p) => ({ ...p, priceVnd: e.target.value }))} />
+            <Input label={t('admin.billing.durationDays')} type="number" value={planForm.durationDays} onChange={(e) => setPlanForm((p) => ({ ...p, durationDays: e.target.value }))} />
+            <Input label={t('admin.billing.priceVnd')} type="number" value={planForm.priceVnd} onChange={(e) => setPlanForm((p) => ({ ...p, priceVnd: e.target.value }))} />
           </div>
-
           <Textarea
-            label="Features (phân tách bằng dấu phẩy)"
+            label={t('admin.billing.featuresLabel')}
             rows={2}
-            placeholder="Không giới hạn phòng, AI không giới hạn, ..."
+            placeholder={t('admin.billing.featuresPlaceholder')}
             value={planForm.features}
             onChange={(e) => setPlanForm((p) => ({ ...p, features: e.target.value }))}
           />
-          
-          {/* Nhóm nút gạt Active và Popular */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Switch checked={planForm.isActive} onChange={(v) => setPlanForm((p) => ({ ...p, isActive: v }))} />
-              <span className="text-sm">Active</span>
+              <span className="text-sm">{t('common.active')}</span>
             </div>
-            
             <div className="flex items-center gap-2">
               <Switch checked={planForm.isPopular} onChange={(v) => setPlanForm((p) => ({ ...p, isPopular: v }))} />
-              <span className="text-sm">Popular</span>
+              <span className="text-sm">{t('common.popular')}</span>
             </div>
           </div>
-
           <Button type="submit" variant="primary" className="w-full" disabled={savingPlan}>
-            {savingPlan ? 'Saving...' : 'Save'}
+            {savingPlan ? t('common.saving') : t('common.save')}
           </Button>
         </form>
       </Modal>

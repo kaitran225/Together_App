@@ -3,8 +3,10 @@ import { Button, Modal, SegmentedControl, Table, TableBody, TableCell, TableHead
 import { AdminActionToast, AdminConfirmDialog, AdminPageSection, AdminStatusBadge } from '../components'
 import { useAdminActions } from '../hooks/useAdminActions'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function AdminModeration() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<'reported' | 'banned'>('reported')
   const [reportedUsers, setReportedUsers] = useState<any[]>([])
   const [bannedUsers, setBannedUsers] = useState<any[]>([])
@@ -24,7 +26,6 @@ export default function AdminModeration() {
       } else {
         const res = await workflowApi.getUsers()
         if (res.success && res.data) {
-          // Filter users who are Banned
           const banned = res.data.filter((u: any) => u.status?.toUpperCase() === 'BANNED')
           setBannedUsers(banned)
         }
@@ -45,29 +46,29 @@ export default function AdminModeration() {
     try {
       const res = await workflowApi.banReportedUser(pendingBanSso)
       if (res.success) {
-        showToast(`User ${pendingBanSso} has been banned successfully.`, 'warning')
+        showToast(t('admin.moderation.banSuccess', { sso: pendingBanSso }), 'warning')
         setPendingBanSso(null)
         loadData()
       } else {
-        showToast(res.message || 'Failed to ban user.', 'error')
+        showToast(res.message || t('admin.moderation.banFailed'), 'error')
       }
-    } catch (err) {
-      showToast('Error banning user.', 'error')
+    } catch {
+      showToast(t('admin.moderation.banError'), 'error')
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
       <AdminPageSection
-        title="Moderation"
-        subtitle="Review reports and ban records"
+        title={t('admin.moderation.title')}
+        subtitle={t('admin.moderation.subtitle')}
         action={
           <SegmentedControl
             value={tab}
             onChange={(v) => setTab(v as 'reported' | 'banned')}
             options={[
-              { value: 'reported', label: 'Reported Users' },
-              { value: 'banned', label: 'Banned Users' },
+              { value: 'reported', label: t('admin.moderation.reportedUsers') },
+              { value: 'banned', label: t('admin.moderation.bannedUsers') },
             ]}
           />
         }
@@ -79,15 +80,15 @@ export default function AdminModeration() {
             </div>
           ) : tab === 'reported' ? (
             reportedUsers.length === 0 ? (
-              <p className="text-sm text-neutral-500 text-center py-8">Không có báo cáo nào chưa xử lý.</p>
+              <p className="text-sm text-neutral-500 text-center py-8">{t('admin.moderation.noReports')}</p>
             ) : (
               <Table className="min-w-[760px]">
                 <TableHead>
                   <TableRow className="bg-transparent">
-                    <TableHeaderCell>User SSO</TableHeaderCell>
-                    <TableHeaderCell>Username / Name</TableHeaderCell>
-                    <TableHeaderCell>Reason</TableHeaderCell>
-                    <TableHeaderCell>Action</TableHeaderCell>
+                    <TableHeaderCell>{t('admin.moderation.userSso')}</TableHeaderCell>
+                    <TableHeaderCell>{t('admin.moderation.usernameName')}</TableHeaderCell>
+                    <TableHeaderCell>{t('admin.moderation.reason')}</TableHeaderCell>
+                    <TableHeaderCell>{t('admin.moderation.action')}</TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -103,24 +104,26 @@ export default function AdminModeration() {
                             size="sm"
                             onClick={() =>
                               setSelectedCase({
-                                title: `Report Detail`,
+                                title: t('admin.moderation.reportDetail'),
                                 details: [
-                                  `Report ID: ${row.reportId}`,
-                                  `Reported User SSO: ${row.reportedUserSso}`,
-                                  `Username: ${row.username || 'N/A'}`,
-                                  `Email: ${row.email || 'N/A'}`,
-                                  `Reporter SSO: ${row.reporterSso}`,
-                                  `Reason: ${row.reason}`,
-                                  `Room ID: ${row.roomId || 'None'}`,
-                                  `Status: ${row.status}`,
-                                  `Created At: ${row.createdAt ? new Date(row.createdAt).toLocaleString('vi-VN') : '—'}`,
+                                  t('admin.moderation.reportId', { id: row.reportId }),
+                                  t('admin.moderation.reportedUserSso', { sso: row.reportedUserSso }),
+                                  t('admin.moderation.usernameLine', { name: row.username || t('common.na') }),
+                                  t('admin.moderation.emailLine', { email: row.email || t('common.na') }),
+                                  t('admin.moderation.reporterSso', { sso: row.reporterSso }),
+                                  t('admin.moderation.reasonLine', { reason: row.reason }),
+                                  t('admin.moderation.roomIdLine', { room: row.roomId || t('common.noneValue') }),
+                                  t('admin.moderation.statusLine', { status: row.status }),
+                                  t('admin.moderation.createdAtLine', {
+                                    date: row.createdAt ? new Date(row.createdAt).toLocaleString('vi-VN') : '—',
+                                  }),
                                 ],
                               })
                             }
                           >
-                            View
+                            {t('common.view')}
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setPendingBanSso(row.reportedUserSso)}>Ban</Button>
+                          <Button variant="ghost" size="sm" onClick={() => setPendingBanSso(row.reportedUserSso)}>{t('common.ban')}</Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -129,15 +132,15 @@ export default function AdminModeration() {
               </Table>
             )
           ) : bannedUsers.length === 0 ? (
-            <p className="text-sm text-neutral-500 text-center py-8">Không có người dùng bị cấm.</p>
+            <p className="text-sm text-neutral-500 text-center py-8">{t('admin.moderation.noBanned')}</p>
           ) : (
             <Table className="min-w-[760px]">
               <TableHead>
                 <TableRow className="bg-transparent">
-                  <TableHeaderCell>User SSO</TableHeaderCell>
-                  <TableHeaderCell>Username / Name</TableHeaderCell>
-                  <TableHeaderCell>Email</TableHeaderCell>
-                  <TableHeaderCell>Status</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.moderation.userSso')}</TableHeaderCell>
+                  <TableHeaderCell>{t('admin.moderation.usernameName')}</TableHeaderCell>
+                  <TableHeaderCell>{t('common.email')}</TableHeaderCell>
+                  <TableHeaderCell>{t('common.status')}</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -154,7 +157,7 @@ export default function AdminModeration() {
           )}
         </div>
       </AdminPageSection>
-      <Modal open={!!selectedCase} onClose={() => setSelectedCase(null)} title={selectedCase?.title ?? 'Case detail'}>
+      <Modal open={!!selectedCase} onClose={() => setSelectedCase(null)} title={selectedCase?.title ?? t('admin.moderation.caseDetail')}>
         <div className="space-y-2 text-sm text-neutral-700">
           {selectedCase?.details.map((line) => (
             <p key={line} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-charcoal)] px-3 py-2 text-neutral-100">
@@ -165,9 +168,9 @@ export default function AdminModeration() {
       </Modal>
       <AdminConfirmDialog
         open={!!pendingBanSso}
-        title="Ban Reported User"
-        message={pendingBanSso ? `Confirm ban for user SSO ${pendingBanSso}?` : ''}
-        confirmLabel="Ban"
+        title={t('admin.moderation.banReportedTitle')}
+        message={pendingBanSso ? t('admin.moderation.banConfirm', { sso: pendingBanSso }) : ''}
+        confirmLabel={t('common.ban')}
         onCancel={() => setPendingBanSso(null)}
         onConfirm={handleConfirmBan}
       />

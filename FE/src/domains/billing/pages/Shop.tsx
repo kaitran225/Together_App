@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 const PACK_ICONS = [
   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -13,6 +14,7 @@ const PACK_ICONS = [
 ]
 
 export default function Shop() {
+  const { t } = useTranslation()
   const [balance, setBalance] = useState<number>(0)
   const [packages, setPackages] = useState<any[]>([])
 
@@ -31,11 +33,11 @@ export default function Shop() {
       if (res.success && res.data && res.data.checkoutUrl) {
         window.location.href = res.data.checkoutUrl
       } else {
-        alert("Có lỗi khi tạo link thanh toán.")
+        alert(t('shop.checkoutError'))
       }
     } catch (e) {
       console.error(e)
-      alert("Có lỗi kết nối với PayOS.")
+      alert(t('shop.payosError'))
     }
   }
 
@@ -44,10 +46,10 @@ export default function Shop() {
       {/* Heading — compact */}
       <div className="flex flex-col items-center gap-2 pb-5 sm:pb-6">
         <h1 className="text-center text-xl font-bold uppercase tracking-tight text-neutral-900 sm:text-2xl">
-          Mua xu
+          {t('shop.title')}
         </h1>
         <p className="rounded-md border border-white/10 bg-[var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-neutral-900">
-          {balance.toLocaleString()} Coins
+          {balance.toLocaleString()} {t('shop.coins')}
         </p>
       </div>
 
@@ -65,7 +67,7 @@ export default function Shop() {
             {pack.isPopular && (
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 rounded bg-primary px-2 py-1">
                 <span className="text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                  Phổ biến nhất
+                  {t('shop.mostPopular')}
                 </span>
               </div>
             )}
@@ -77,15 +79,15 @@ export default function Shop() {
                 {pack.packageName}
               </h3>
               <p className="mb-0.5 text-lg font-bold leading-8 text-neutral-900 sm:text-xl">
-                {pack.coinsAmount.toLocaleString()} Xu
+                {pack.coinsAmount.toLocaleString()} {t('shop.coins')}
               </p>
               {pack.bonusCoins > 0 && (
                 <p className="mb-1 text-xs font-semibold text-green-600">
-                  + {pack.bonusCoins.toLocaleString()} Xu Bonus
+                  {t('shop.bonusCoins', { count: pack.bonusCoins.toLocaleString() })}
                 </p>
               )}
               <p className="mb-4 text-sm text-neutral-600">
-                {pack.priceVnd.toLocaleString()} VND
+                {t('shop.currencyVnd', { amount: pack.priceVnd.toLocaleString() })}
               </p>
             </div>
             <Button
@@ -94,7 +96,7 @@ export default function Shop() {
               className="w-full uppercase"
               onClick={() => handleBuy(pack.packageId)}
             >
-              Mua
+              {t('shop.buy')}
             </Button>
           </div>
         ))}
@@ -104,10 +106,10 @@ export default function Shop() {
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-neutral-500">
         <div className="flex flex-wrap gap-4">
           <Link to="/transaction" className="font-medium text-neutral-900 hover:underline">
-            Lịch sử giao dịch
+            {t('shop.history')}
           </Link>
-          <a href="#" className="text-neutral-500 hover:underline">Điều khoản dịch vụ</a>
-          <a href="#" className="text-neutral-500 hover:underline">Hỗ trợ</a>
+          <a href="#" className="text-neutral-500 hover:underline">{t('shop.termsOfService')}</a>
+          <a href="#" className="text-neutral-500 hover:underline">{t('shop.support')}</a>
         </div>
       </footer>
     </div>

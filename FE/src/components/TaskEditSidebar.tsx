@@ -3,6 +3,7 @@ import { Button, CloseIcon } from './common'
 import { DEFAULT_STATUS_OPTIONS } from '../mocks'
 import { workflowApi } from '../api/client'
 import type { TaskSubmissionResponse } from '../types/dto'
+import { useTranslation } from '../contexts/LanguageContext'
 
 /** Shared task shape for the edit sidebar (Scrum + Sprint) */
 export type TaskForEdit = {
@@ -74,6 +75,8 @@ export function TaskEditSidebar({
   onWorkflowChange,
   onDeleted,
 }: TaskEditSidebarProps) {
+  const { t, language } = useTranslation()
+  const locale = language === 'vi' ? 'vi-VN' : 'en-US'
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.desc ?? task.description ?? '')
   const [assignee, setAssignee] = useState(task.assignee)
@@ -106,7 +109,7 @@ export function TaskEditSidebar({
   const isEditable = phase === 'TODO' || phase === 'IN_PROGRESS' || phase === 'IN_REVIEW'
 
   const getMemberName = (userSso?: string | null) => {
-    if (!userSso) return 'Unknown'
+    if (!userSso) return t('tasks.unknown')
     return members?.find((m) => m.id === userSso)?.name || userSso
   }
 
@@ -189,7 +192,7 @@ export function TaskEditSidebar({
     }
     const maxBytes = 2 * 1024 * 1024
     if (file.size > maxBytes) {
-      setWorkflowError('File tối đa 2MB. Với file lớn hơn, hãy dán link Drive/GitHub.')
+      setWorkflowError(t('tasks.fileMaxSize'))
       setSubmitFileMeta({ name: file.name, size: file.size })
       return
     }
@@ -212,10 +215,10 @@ export function TaskEditSidebar({
     if (!taskId) return
     const content =
       submitContent.trim() ||
-      (submitLink.trim() ? `Link bài làm: ${submitLink.trim()}` : '') ||
-      (submitFileMeta ? `File: ${submitFileMeta.name}` : '')
+      (submitLink.trim() ? t('tasks.submitLinkPrefix', { url: submitLink.trim() }) : '') ||
+      (submitFileMeta ? t('tasks.submitFilePrefix', { name: submitFileMeta.name }) : '')
     if (!content) {
-      setWorkflowError('Nhập mô tả bài làm, dán link hoặc chọn tệp.')
+      setWorkflowError(t('tasks.submitContentRequired'))
       return
     }
     setSubmitBusy(true)
@@ -230,10 +233,10 @@ export function TaskEditSidebar({
         await loadSubmissions()
         onWorkflowChange?.()
       } else {
-        setWorkflowError(res.message || 'Nộp bài thất bại.')
+        setWorkflowError(res.message || t('tasks.submitFailed'))
       }
     } catch (e: any) {
-      setWorkflowError(e?.message || 'Nộp bài thất bại.')
+      setWorkflowError(e?.message || t('tasks.submitFailed'))
     } finally {
       setSubmitBusy(false)
     }
@@ -247,7 +250,8 @@ export function TaskEditSidebar({
       const res = await workflowApi.evaluateSubmission(
         submissionId,
         Number.isFinite(grade) ? grade : 0,
-        reviewFeedback.trim() || (decision === 'APPROVED' ? 'Đạt yêu cầu' : 'Cần chỉnh sửa'),
+        reviewFeedback.trim() ||
+          (decision === 'APPROVED' ? t('tasks.approveDefaultFeedback') : t('tasks.rejectDefaultFeedback')),
         decision
       )
       if (res.success) {
@@ -255,10 +259,10 @@ export function TaskEditSidebar({
         await loadSubmissions()
         onWorkflowChange?.()
       } else {
-        setWorkflowError(res.message || 'Đánh giá thất bại.')
+        setWorkflowError(res.message || t('tasks.evaluateFailed'))
       }
     } catch (e: any) {
-      setWorkflowError(e?.message || 'Đánh giá thất bại.')
+      setWorkflowError(e?.message || t('tasks.evaluateFailed'))
     } finally {
       setReviewBusy(false)
     }
@@ -266,7 +270,7 @@ export function TaskEditSidebar({
 
   const handleDelete = async () => {
     if (!taskId || !isOwner) return
-    if (!window.confirm('Xóa task này? Hành động không thể hoàn tác.')) return
+    if (!window.confirm(t('tasks.deleteConfirm'))) return
     setDeleteBusy(true)
     setWorkflowError('')
     try {
@@ -275,10 +279,10 @@ export function TaskEditSidebar({
         onDeleted?.()
         onClose()
       } else {
-        setWorkflowError(res.message || 'Xóa task thất bại.')
+        setWorkflowError(res.message || t('tasks.deleteFailed'))
       }
     } catch (e: any) {
-      setWorkflowError(e?.message || 'Xóa task thất bại.')
+      setWorkflowError(e?.message || t('tasks.deleteFailed'))
     } finally {
       setDeleteBusy(false)
     }
@@ -298,14 +302,14 @@ export function TaskEditSidebar({
     if (!item.dataUrl) return
     const win = window.open()
     if (!win) return
-    const title = item.name || 'attachment'
+    const fileTitle = item.name || 'attachment'
     if (item.dataUrl.startsWith('data:image/')) {
       win.document.write(
-        `<!doctype html><title>${title}</title><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="${item.dataUrl}" alt="${title}" style="max-width:100%;max-height:100vh;object-fit:contain"/></body>`
+        `<!doctype html><title>${fileTitle}</title><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="${item.dataUrl}" alt="${fileTitle}" style="max-width:100%;max-height:100vh;object-fit:contain"/></body>`
       )
     } else if (item.dataUrl.startsWith('data:application/pdf')) {
       win.document.write(
-        `<!doctype html><title>${title}</title><body style="margin:0"><iframe src="${item.dataUrl}" style="border:0;width:100%;height:100vh"></iframe></body>`
+        `<!doctype html><title>${fileTitle}</title><body style="margin:0"><iframe src="${item.dataUrl}" style="border:0;width:100%;height:100vh"></iframe></body>`
       )
     } else {
       win.location.href = item.dataUrl
@@ -344,7 +348,7 @@ export function TaskEditSidebar({
               </a>
             ) : (
               <>
-                <span className="text-neutral-700">📎 {item.name || 'Tệp đính kèm'}</span>
+                <span className="text-neutral-700">📎 {item.name || t('tasks.attachment')}</span>
                 {allowFileActions && item.dataUrl && (
                   <>
                     <button
@@ -352,19 +356,19 @@ export function TaskEditSidebar({
                       className="underline text-primary"
                       onClick={() => openFileViewer(item)}
                     >
-                      Xem
+                      {t('tasks.view')}
                     </button>
                     <button
                       type="button"
                       className="underline text-primary"
                       onClick={() => downloadFile(item)}
                     >
-                      Tải về
+                      {t('tasks.download')}
                     </button>
                   </>
                 )}
                 {allowFileActions && !item.dataUrl && (
-                  <span className="text-neutral-400">(không có dữ liệu xem/tải)</span>
+                  <span className="text-neutral-400">{t('tasks.noFileData')}</span>
                 )}
               </>
             )}
@@ -376,10 +380,10 @@ export function TaskEditSidebar({
 
   const renderAssigneeField = () => (
     <div>
-      <label className={labelClass}>Assignee{!isOwner ? ' (chỉ Owner được giao)' : ''}</label>
+      <label className={labelClass}>{isOwner ? t('tasks.assignee') : t('tasks.assigneeOwnerOnly')}</label>
       {isOwner && isEditable && members && members.length > 0 ? (
         <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={inputClass}>
-          <option value="">Unassigned</option>
+          <option value="">{t('tasks.unassigned')}</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
@@ -388,7 +392,7 @@ export function TaskEditSidebar({
         </select>
       ) : members && members.length > 0 ? (
         <div className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-neutral-50 text-neutral-700">
-          {members.find((m) => m.id === assignee)?.name || assignee || 'Unassigned'}
+          {members.find((m) => m.id === assignee)?.name || assignee || t('tasks.unassigned')}
         </div>
       ) : assigneeDisplay ? (
         <div className="rounded-lg border border-neutral-200 bg-neutral-50/80 p-2">
@@ -396,7 +400,7 @@ export function TaskEditSidebar({
         </div>
       ) : (
         <div className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-neutral-50 text-neutral-700">
-          {assignee || 'Unassigned'}
+          {assignee || t('tasks.unassigned')}
         </div>
       )}
     </div>
@@ -405,30 +409,30 @@ export function TaskEditSidebar({
   const renderCoreFields = () => (
     <section className="space-y-1.5">
       <div>
-        <label className={labelClass}>Title</label>
+        <label className={labelClass}>{t('tasks.title')}</label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           readOnly={isDone}
           className={`${inputClass} ${isDone ? 'bg-neutral-50' : ''}`}
-          placeholder="Task title"
+          placeholder={t('tasks.titlePlaceholder')}
         />
       </div>
       <div>
-        <label className={labelClass}>Description</label>
+        <label className={labelClass}>{t('tasks.description')}</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           readOnly={isDone}
           rows={3}
           className={`${inputClass} resize-y min-h-[60px] ${isDone ? 'bg-neutral-50' : ''}`}
-          placeholder="Add a description..."
+          placeholder={t('tasks.descriptionPlaceholder')}
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={labelClass}>Status</label>
+          <label className={labelClass}>{t('tasks.status')}</label>
           {isDone || !isEditable || lockWorkflowFields ? (
             <div className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-neutral-50 text-neutral-700">
               {status || phase}
@@ -444,21 +448,21 @@ export function TaskEditSidebar({
             </select>
           )}
           {lockWorkflowFields && !isDone && (
-            <p className="text-[9px] text-neutral-400 mt-0.5">Đã giao — không đổi status tại đây</p>
+            <p className="text-[9px] text-neutral-400 mt-0.5">{t('tasks.statusLockedHint')}</p>
           )}
         </div>
         <div>
-          <label className={labelClass}>Priority</label>
+          <label className={labelClass}>{t('tasks.priority')}</label>
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
             disabled={isDone || lockWorkflowFields}
             className={`${inputClass} ${isDone || lockWorkflowFields ? 'bg-neutral-50' : ''}`}
           >
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-            <option value="Urgent">Urgent</option>
+            <option value="Low">{t('tasks.priorityLow')}</option>
+            <option value="Medium">{t('tasks.priorityMedium')}</option>
+            <option value="High">{t('tasks.priorityHigh')}</option>
+            <option value="Urgent">{t('tasks.priorityUrgent')}</option>
           </select>
         </div>
       </div>
@@ -470,14 +474,14 @@ export function TaskEditSidebar({
     <div className="flex flex-col h-full bg-white rounded-lg border border-neutral-200 shadow-sm overflow-hidden">
       <div className="shrink-0 flex items-start justify-between gap-1.5 p-2 border-b border-neutral-200">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[10px] font-bold uppercase tracking-wide text-neutral-500 mb-0.5">Chi tiết Task</h2>
+          <h2 className="text-[10px] font-bold uppercase tracking-wide text-neutral-500 mb-0.5">{t('tasks.detailTitle')}</h2>
           <p className="text-xs font-semibold text-neutral-900 truncate">{task.title}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="p-1.5 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
-          aria-label="Close"
+          aria-label={t('common.close')}
         >
           <CloseIcon className="w-4 h-4" />
         </button>
@@ -492,7 +496,7 @@ export function TaskEditSidebar({
         {(phase === 'TODO' || phase === 'IN_PROGRESS' || phase === 'IN_REVIEW' || phase === 'OTHER') && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className={labelClass}>Start date</label>
+              <label className={labelClass}>{t('tasks.startDate')}</label>
               <input
                 type="date"
                 value={startDate}
@@ -502,7 +506,7 @@ export function TaskEditSidebar({
               />
             </div>
             <div>
-              <label className={labelClass}>End date</label>
+              <label className={labelClass}>{t('tasks.endDate')}</label>
               <input
                 type="date"
                 value={endDate}
@@ -517,7 +521,7 @@ export function TaskEditSidebar({
         {/* In Progress: nộp bài */}
         {phase === 'IN_PROGRESS' && taskId && (
           <section className="rounded-md border border-neutral-200 bg-neutral-50/80 p-2 space-y-2">
-            <h3 className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">Nộp bài</h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">{t('tasks.submitWork')}</h3>
             {canSubmit ? (
               <div className="space-y-1.5">
                 <textarea
@@ -525,17 +529,17 @@ export function TaskEditSidebar({
                   onChange={(e) => setSubmitContent(e.target.value)}
                   rows={2}
                   className={inputClass}
-                  placeholder="Mô tả bài làm..."
+                  placeholder={t('tasks.submitPlaceholder')}
                 />
                 <input
                   type="url"
                   value={submitLink}
                   onChange={(e) => setSubmitLink(e.target.value)}
                   className={inputClass}
-                  placeholder="Dán link (Google Drive, GitHub, ...)"
+                  placeholder={t('tasks.linkPlaceholder')}
                 />
                 <div>
-                  <label className={labelClass}>Hoặc upload tệp (≤ 2MB)</label>
+                  <label className={labelClass}>{t('tasks.uploadFileLabel')}</label>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -544,7 +548,10 @@ export function TaskEditSidebar({
                   />
                   {submitFileMeta && (
                     <p className="text-[9px] text-neutral-500 mt-0.5">
-                      Đã chọn: {submitFileMeta.name} ({Math.round(submitFileMeta.size / 1024)} KB)
+                      {t('tasks.fileSelected', {
+                        name: submitFileMeta.name,
+                        size: Math.round(submitFileMeta.size / 1024),
+                      })}
                     </p>
                   )}
                 </div>
@@ -555,17 +562,17 @@ export function TaskEditSidebar({
                   disabled={submitBusy}
                   onClick={handleSubmitWork}
                 >
-                  {submitBusy ? 'Đang nộp...' : 'Nộp bài → In Review'}
+                  {submitBusy ? t('tasks.submitting') : t('tasks.submitToReview')}
                 </Button>
               </div>
             ) : (
               <p className="text-[10px] text-neutral-500">
-                Chỉ thành viên được giao task mới được nộp bài.
+                {t('tasks.submitAssigneeOnly')}
               </p>
             )}
             {submissions.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-neutral-700">Lịch sử nộp</p>
+                <p className="text-[10px] font-semibold text-neutral-700">{t('tasks.submissionHistory')}</p>
                 {submissions.map((s) => (
                   <div key={s.submissionId} className="rounded border border-neutral-200 bg-white p-1.5 space-y-1">
                     <p className="text-[9px] font-medium text-neutral-500">
@@ -585,22 +592,23 @@ export function TaskEditSidebar({
         {/* In Review: review + grade */}
         {phase === 'IN_REVIEW' && taskId && (
           <section className="rounded-md border border-amber-200 bg-amber-50/50 p-2 space-y-2">
-            <h3 className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Review</h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-wide text-amber-700">{t('tasks.review')}</h3>
             {submissions.length === 0 ? (
-              <p className="text-[10px] text-neutral-500">Chưa có bài nộp.</p>
+              <p className="text-[10px] text-neutral-500">{t('tasks.noSubmissions')}</p>
             ) : (
               submissions.map((s) => {
                 return (
                   <div key={s.submissionId} className="rounded border border-neutral-200 bg-white p-1.5 space-y-1">
                     <p className="text-[10px] font-medium text-neutral-500">
                       {getMemberName(s.userSso)} · {s.status}
-                      {s.submittedAt ? ` · ${new Date(s.submittedAt).toLocaleString('vi-VN')}` : ''}
+                      {s.submittedAt ? ` · ${new Date(s.submittedAt).toLocaleString(locale)}` : ''}
                     </p>
                     <p className="text-[10px] text-neutral-800 whitespace-pre-wrap">{s.content}</p>
                     {renderAttachments(s.attachments, { allowFileActions: isOwner })}
                     {s.grade != null && (
                       <p className="text-[9px] text-neutral-600">
-                        Điểm: {s.grade}{s.feedback ? ` · ${s.feedback}` : ''}
+                        {t('tasks.grade', { grade: s.grade })}
+                        {s.feedback ? ` · ${s.feedback}` : ''}
                       </p>
                     )}
                     {canReview && String(s.status).toUpperCase() === 'PENDING' && (
@@ -614,14 +622,14 @@ export function TaskEditSidebar({
                             value={reviewGrade}
                             onChange={(e) => setReviewGrade(e.target.value)}
                             className={inputClass}
-                            placeholder="Điểm"
+                            placeholder={t('tasks.gradePlaceholder')}
                           />
                           <input
                             type="text"
                             value={reviewFeedback}
                             onChange={(e) => setReviewFeedback(e.target.value)}
                             className={inputClass}
-                            placeholder="Nhận xét"
+                            placeholder={t('tasks.feedbackPlaceholder')}
                           />
                         </div>
                         <div className="flex gap-1">
@@ -632,7 +640,7 @@ export function TaskEditSidebar({
                             disabled={reviewBusy}
                             onClick={() => handleEvaluate(s.submissionId, 'APPROVED')}
                           >
-                            Duyệt → Done
+                            {t('tasks.approveDone')}
                           </Button>
                           <Button
                             variant="ghost"
@@ -641,7 +649,7 @@ export function TaskEditSidebar({
                             disabled={reviewBusy}
                             onClick={() => handleEvaluate(s.submissionId, 'REJECTED')}
                           >
-                            Từ chối
+                            {t('tasks.reject')}
                           </Button>
                         </div>
                       </div>
@@ -651,7 +659,7 @@ export function TaskEditSidebar({
               })
             )}
             {!isOwner && (
-              <p className="text-[10px] text-neutral-500">Chỉ Owner được chấm điểm / duyệt bài.</p>
+              <p className="text-[10px] text-neutral-500">{t('tasks.ownerReviewOnly')}</p>
             )}
           </section>
         )}
@@ -660,26 +668,26 @@ export function TaskEditSidebar({
         {isDone && (
           <section className="space-y-1.5 rounded-md border border-emerald-200 bg-emerald-50/40 p-2">
             <div>
-              <label className={labelClass}>Completed date</label>
+              <label className={labelClass}>{t('tasks.completedDate')}</label>
               <div className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white text-neutral-800">
                 {completed ||
                   (task.completedAt
-                    ? new Date(String(task.completedAt)).toLocaleString('vi-VN')
+                    ? new Date(String(task.completedAt)).toLocaleString(locale)
                     : '—')}
               </div>
             </div>
             <div>
-              <label className={labelClass}>Actual hours</label>
+              <label className={labelClass}>{t('tasks.actualHours')}</label>
               <div className="w-full px-2 py-1.5 text-xs border border-neutral-200 rounded-md bg-white text-neutral-800 font-semibold">
-                {actualHours != null ? `${actualHours} h` : '—'}
+                {actualHours != null ? t('tasks.hoursValue', { hours: actualHours }) : '—'}
               </div>
               <p className="text-[9px] text-neutral-500 mt-0.5">
-                Tính từ lúc task vào In Progress đến khi Done.
+                {t('tasks.actualHoursHint')}
               </p>
             </div>
             {submissions.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-neutral-700">Bài đã duyệt</p>
+                <p className="text-[10px] font-semibold text-neutral-700">{t('tasks.approvedWork')}</p>
                 {submissions.map((s) => (
                   <div key={s.submissionId} className="rounded border border-neutral-200 bg-white p-1.5 space-y-1">
                     <p className="text-[9px] font-medium text-neutral-500">{getMemberName(s.userSso)}</p>
@@ -687,7 +695,7 @@ export function TaskEditSidebar({
                     {renderAttachments(s.attachments, { allowFileActions: isOwner })}
                     <p className="text-[9px] text-neutral-500">
                       {s.status}
-                      {s.grade != null ? ` · Điểm: ${s.grade}` : ''}
+                      {s.grade != null ? ` · ${t('tasks.grade', { grade: s.grade })}` : ''}
                     </p>
                   </div>
                 ))}
@@ -700,7 +708,7 @@ export function TaskEditSidebar({
       <div className="shrink-0 flex gap-1.5 p-2 border-t border-neutral-200">
         {!isDone && (
           <Button variant="primary" size="sm" className="flex-1 py-1 text-xs h-7" onClick={handleSave}>
-            Save
+            {t('common.save')}
           </Button>
         )}
         {isDone && isOwner && taskId && (
@@ -711,11 +719,11 @@ export function TaskEditSidebar({
             disabled={deleteBusy}
             onClick={handleDelete}
           >
-            {deleteBusy ? 'Đang xóa...' : 'Xóa task'}
+            {deleteBusy ? t('tasks.deleting') : t('tasks.deleteTask')}
           </Button>
         )}
         <Button variant="ghost" size="sm" className="py-1 text-xs h-7" onClick={onClose}>
-          {isDone ? 'Đóng' : 'Cancel'}
+          {isDone ? t('common.close') : t('common.cancel')}
         </Button>
       </div>
     </div>

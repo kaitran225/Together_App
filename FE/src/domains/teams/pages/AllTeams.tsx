@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button, Input, Modal, Card, Checkbox } from '../../../components/common'
 import { myTeamsData, archivedData } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 function MyTeamCard({
   id,
@@ -21,7 +22,10 @@ function MyTeamCard({
   avatarUrl?: string
   memberPreviews?: { userSso: string; nickname?: string; avatarUrl?: string }[]
 }) {
+  const { t } = useTranslation()
   const previews = memberPreviews.slice(0, 3)
+  const tagLabel =
+    tag === 'PRIVATE' ? t('teams.tagPrivate') : tag === 'PUBLIC' ? t('teams.tagPublic') : tag
   return (
     <Link
       to={`/teams/board?teamId=${id}`}
@@ -29,7 +33,7 @@ function MyTeamCard({
     >
       <div className="p-3 pb-2">
         <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] bg-[var(--color-charcoal)] border border-[var(--color-border)] text-neutral-800">
-          {tag}
+          {tagLabel}
         </span>
       </div>
       <div className="px-3 pb-3 flex flex-col flex-1 min-h-0">
@@ -69,12 +73,12 @@ function MyTeamCard({
             })}
           </div>
           <span className="text-[10px] font-bold text-neutral-700 uppercase tracking-[0.06em]">
-            {members} members
+            {t('teams.membersCount', { count: members })}
           </span>
         </div>
         <div className="mt-2">
           <span className="inline-flex items-center rounded-full bg-primary/20 text-neutral-900 px-2 py-0.5 text-[10px] font-semibold">
-            Go to board
+            {t('teams.goToBoard')}
           </span>
         </div>
       </div>
@@ -83,6 +87,7 @@ function MyTeamCard({
 }
 
 function ArchivedCard({ name, active }: (typeof archivedData)[0]) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] p-2.5 hover:border-neutral-400 transition-colors shadow-none">
       <p className="text-xs font-semibold text-neutral-900 truncate">{name}</p>
@@ -91,7 +96,7 @@ function ArchivedCard({ name, active }: (typeof archivedData)[0]) {
       </span>
       <Link to="/teams/board" className="mt-auto pt-2">
         <Button variant="secondary" size="sm" className="w-full py-1 text-xs h-7 font-semibold">
-          Go to study
+          {t('teams.goToStudy')}
         </Button>
       </Link>
     </div>
@@ -99,6 +104,7 @@ function ArchivedCard({ name, active }: (typeof archivedData)[0]) {
 }
 
 export default function AllTeams() {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [teams, setTeams] = useState<any[]>([])
   const [createOpen, setCreateOpen] = useState(false)
@@ -116,14 +122,14 @@ export default function AllTeams() {
     workflowApi.getMyTeams()
       .then((res) => {
         if (res.success && res.data) {
-          const mapped = res.data.map((t: any) => ({
-            id: String(t.teamId),
-            tag: t.isPrivate ? 'PRIVATE' : 'PUBLIC',
-            code: t.name,
-            subtitle: t.description || '',
-            members: t.currentMemberCount || 1,
-            avatarUrl: t.avatarUrl || undefined,
-            memberPreviews: Array.isArray(t.memberPreviews) ? t.memberPreviews : [],
+          const mapped = res.data.map((team: any) => ({
+            id: String(team.teamId),
+            tag: team.isPrivate ? 'PRIVATE' : 'PUBLIC',
+            code: team.name,
+            subtitle: team.description || '',
+            members: team.currentMemberCount || 1,
+            avatarUrl: team.avatarUrl || undefined,
+            memberPreviews: Array.isArray(team.memberPreviews) ? team.memberPreviews : [],
           }))
           const isMock = import.meta.env.VITE_USE_MOCK === 'true'
           if (mapped.length > 0) {
@@ -148,7 +154,7 @@ export default function AllTeams() {
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim()) {
-      setError('Team name is required.')
+      setError(t('teams.nameRequired'))
       return
     }
     setError('')
@@ -170,10 +176,10 @@ export default function AllTeams() {
         setNewTeamMaxMembers(4)
         loadTeams()
       } else {
-        setError(res.message || 'Failed to create team.')
+        setError(res.message || t('teams.createFailed'))
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred.')
+      setError(err.message || t('teams.errorOccurred'))
     } finally {
       setLoading(false)
     }
@@ -181,7 +187,7 @@ export default function AllTeams() {
 
   const handleJoinTeam = async () => {
     if (!inviteCode.trim()) {
-      setError('Invite code is required.')
+      setError(t('teams.inviteCodeRequired'))
       return
     }
     setError('')
@@ -193,10 +199,10 @@ export default function AllTeams() {
         setInviteCode('')
         loadTeams()
       } else {
-        setError(res.message || 'Failed to join team.')
+        setError(res.message || t('teams.joinFailed'))
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred.')
+      setError(err.message || t('teams.errorOccurred'))
     } finally {
       setLoading(false)
     }
@@ -214,8 +220,8 @@ export default function AllTeams() {
             </svg>
           </span>
           <div>
-            <h1 className="text-base md:text-lg font-bold text-neutral-900 truncate tracking-tight">MY TEAMS</h1>
-            <p className="text-xs text-neutral-500 truncate hidden sm:block">Join the study room and focus together as much as you can.</p>
+            <h1 className="text-base md:text-lg font-bold text-neutral-900 truncate tracking-tight">{t('teams.myTeamsTitle')}</h1>
+            <p className="text-xs text-neutral-500 truncate hidden sm:block">{t('teams.myTeamsSubtitle')}</p>
           </div>
         </div>
        </div>
@@ -225,7 +231,7 @@ export default function AllTeams() {
         <main className="flex-1 min-w-0 flex flex-col p-4 bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] shadow-none overflow-auto">
           <section className="mb-4">
             <h2 className="inline-block px-3 py-1.5 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] text-neutral-800 text-xs font-bold uppercase tracking-wide mb-2">
-              My Teams
+              {t('teams.myTeamsSection')}
             </h2>
             <div className="relative flex items-center gap-2">
               <div
@@ -234,11 +240,11 @@ export default function AllTeams() {
               >
                 {teams.length === 0 ? (
                   <div className="flex items-center justify-center min-h-[180px] text-neutral-500">
-                    <p className="text-sm">No teams yet. Create or join a team to get started.</p>
+                    <p className="text-sm">{t('teams.empty')}</p>
                   </div>
                 ) : (
-                  teams.map((t) => (
-                    <MyTeamCard key={t.id} {...t} />
+                  teams.map((team) => (
+                    <MyTeamCard key={team.id} {...team} />
                   ))
                 )}
               </div>
@@ -247,12 +253,12 @@ export default function AllTeams() {
           {import.meta.env.VITE_USE_MOCK === 'true' && (
           <section>
             <h2 className="inline-block px-3 py-1.5 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] text-neutral-800 text-xs font-bold uppercase tracking-wide mb-2">
-              Archived teams
+              {t('teams.archivedSection')}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
-              {archivedData.map((t) => (
-                <div key={t.id} className="min-w-0">
-                  <ArchivedCard {...t} />
+              {archivedData.map((team) => (
+                <div key={team.id} className="min-w-0">
+                  <ArchivedCard {...team} />
                 </div>
               ))}
             </div>
@@ -263,7 +269,7 @@ export default function AllTeams() {
         {/* Right sidebar — full width when stacked, fixed width on lg+ */}
         <aside className="w-full lg:w-80 lg:shrink-0 flex flex-col overflow-hidden bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] shadow-none">
           <div className="flex items-center justify-between gap-2 pb-2 pt-4 px-4 border-b border-[var(--color-border)]">
-            <h2 className="text-sm font-semibold text-neutral-900">Quick actions</h2>
+            <h2 className="text-sm font-semibold text-neutral-900">{t('teams.quickActions')}</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0 flex flex-col gap-2 sm:gap-3">
             <button
@@ -271,46 +277,46 @@ export default function AllTeams() {
               className="flex flex-row items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-2.5 px-3 sm:py-3 shadow-none"
             >
               <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-neutral-900 text-lg font-bold leading-tight shrink-0">+</span>
-              <span className="text-sm font-semibold">Create new team</span>
+              <span className="text-sm font-semibold">{t('teams.createNewTeam')}</span>
             </button>
             <button
               onClick={() => { setError(''); setJoinOpen(true); }}
               className="flex flex-row items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-charcoal)] hover:border-primary/40 hover:bg-[var(--color-cream-200)] transition-colors text-neutral-900 py-2.5 px-3 sm:py-3 shadow-none"
             >
               <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-neutral-900 text-lg font-bold leading-tight shrink-0">→</span>
-              <span className="text-sm font-semibold">Join team by code</span>
+              <span className="text-sm font-semibold">{t('teams.joinByCode')}</span>
             </button>
           </div>
         </aside>
       </div>
 
       {/* Create Team Modal */}
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} size="max-w-md" title="Create New Team">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} size="max-w-md" title={t('teams.createModalTitle')}>
         <Card className="p-5 w-full">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Create New Team</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.createModalTitle')}</h3>
           {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
           <div className="flex flex-col gap-4 mb-4">
             <Input
-              label="Team Name"
-              placeholder="e.g. Science Study Group"
+              label={t('teams.teamName')}
+              placeholder={t('teams.teamNamePlaceholder')}
               value={newTeamName}
               onChange={(e) => setNewTeamName(e.target.value)}
               required
             />
             <Input
-              label="Description"
-              placeholder="What is this team about?"
+              label={t('teams.description')}
+              placeholder={t('teams.descriptionPlaceholder')}
               value={newTeamDesc}
               onChange={(e) => setNewTeamDesc(e.target.value)}
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-neutral-700">Team Avatar</label>
+              <label className="text-xs font-semibold text-neutral-700">{t('teams.teamAvatar')}</label>
               <div className="flex items-center gap-3">
                 {newTeamAvatar ? (
-                  <img src={newTeamAvatar} alt="Team Preview" className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
+                  <img src={newTeamAvatar} alt={t('teams.teamPreviewAlt')} className="w-12 h-12 rounded-xl object-cover border border-[var(--color-border)]" />
                 ) : (
                   <div className="w-12 h-12 rounded-xl bg-[var(--color-charcoal)] border border-[var(--color-border)] flex items-center justify-center text-neutral-400 font-bold text-xs uppercase">
-                    No avt
+                    {t('teams.noAvatar')}
                   </div>
                 )}
                 <div className="flex-1">
@@ -323,7 +329,7 @@ export default function AllTeams() {
                       const file = e.target.files?.[0]
                       if (file) {
                         if (file.size > 2 * 1024 * 1024) {
-                          setError('Image size must be less than 2MB')
+                          setError(t('teams.imageTooLarge'))
                           return
                         }
                         const reader = new FileReader()
@@ -339,7 +345,7 @@ export default function AllTeams() {
                     htmlFor="team-avatar-upload"
                     className="inline-flex items-center justify-center px-3 py-1.5 border border-[var(--color-border)] rounded-md text-xs font-semibold text-neutral-800 bg-[var(--color-charcoal)] hover:bg-[var(--color-border)] cursor-pointer transition-colors"
                   >
-                    Upload Image
+                    {t('teams.uploadImage')}
                   </label>
                   {newTeamAvatar && (
                     <button
@@ -347,59 +353,59 @@ export default function AllTeams() {
                       onClick={() => setNewTeamAvatar('')}
                       className="ml-2 text-xs text-red-600 hover:text-red-700 font-semibold"
                     >
-                      Clear
+                      {t('teams.clear')}
                     </button>
                   )}
                 </div>
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-neutral-700">Số lượng thành viên tối đa (4 - 6)</label>
+              <label className="text-xs font-semibold text-neutral-700">{t('teams.maxMembers')}</label>
               <select
                 value={newTeamMaxMembers}
                 onChange={(e) => setNewTeamMaxMembers(parseInt(e.target.value))}
                 className="w-full px-3 py-1.5 border border-[var(--color-border)] bg-[var(--color-surface)] rounded-md text-sm focus:outline-none"
               >
-                <option value={4}>4 slots</option>
-                <option value={5}>5 slots</option>
-                <option value={6}>6 slots</option>
+                <option value={4}>{t('teams.slots', { count: 4 })}</option>
+                <option value={5}>{t('teams.slots', { count: 5 })}</option>
+                <option value={6}>{t('teams.slots', { count: 6 })}</option>
               </select>
             </div>
             <div className="flex items-center gap-2 py-1">
               <Checkbox
-                label="Private Team"
+                label={t('teams.privateTeam')}
                 checked={newTeamIsPrivate}
                 onChange={(e) => setNewTeamIsPrivate(e.target.checked)}
               />
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setCreateOpen(false)}>{t('common.cancel')}</Button>
             <Button variant="primary" className="flex-1" onClick={handleCreateTeam} disabled={loading}>
-              {loading ? 'Creating...' : 'Create'}
+              {loading ? t('teams.creating') : t('teams.create')}
             </Button>
           </div>
         </Card>
       </Modal>
 
       {/* Join Team Modal */}
-      <Modal open={joinOpen} onClose={() => setJoinOpen(false)} size="max-w-md" title="Join Team">
+      <Modal open={joinOpen} onClose={() => setJoinOpen(false)} size="max-w-md" title={t('teams.joinModalTitle')}>
         <Card className="p-5 w-full">
-          <h3 className="text-lg font-bold text-neutral-900 mb-4">Join Team</h3>
+          <h3 className="text-lg font-bold text-neutral-900 mb-4">{t('teams.joinModalTitle')}</h3>
           {error && <div className="p-3 mb-3 bg-red-50 text-red-600 text-xs rounded border border-red-200">{error}</div>}
           <div className="flex flex-col gap-4 mb-4">
             <Input
-              label="Invite Code"
-              placeholder="Enter invite code"
+              label={t('teams.inviteCode')}
+              placeholder={t('teams.inviteCodePlaceholder')}
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
               required
             />
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => setJoinOpen(false)}>Cancel</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => setJoinOpen(false)}>{t('common.cancel')}</Button>
             <Button variant="primary" className="flex-1" onClick={handleJoinTeam} disabled={loading}>
-              {loading ? 'Joining...' : 'Join'}
+              {loading ? t('teams.joining') : t('teams.join')}
             </Button>
           </div>
         </Card>
@@ -407,4 +413,3 @@ export default function AllTeams() {
     </div>
   )
 }
-

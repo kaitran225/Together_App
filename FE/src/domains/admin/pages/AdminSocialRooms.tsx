@@ -3,8 +3,10 @@ import { Button, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableR
 import { AdminActionToast, AdminConfirmDialog, AdminKpiCard, AdminPageSection, AdminStatusBadge } from '../components'
 import { useAdminActions } from '../hooks/useAdminActions'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function AdminSocialRooms() {
+  const { t } = useTranslation()
   const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [pendingCloseId, setPendingCloseId] = useState<number | null>(null)
@@ -39,14 +41,14 @@ export default function AdminSocialRooms() {
     try {
       const res = await workflowApi.forceCloseAdminRoom(pendingCloseId)
       if (res.success) {
-        showToast(`Room "${pendingRoom?.name ?? pendingCloseId}" was force-closed.`, 'warning')
+        showToast(t('admin.socialRooms.closedToast', { name: pendingRoom?.name ?? pendingCloseId }), 'warning')
         setPendingCloseId(null)
         await loadRooms()
       } else {
-        showToast(res.message || 'Failed to force-close room.', 'error')
+        showToast(res.message || t('admin.socialRooms.closeFailed'), 'error')
       }
     } catch {
-      showToast('Error force-closing room.', 'error')
+      showToast(t('admin.socialRooms.closeError'), 'error')
     } finally {
       setClosing(false)
     }
@@ -54,9 +56,9 @@ export default function AdminSocialRooms() {
 
   return (
     <div className="flex flex-col gap-4">
-      <AdminPageSection title="Social Rooms" subtitle="Monitor room activity and force-close if needed">
+      <AdminPageSection title={t('admin.socialRooms.title')} subtitle={t('admin.socialRooms.subtitle')}>
         <div className="max-w-sm">
-          <AdminKpiCard label="Total Rooms" value={`${rooms.length}`} hint="Across all categories" />
+          <AdminKpiCard label={t('admin.socialRooms.totalRooms')} value={`${rooms.length}`} hint={t('admin.socialRooms.totalRoomsHint')} />
         </div>
       </AdminPageSection>
 
@@ -66,16 +68,16 @@ export default function AdminSocialRooms() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : rooms.length === 0 ? (
-          <p className="text-sm text-neutral-500 text-center py-8">Chưa có phòng học nào.</p>
+          <p className="text-sm text-neutral-500 text-center py-8">{t('admin.socialRooms.empty')}</p>
         ) : (
           <Table className="min-w-[860px]">
             <TableHead>
               <TableRow className="bg-transparent">
-                <TableHeaderCell>Room Name</TableHeaderCell>
-                <TableHeaderCell>Owner</TableHeaderCell>
-                <TableHeaderCell>Max Members</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell className="text-right">Actions</TableHeaderCell>
+                <TableHeaderCell>{t('admin.socialRooms.roomName')}</TableHeaderCell>
+                <TableHeaderCell>{t('admin.socialRooms.owner')}</TableHeaderCell>
+                <TableHeaderCell>{t('admin.socialRooms.maxMembers')}</TableHeaderCell>
+                <TableHeaderCell>{t('common.status')}</TableHeaderCell>
+                <TableHeaderCell className="text-right">{t('common.actions')}</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -92,7 +94,7 @@ export default function AdminSocialRooms() {
                       disabled={isClosed(row.status)}
                       onClick={() => setPendingCloseId(row.roomId)}
                     >
-                      {isClosed(row.status) ? 'Closed' : 'Force close'}
+                      {isClosed(row.status) ? t('common.closed') : t('admin.socialRooms.forceClose')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -104,9 +106,9 @@ export default function AdminSocialRooms() {
 
       <AdminConfirmDialog
         open={!!pendingRoom}
-        title="Force close room"
-        message={pendingRoom ? `Force-close room "${pendingRoom.name}"? All active members will be removed.` : ''}
-        confirmLabel={closing ? 'Closing...' : 'Force close'}
+        title={t('admin.socialRooms.forceCloseTitle')}
+        message={pendingRoom ? t('admin.socialRooms.forceCloseMessage', { name: pendingRoom.name }) : ''}
+        confirmLabel={closing ? t('admin.socialRooms.closing') : t('admin.socialRooms.forceClose')}
         onCancel={() => setPendingCloseId(null)}
         onConfirm={handleForceClose}
       />

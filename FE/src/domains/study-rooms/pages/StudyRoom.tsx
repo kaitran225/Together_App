@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, IconButton, Modal } from '../../../components/common'
 import { authApi, readApi, workflowApi } from '../../../api/client'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useTranslation } from '../../../contexts/LanguageContext'
 import { StompClient } from '../../../api/websocket'
 
 type Participant = {
@@ -46,6 +47,7 @@ export default function StudyRoom() {
   const navigate = useNavigate()
   const roomId = searchParams.get('roomId')
 
+  const { t } = useTranslation()
   const { user, refreshProfile } = useAuth()
   const [messages, setMessages] = useState<any[]>([])
   const [participants, setParticipants] = useState<Participant[]>(() => {
@@ -688,16 +690,16 @@ export default function StudyRoom() {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-neutral-200 dark:bg-[var(--color-background)] p-4">
         <Card className="max-w-md w-full p-6 text-center border-2 border-neutral-300 shadow-lg bg-white rounded-2xl">
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">Session Completed!</h2>
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('studyRooms.sessionCompleted')}</h2>
           <p className="text-sm text-neutral-600 mb-6">
-            Great job! You've successfully finished your study session in this room.
+            {t('studyRooms.sessionCompletedDesc')}
           </p>
           <div className="bg-emerald-50 border border-emerald-250 rounded-xl p-4 mb-6">
-            <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Experience Gained</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{t('studyRooms.expGained')}</p>
             <p className="text-3xl font-extrabold text-emerald-600">+{expEarned} EXP</p>
           </div>
           <Link to="/study-rooms">
-            <Button variant="primary" className="w-full rounded-xl">Back to Rooms</Button>
+            <Button variant="primary" className="w-full rounded-xl">{t('studyRooms.backToRooms')}</Button>
           </Link>
         </Card>
       </div>
@@ -730,7 +732,7 @@ export default function StudyRoom() {
               className="!bg-error !border-error hover:!opacity-90 text-white text-[11px] font-bold rounded-xl"
               onClick={() => setShowEndModal(true)}
             >
-              End
+              {t('studyRooms.end')}
             </Button>
           )}
           <span className="w-7 h-7 rounded-full bg-accent-muted text-neutral-800 dark:text-primary border-2 border-primary/30 flex items-center justify-center text-[10px] font-semibold shrink-0" aria-hidden>
@@ -753,7 +755,7 @@ export default function StudyRoom() {
                   const showRemoteVideo = !p.isYou
                     && remoteVideoOn[p.userSso] !== false
                     && hasLiveVideo(remoteStreams[p.userSso])
-                  const label = `${p.displayName}${p.isYou ? ' (YOU)' : ''}`
+                  const label = `${p.displayName}${p.isYou ? t('studyRooms.youSuffix') : ''}`
                   const initial = (p.displayName || 'U').charAt(0).toUpperCase()
 
                   return (
@@ -811,7 +813,7 @@ export default function StudyRoom() {
                               <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                               </svg>
-                              Camera OFF
+                              {t('studyRooms.cameraOff')}
                             </span>
                           )}
                         </div>
@@ -827,7 +829,7 @@ export default function StudyRoom() {
         {/* Right: Chat — stacked under video on mobile */}
         <aside className="h-72 md:h-auto w-full md:w-80 shrink-0 flex flex-col overflow-hidden bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-300 dark:border-[var(--color-border)] shadow-md">
           <div className="flex items-center justify-between gap-2 pb-1.5 mb-0 pt-4 px-4 border-b-2 border-neutral-300">
-            <h2 className="text-sm font-semibold text-neutral-900">Conversation</h2>
+            <h2 className="text-sm font-semibold text-neutral-900">{t('studyRooms.conversation')}</h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
             {messages.map((m, i) => (
@@ -876,7 +878,7 @@ export default function StudyRoom() {
                 setChatInput('')
               }}
               onFileChange={() => {}}
-              placeholder="Type a message..."
+              placeholder={t('studyRooms.chatPlaceholder')}
             />
           </div>
         </aside>
@@ -889,7 +891,7 @@ export default function StudyRoom() {
         <div className="flex items-center gap-2">
           <IconButton
             onClick={() => setVideoOn(!videoOn)}
-            label={videoOn ? 'Turn off camera' : 'Turn on camera'}
+            label={videoOn ? t('studyRooms.turnOffCamera') : t('studyRooms.turnOnCamera')}
             className={`border-2 transition-all duration-200 ${
               videoOn
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400'
@@ -917,19 +919,19 @@ export default function StudyRoom() {
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
           </svg>
-          Leave
+          {t('common.leave')}
         </Button>
       </footer>
 
       {/* End study session modal — host only */}
-      <Modal open={showEndModal && isHost} onClose={() => setShowEndModal(false)} size="max-w-md" title="End study session?">
+      <Modal open={showEndModal && isHost} onClose={() => setShowEndModal(false)} size="max-w-md" title={t('studyRooms.endSessionTitle')}>
         <Card className="p-5 max-w-md w-full border-0 shadow-none bg-transparent">
           <p className="text-sm font-medium text-neutral-600 text-center mb-6">
-            Are you sure you want to end this room for everyone?
+            {t('studyRooms.endSessionConfirm')}
           </p>
           <div className="flex gap-3 mb-6">
             <Button variant="primary" size="md" className="flex-1 rounded-xl" onClick={() => setShowEndModal(false)}>
-              Continue
+              {t('common.continue')}
             </Button>
             <Button
               variant="secondary"
@@ -940,18 +942,18 @@ export default function StudyRoom() {
                 handleEndRoomAsHost()
               }}
             >
-              End session
+              {t('studyRooms.endSession')}
             </Button>
           </div>
           <div className="flex justify-between gap-4 text-center border-t border-neutral-200 pt-4">
             <div>
               <p className="text-xl font-bold text-neutral-900">{formatMins(secondsStudied)}</p>
-              <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide mt-1">Time studied</p>
+              <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide mt-1">{t('studyRooms.timeStudied')}</p>
             </div>
             <div className="w-px bg-neutral-200" />
             <div>
               <p className="text-xl font-bold text-neutral-900">{participants.length}</p>
-              <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide mt-1">Members</p>
+              <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wide mt-1">{t('studyRooms.members')}</p>
             </div>
           </div>
         </Card>

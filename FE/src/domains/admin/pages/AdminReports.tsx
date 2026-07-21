@@ -4,8 +4,10 @@ import { ChartContainer, BarChart, LineChart, useChartExport, usePdfExport } fro
 import { AdminKpiCard, AdminPageSection } from '../components'
 import { subscriptionsVsCancellation } from '../data/reportsData'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function AdminReports() {
+  const { t } = useTranslation()
   const [fromDate, setFromDate] = useState('2026-01-01')
   const [toDate, setToDate] = useState('2026-06-30')
   const usersExport = useChartExport()
@@ -13,19 +15,23 @@ export default function AdminReports() {
   const { exportSingleChartPdf, exportPageChartsPdf } = usePdfExport()
 
   const [kpis, setKpis] = useState([
-    { label: 'Total Users', value: '—', hint: 'Loading...' },
-    { label: 'Active Users', value: '—', hint: 'Loading...' },
+    { label: t('admin.reports.totalUsers'), value: '—', hint: t('common.loading') },
+    { label: t('admin.reports.activeUsers'), value: '—', hint: t('common.loading') },
   ])
   const [newUsersByMonth, setNewUsersByMonth] = useState<{ label: string; value: number }[]>([])
 
   useEffect(() => {
+    setKpis([
+      { label: t('admin.reports.totalUsers'), value: '—', hint: t('common.loading') },
+      { label: t('admin.reports.activeUsers'), value: '—', hint: t('common.loading') },
+    ])
     workflowApi.getAdminOverview()
       .then((res) => {
         if (res.success && res.data) {
           const d = res.data
           setKpis([
-            { label: 'Total Users', value: String(d.totalUsers ?? 0), hint: 'Tổng số người dùng đăng ký' },
-            { label: 'Active Users', value: String(d.activeUsers ?? 0), hint: 'Hoạt động trong 30 ngày qua' },
+            { label: t('admin.reports.totalUsers'), value: String(d.totalUsers ?? 0), hint: t('admin.reports.totalUsersHint') },
+            { label: t('admin.reports.activeUsers'), value: String(d.activeUsers ?? 0), hint: t('admin.reports.activeUsersHint') },
           ])
         }
       })
@@ -38,13 +44,15 @@ export default function AdminReports() {
         }
       })
       .catch((err) => console.error('Failed to load new users by month:', err))
-  }, [])
+  }, [t])
+
+  const rangeSubtitle = t('admin.reports.pdfRange', { from: fromDate, to: toDate })
 
   return (
     <div className="flex flex-col gap-4">
       <AdminPageSection
-        title="Reports"
-        subtitle="Date range based reporting snapshot"
+        title={t('admin.reports.title')}
+        subtitle={t('admin.reports.subtitle')}
         action={
           <div className="flex flex-wrap items-center gap-2 justify-end">
             <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-neutral-900" />
@@ -54,12 +62,12 @@ export default function AdminReports() {
               variant="secondary"
               onClick={() =>
                 exportPageChartsPdf([usersExport.chartRef.current, subExport.chartRef.current], {
-                  title: 'Admin Reports Charts',
-                  subtitle: `${fromDate} to ${toDate}`,
+                  title: t('admin.reports.pdfTitle'),
+                  subtitle: rangeSubtitle,
                 })
               }
             >
-              Export Page PDF
+              {t('admin.exportPagePdf')}
             </Button>
           </div>
         }
@@ -74,15 +82,15 @@ export default function AdminReports() {
       <div className="grid gap-4 xl:grid-cols-2">
         <div ref={usersExport.chartRef}>
           <ChartContainer
-            title="New users per month"
-            legend={[{ label: 'Users', color: '#5CB5F2' }]}
+            title={t('admin.reports.newUsersPerMonth')}
+            legend={[{ label: t('admin.legendUsers'), color: '#5CB5F2' }]}
             action={
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => exportSingleChartPdf(usersExport.chartRef.current, { title: 'New Users Per Month', subtitle: `${fromDate} to ${toDate}` })}
+                onClick={() => exportSingleChartPdf(usersExport.chartRef.current, { title: t('admin.reports.newUsersPdf'), subtitle: rangeSubtitle })}
               >
-                Export PDF
+                {t('common.exportPdf')}
               </Button>
             }
           >
@@ -95,26 +103,26 @@ export default function AdminReports() {
             this up for real requires adding that tracking first, not just an API call. */}
         <div ref={subExport.chartRef}>
           <ChartContainer
-            title="Subscriptions vs cancellation (demo data)"
-            legend={[{ label: 'Subscriptions', color: '#8FC766' }, { label: 'Cancellations', color: '#DE6B38' }]}
+            title={t('admin.reports.subsVsCancel')}
+            legend={[{ label: t('admin.reports.subscriptions'), color: '#8FC766' }, { label: t('admin.reports.cancellations'), color: '#DE6B38' }]}
             action={
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => exportSingleChartPdf(subExport.chartRef.current, { title: 'Subscriptions Vs Cancellation', subtitle: `${fromDate} to ${toDate}` })}
+                onClick={() => exportSingleChartPdf(subExport.chartRef.current, { title: t('admin.reports.subsVsCancelPdf'), subtitle: rangeSubtitle })}
               >
-                Export PDF
+                {t('common.exportPdf')}
               </Button>
             }
           >
             <p className="text-xs text-neutral-500 mb-2 px-1">
-              Chưa có dữ liệu thật — hệ thống chưa theo dõi subscription/cancellation lifecycle. Biểu đồ bên dưới chỉ là mẫu.
+              {t('admin.reports.subsVsCancelNote')}
             </p>
             <LineChart
               data={subscriptionsVsCancellation}
               series={[
-                { key: 'subscriptions', label: 'Subscriptions', color: '#8FC766' },
-                { key: 'cancellations', label: 'Cancellations', color: '#DE6B38' },
+                { key: 'subscriptions', label: t('admin.reports.subscriptions'), color: '#8FC766' },
+                { key: 'cancellations', label: t('admin.reports.cancellations'), color: '#DE6B38' },
               ]}
             />
           </ChartContainer>

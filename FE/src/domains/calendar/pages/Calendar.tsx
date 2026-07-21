@@ -3,6 +3,7 @@ import { Button, Input, Modal } from '../../../components/common'
 import { WEEKDAYS, INITIAL_AI_MESSAGE, buildFakeEvents, getMockAiReply, EVENT_STYLES, type ChatMessage } from '../../../mocks'
 import { toDateKey, isSameDay, getCalendarDays } from '../../../utils/calendarUtils'
 import { workflowApi, useMock } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 function calculateDateTime(dayName: string, timeStr: string): Date {
   const now = new Date()
@@ -39,6 +40,7 @@ function calculateDateTime(dayName: string, timeStr: string): Date {
 }
 
 export default function Calendar() {
+  const { t } = useTranslation()
   const today = useMemo(() => new Date(), [])
   const [viewDate, setViewDate] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([INITIAL_AI_MESSAGE])
@@ -204,7 +206,7 @@ export default function Calendar() {
   }
 
   const runOptimizeWeek = async () => {
-    const text = 'Tối ưu lịch tuần này và cho biết khung giờ rảnh để học sâu'
+    const text = t('calendar.optimizePrompt')
     setChatMessages((prev) => [...prev, { role: 'user', text }])
     try {
       const res = await workflowApi.assistSchedule(text)
@@ -220,13 +222,13 @@ export default function Calendar() {
       ...prev,
       {
         role: 'ai',
-        text: "I've looked at your week. I suggest blocking 9–11 AM on Tue and Thu for deep work, and keeping Wed afternoon free for meetings. Want me to add these blocks?",
+        text: t('calendar.optimizeFallback'),
       },
     ])
   }
 
   const runFindFocusTime = async () => {
-    const text = 'Tìm thời gian rảnh / focus time trên lịch của tôi tuần này'
+    const text = t('calendar.focusPrompt')
     setChatMessages((prev) => [...prev, { role: 'user', text }])
     try {
       const res = await workflowApi.assistSchedule(text)
@@ -242,7 +244,7 @@ export default function Calendar() {
       ...prev,
       {
         role: 'ai',
-        text: "Based on your calendar, you have focus time: Tue 9–11 AM, Thu 2–4 PM, and Sat morning. I can add a recurring 'Focus' block for these slots if you'd like.",
+        text: t('calendar.focusFallback'),
       },
     ])
   }
@@ -255,19 +257,19 @@ export default function Calendar() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-900 tracking-tight">{monthLabel}</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={goPrev} aria-label="Previous month">
-                ← Prev
+              <Button variant="secondary" size="sm" onClick={goPrev} aria-label={t('calendar.prevMonth')}>
+                {t('calendar.prev')}
               </Button>
               <Button
                 variant={isViewingCurrentMonth ? 'primary' : 'secondary'}
                 size="sm"
                 onClick={goToday}
-                aria-label="Go to current month"
+                aria-label={t('calendar.goToday')}
               >
-                Today
+                {t('calendar.today')}
               </Button>
-              <Button variant="secondary" size="sm" onClick={goNext} aria-label="Next month">
-                Next →
+              <Button variant="secondary" size="sm" onClick={goNext} aria-label={t('calendar.nextMonth')}>
+                {t('calendar.next')}
               </Button>
               <Button 
                 variant="ghost" 
@@ -275,12 +277,12 @@ export default function Calendar() {
                 className="ml-2"
                 onClick={() => setIsAddModalOpen(true)}
               >
-                + Add event
+                {t('calendar.addEvent')}
               </Button>
             </div>
           </div>
           
-          {loading && <div className="text-xs text-neutral-500">Updating calendar events...</div>}
+          {loading && <div className="text-xs text-neutral-500">{t('calendar.updating')}</div>}
 
           <div className="rounded-2xl border-2 border-neutral-200 dark:border-[var(--color-charcoal)] bg-white dark:bg-[var(--color-surface)] overflow-hidden shadow-sm">
             {/* Weekday labels — separate row */}
@@ -331,7 +333,7 @@ export default function Calendar() {
                         </div>
                       ))}
                       {events.length > 3 && (
-                        <span className="text-[10px] text-neutral-500 dark:text-neutral-500 font-medium">+{events.length - 3} more</span>
+                        <span className="text-[10px] text-neutral-500 dark:text-neutral-500 font-medium">{t('common.moreCount', { count: events.length - 3 })}</span>
                       )}
                     </div>
                   </div>
@@ -346,7 +348,7 @@ export default function Calendar() {
           <div className="shrink-0 px-4 py-2.5 bg-accent-muted dark:bg-primary/20 border-b-2 border-accent/20 dark:border-primary/30">
             <h2 className="text-xs font-bold text-neutral-900 dark:text-neutral-900 uppercase tracking-wide flex items-center gap-1.5">
               <span className="text-primary font-bold">∞</span>
-              Together AI
+              {t('calendar.aiTitle')}
             </h2>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
@@ -358,8 +360,8 @@ export default function Calendar() {
                     : 'bg-neutral-100 dark:bg-[var(--color-surface)] border border-neutral-200 dark:border-[var(--color-charcoal)] text-neutral-900 dark:text-neutral-900'
                     }`}
                 >
-                  {m.role === 'ai' && <span className="text-[9px] font-semibold text-neutral-500 dark:text-neutral-500 uppercase block mb-0.5">AI Assistant</span>}
-                  {m.role === 'user' && <span className="text-[9px] font-semibold text-primary uppercase block mb-0.5">You</span>}
+                  {m.role === 'ai' && <span className="text-[9px] font-semibold text-neutral-500 dark:text-neutral-500 uppercase block mb-0.5">{t('calendar.aiAssistant')}</span>}
+                  {m.role === 'user' && <span className="text-[9px] font-semibold text-primary uppercase block mb-0.5">{t('calendar.you')}</span>}
                   <p className="text-xs font-medium leading-snug">{m.text}</p>
                 </div>
               </div>
@@ -368,22 +370,22 @@ export default function Calendar() {
           <div className="shrink-0 p-3 border-t-2 border-neutral-200 dark:border-[var(--color-charcoal)] space-y-2">
             <div className="flex gap-2 items-stretch">
               <Input
-                placeholder="Ask anything..."
+                placeholder={t('calendar.askPlaceholder')}
                 className="flex-1 min-w-0 h-9 min-h-0 px-3 py-0 rounded-lg border-2 border-neutral-200 dark:border-[var(--color-charcoal)] text-sm"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
               />
               <Button variant="primary" size="sm" onClick={sendMessage} className="shrink-0 h-9 min-h-0 px-3 rounded-lg text-xs font-semibold">
-                Send
+                {t('common.send')}
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5">
               <Button variant="secondary" size="sm" className="h-8 min-h-0 py-0 px-2.5 text-xs rounded-lg" onClick={runOptimizeWeek}>
-                Optimize week
+                {t('calendar.optimizeWeek')}
               </Button>
               <Button variant="secondary" size="sm" className="h-8 min-h-0 py-0 px-2.5 text-xs rounded-lg" onClick={runFindFocusTime}>
-                Find focus time
+                {t('calendar.findFocusTime')}
               </Button>
             </div>
           </div>
@@ -395,17 +397,17 @@ export default function Calendar() {
         <Modal
           open={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
-          title="Create New Event"
+          title={t('calendar.createEvent')}
         >
           <form
             onSubmit={async (e) => {
               e.preventDefault()
               if (!newTitle.trim()) {
-                alert('Title is required')
+                alert(t('calendar.titleRequired'))
                 return
               }
               if (!newStart || !newEnd) {
-                alert('Start and End times are required')
+                alert(t('calendar.timesRequired'))
                 return
               }
               try {
@@ -428,47 +430,47 @@ export default function Calendar() {
                   setNewLocation('')
                   setNewCategoryId(undefined)
                 } else {
-                  alert(res.message || 'Failed to create event')
+                  alert(res.message || t('calendar.createFailed'))
                 }
               } catch (err) {
                 console.error(err)
-                alert('An error occurred while creating the event')
+                alert(t('calendar.createError'))
               }
             }}
             className="space-y-4"
           >
             <div>
-              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Title *</label>
+              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.titleLabel')}</label>
               <Input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Study session, Meeting..."
+                placeholder={t('calendar.titlePlaceholder')}
                 required
               />
             </div>
             
             <div>
-              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Description</label>
+              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.description')}</label>
               <textarea
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Details about this event..."
+                placeholder={t('calendar.descriptionPlaceholder')}
                 className="w-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary min-h-[5rem]"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Location / Platform</label>
+              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.location')}</label>
               <Input
                 value={newLocation}
                 onChange={(e) => setNewLocation(e.target.value)}
-                placeholder="Google Meet, Room 101..."
+                placeholder={t('calendar.locationPlaceholder')}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Start Time *</label>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.startTime')}</label>
                 <Input
                   type="datetime-local"
                   value={newStart}
@@ -477,7 +479,7 @@ export default function Calendar() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">End Time *</label>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.endTime')}</label>
                 <Input
                   type="datetime-local"
                   value={newEnd}
@@ -488,13 +490,13 @@ export default function Calendar() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Category</label>
+              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.category')}</label>
               <select
                 value={newCategoryId || ''}
                 onChange={(e) => setNewCategoryId(e.target.value ? Number(e.target.value) : undefined)}
                 className="w-full rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                <option value="">None</option>
+                <option value="">{t('common.none')}</option>
                 {categories.map((c) => (
                   <option key={c.categoryId} value={c.categoryId}>
                     {c.name}
@@ -505,10 +507,10 @@ export default function Calendar() {
 
             <div className="flex justify-end gap-2 pt-4 border-t border-neutral-100">
               <Button variant="secondary" size="sm" type="button" onClick={() => setIsAddModalOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button variant="primary" size="sm" type="submit">
-                Create Event
+                {t('calendar.createEventBtn')}
               </Button>
             </div>
           </form>
@@ -520,22 +522,22 @@ export default function Calendar() {
         <Modal
           open={!!selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          title="Event Details"
+          title={t('calendar.eventDetails')}
         >
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Title</label>
+              <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('common.title')}</label>
               <p className="text-sm font-bold text-neutral-900">{selectedEvent.title}</p>
             </div>
             {selectedEvent.description && (
               <div>
-                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Description</label>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.description')}</label>
                 <p className="text-sm text-neutral-700 whitespace-pre-wrap">{selectedEvent.description}</p>
               </div>
             )}
             {selectedEvent.startTime && (
               <div>
-                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Time</label>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.time')}</label>
                 <p className="text-sm text-neutral-700">
                   {new Date(selectedEvent.startTime).toLocaleString()} -{' '}
                   {selectedEvent.endTime ? new Date(selectedEvent.endTime).toLocaleString() : ''}
@@ -544,7 +546,7 @@ export default function Calendar() {
             )}
             {selectedEvent.location && (
               <div>
-                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">Location / Platform</label>
+                <label className="text-xs font-semibold text-neutral-500 uppercase tracking-wider block mb-1">{t('calendar.location')}</label>
                 <p className="text-sm text-neutral-700">{selectedEvent.location}</p>
               </div>
             )}
@@ -556,18 +558,18 @@ export default function Calendar() {
                   size="sm"
                   className="!bg-error/10 !border-error/50 !text-error hover:!bg-error/20"
                   onClick={async () => {
-                    if (confirm('Are you sure you want to delete this event?')) {
+                    if (confirm(t('calendar.deleteConfirm'))) {
                       await workflowApi.deleteSchedule(selectedEvent.id)
                       fetchSchedules()
                       setSelectedEvent(null)
                     }
                   }}
                 >
-                  Delete Event
+                  {t('calendar.deleteEvent')}
                 </Button>
               ) : null}
               <Button variant="secondary" size="sm" onClick={() => setSelectedEvent(null)}>
-                Close
+                {t('common.close')}
               </Button>
             </div>
           </div>
@@ -577,16 +579,16 @@ export default function Calendar() {
       {/* Event types legend */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-600 dark:text-neutral-500">
         <span className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded bg-primary" /> Today
+          <span className="w-3 h-3 rounded bg-primary" /> {t('calendar.legendToday')}
         </span>
         <span className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded bg-highlight" /> Deadline
+          <span className="w-3 h-3 rounded bg-highlight" /> {t('calendar.legendDeadline')}
         </span>
         <span className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded bg-[var(--color-focus-area)] border border-[var(--color-focus-area)]/30" /> Class
+          <span className="w-3 h-3 rounded bg-[var(--color-focus-area)] border border-[var(--color-focus-area)]/30" /> {t('calendar.legendClass')}
         </span>
         <span className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded bg-success/20 border border-success/30" /> Meeting
+          <span className="w-3 h-3 rounded bg-success/20 border border-success/30" /> {t('calendar.legendMeeting')}
         </span>
       </div>
     </div>
