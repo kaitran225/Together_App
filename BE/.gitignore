@@ -19,7 +19,7 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs
+# virtual machine crash 
 hs_err_pid*
 replay_pid*
 

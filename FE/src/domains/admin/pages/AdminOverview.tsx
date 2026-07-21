@@ -1,12 +1,50 @@
+import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { ChartContainer, LineChart, PieChart, useChartExport, usePdfExport } from '../charts'
 import { AdminKpiCard, AdminPageSection } from '../components'
-import { dashboardKpis, planDistribution, userGrowthSeries } from '../data/dashboardData'
+import { workflowApi } from '../../../api/client'
 
 export default function AdminOverview() {
   const growthExport = useChartExport()
   const distExport = useChartExport()
   const { exportSingleChartPdf, exportPageChartsPdf } = usePdfExport()
+
+  const [kpis, setKpis] = useState([
+    { label: 'Total Users', value: '—', hint: 'Loading...' },
+    { label: 'Active Users', value: '—', hint: 'Loading...' },
+  ])
+  const [userGrowthSeries, setUserGrowthSeries] = useState<{ label: string; series: { users: number } }[]>([])
+  const [planDistribution, setPlanDistribution] = useState<{ label: string; value: number }[]>([])
+
+  useEffect(() => {
+    workflowApi.getAdminOverview()
+      .then((res) => {
+        if (res.success && res.data) {
+          const d = res.data
+          setKpis([
+            { label: 'Total Users', value: String(d.totalUsers ?? 0), hint: 'Tổng số người dùng' },
+            { label: 'Active Users', value: String(d.activeUsers ?? 0), hint: 'Hoạt động trong 30 ngày qua' },
+          ])
+        }
+      })
+      .catch((err) => console.error('Failed to load admin overview:', err))
+
+    workflowApi.getAdminUserGrowth(6)
+      .then((res) => {
+        if (res.success && res.data) {
+          setUserGrowthSeries(res.data.map((d) => ({ label: d.label, series: { users: d.value } })))
+        }
+      })
+      .catch((err) => console.error('Failed to load user growth:', err))
+
+    workflowApi.getAdminPlanDistribution()
+      .then((res) => {
+        if (res.success && res.data) {
+          setPlanDistribution(res.data)
+        }
+      })
+      .catch((err) => console.error('Failed to load plan distribution:', err))
+  }, [])
 
   return (
     <div className="flex flex-col gap-5">
@@ -29,7 +67,7 @@ export default function AdminOverview() {
         }
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {dashboardKpis.map((kpi) => (
+          {kpis.map((kpi) => (
             <AdminKpiCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
           ))}
         </div>
@@ -94,4 +132,3 @@ export default function AdminOverview() {
     </div>
   )
 }
-

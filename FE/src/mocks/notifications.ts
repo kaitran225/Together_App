@@ -16,6 +16,8 @@ export type NotificationItem = {
   time: string
   priority?: boolean
   unread?: boolean
+  linkType?: string | null
+  linkId?: number | null
 }
 
 export const NOTIFICATIONS: NotificationItem[] = [

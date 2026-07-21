@@ -24,37 +24,38 @@
   --color-neutral-800: #262626;
   --color-neutral-900: #171717;
 
-  /* Single prepared palette (liquorice/sunshine/cream/blossom/flame/orange/pear/sky/lilac) */
-  --pal-liquorice: #171717;
+  /* Single prepared palette (lavender/blue/purple/midnight/white/neutral/warm/mint) */
+  --pal-liquorice: #2a2a2a;
   --pal-sunshine: #ffb114;
-  --pal-cream: #ffffff;
+  --pal-cream: #f7f7f7;
   --pal-blossom: #e1e1ff;
   --pal-flame: #ff5c1c;
   --pal-orange: #ffc757;
-  --pal-pear: #83f5a3;
+  --pal-pear: #2ea857;
   --pal-sky: #85b8fd;
   --pal-lilac: #e1e1ff;
   --color-cream-100: #ffffff;
   --color-cream-200: #f7f7f7;
   --color-cream-300: #e1e1ff;
 
-  /* Semantic — requested scheme */
-  --color-primary: #9400d3;
-  --color-primary-hover: #7a00ad;
-  --color-primary-foreground: #ffffff;
+  /* Semantic — palette from provided table */
+  --color-primary: #85b8fd;
+  --color-primary-hover: #191970;
+  --color-primary-foreground: #0f172a;
   --color-accent: var(--pal-sky);
   --color-accent-muted: var(--color-cream-300);
   --color-surface: var(--color-cream-100);
   --color-background: var(--color-cream-200);
   --color-highlight: var(--pal-sunshine);
-  --color-highlight-hover: #e89f00;
-  --color-focus-area: #191970;
+  --color-highlight-hover: var(--pal-orange);
+  --color-focus-area: var(--pal-lilac);
   --color-success: var(--pal-pear);
   --color-warning: var(--pal-orange);
   --color-error: var(--pal-flame);
-  --color-border: rgba(23, 23, 23, 0.14);
-  --color-border-strong: rgba(23, 23, 23, 0.22);
-  --color-charcoal: var(--color-cream-300);
+  --color-border: rgba(25, 25, 112, 0.18);
+  --color-border-strong: rgba(25, 25, 112, 0.3);
+  --color-charcoal: var(--color-cream-200);
+  --background-page: var(--color-background);
 
   /* Flat “gradient” tokens = solid (legacy class names only) */
   --gradient-brand: var(--color-primary);
@@ -99,7 +100,7 @@
     scroll-behavior: smooth;
   }
   body {
-    background: var(--color-background);
+    background: var(--background-page);
     color: var(--color-neutral-900);
     margin: 0;
     min-height: 100vh;
@@ -154,11 +155,13 @@
     --color-border: rgba(255, 255, 255, 0.08);
     --color-border-strong: rgba(255, 255, 255, 0.14);
     --color-charcoal: #2a2a2a;
+    --background-page: #000000;
   }
   .dark .label-study {
     @apply text-neutral-400;
   }
 }
+
 
 /* Label: uppercase, bold, wide tracking (bento) */
 .label-study {
@@ -181,6 +184,15 @@
   html:not(.dark) .border-white\/10 { border-color: color-mix(in srgb, var(--color-cream-300) 35%, transparent) !important; }
   html:not(.dark) .border-white\/15 { border-color: color-mix(in srgb, var(--color-cream-300) 45%, transparent) !important; }
   html:not(.dark) .border-white\/20 { border-color: color-mix(in srgb, var(--color-cream-300) 55%, transparent) !important; }
+
+  /* Dark mode: remap hardcoded light surfaces so the whole app stays in sync */
+  .dark .bg-white { background-color: var(--color-surface) !important; }
+  .dark .bg-white\/80 { background-color: color-mix(in srgb, var(--color-surface) 80%, transparent) !important; }
+  .dark .bg-white\/90 { background-color: color-mix(in srgb, var(--color-surface) 90%, transparent) !important; }
+  .dark .bg-neutral-50 { background-color: var(--color-charcoal) !important; }
+  .dark .bg-neutral-50\/70 { background-color: color-mix(in srgb, var(--color-charcoal) 70%, transparent) !important; }
+  .dark .hover\:bg-white\/10:hover { background-color: color-mix(in srgb, var(--color-surface) 10%, transparent) !important; }
+  .dark .hover\:bg-neutral-50:hover { background-color: var(--color-charcoal) !important; }
   .bg-gradient-brand { background-color: var(--gradient-brand); }
   .bg-gradient-atlitude-1 { background-color: var(--gradient-atlitude-1); }
   .bg-gradient-atlitude-2 { background-color: var(--gradient-atlitude-2); }
@@ -243,5 +255,18 @@
   }
   .animate-scale-in {
     animation: scale-in 0.2s ease-out forwards;
+  }
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
   }
 }

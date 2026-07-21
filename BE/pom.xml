@@ -23,5 +23,6 @@
         <module>workflow</module>
         <module>cronjob</module>
         <module>email</module>
+        <module>gateway</module>
     </modules>
 </project>

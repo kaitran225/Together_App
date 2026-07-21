@@ -1,38 +1,29 @@
 package app.together.common.workflow.dto;
 
-import app.together.common.shared.dto.BaseAuditDTO;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 
-@Getter
-@Setter
-@SuperBuilder
-@NoArgsConstructor
-@AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
+/** Entity DTO with audit fields (flat JSON, same as former {@code BaseAuditDTO} subclasses). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class CoinPackageDto extends BaseAuditDTO {
-    Long packageId;
-    String packageName;
-    Integer coinsAmount;
-    Integer bonusCoins;
-    BigDecimal priceVnd;
-    Boolean isPopular;
-    Boolean isActive;
-    Integer displayOrder;
-    String description;
-
+public record CoinPackageDto(
+        Instant createdAt,
+        String createdBy,
+        Instant updatedAt,
+        String updatedBy,
+        Long packageId,
+        String packageName,
+        Integer coinsAmount,
+        Integer bonusCoins,
+        BigDecimal priceVnd,
+        Boolean isPopular,
+        Boolean isActive,
+        Integer displayOrder,
+        String description,
+        List<String> features
+) {
 }
+

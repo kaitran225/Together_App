@@ -1,5 +1,6 @@
 package app.together.common.workflow.entity;
 
+import app.together.common.auth.enums.TeamRole;
 import app.together.common.shared.persistence.BaseAuditEntity;
 
 import jakarta.persistence.*;
@@ -30,8 +31,9 @@ public class TeamMember extends BaseAuditEntity {
     @EqualsAndHashCode.Include
     String userSso;
 
-    @Column(name = "role")
-    String role;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 32)
+    TeamRole role;
 
     @Column(name = "nickname")
     String nickname;

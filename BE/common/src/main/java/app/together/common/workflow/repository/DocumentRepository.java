@@ -8,4 +8,5 @@ import java.util.List;
 public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByUserSso(String userSso);
+    List<Document> findByUserSsoAndDeletedAtIsNull(String userSso);
 }

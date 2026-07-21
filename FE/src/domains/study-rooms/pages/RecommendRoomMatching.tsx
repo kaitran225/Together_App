@@ -1,12 +1,74 @@
-import { useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button, IconButton, Input } from '../../../components/common'
 import { RECOMMENDED_ROOMS } from '../../../mocks'
+import { readApi, workflowApi } from '../../../api/client'
 
 export default function RecommendRoomMatching() {
   const [goal, setGoal] = useState('')
   const [subject, setSubject] = useState('')
+  const [rooms, setRooms] = useState<any[]>([])
+  const [matching, setMatching] = useState(false)
+  const [matchError, setMatchError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    readApi.getSuggestedRooms()
+      .then((res) => {
+        if (res.success && res.data && res.data.length > 0) {
+          const topicLabels: Record<string, string> = { math: 'MATHEMATICS', science: 'SCIENCE', lang: 'LANGUAGES' }
+          const mapped = res.data.map((r: any) => {
+            const activeCount = r.members ? r.members.filter((m: any) => m.isActive).length : 0
+            const topic = topicLabels[r.topic] || 'OTHER'
+            return {
+              id: String(r.roomId),
+              title: r.title,
+              subject: topic,
+              active: activeCount
+            }
+          })
+          setRooms(mapped)
+        } else {
+          const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+          setRooms(isMock ? RECOMMENDED_ROOMS : [])
+        }
+      })
+      .catch(() => {
+        const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+        setRooms(isMock ? RECOMMENDED_ROOMS : [])
+      })
+  }, [])
+
+  const handleMatchRoom = async () => {
+    if (!goal.trim()) {
+      setMatchError('Goal is required for AI matching.')
+      return
+    }
+    setMatchError('')
+    setMatching(true)
+    try {
+      const res = await workflowApi.matchRoom({
+        title: `Group Study: ${subject.trim() || 'General'}`,
+        description: `Focused study room for ${subject.trim() || 'general learning'}.`,
+        goalDescription: goal.trim(),
+        goalDurationDays: 1,
+        maxMembers: 10,
+        isPremium: false,
+        isPublic: true,
+        roomType: 'SOCIAL'
+      })
+      if (res.success && res.data) {
+        navigate(`/study-room?roomId=${res.data.roomId}`)
+      } else {
+        setMatchError(res.message || 'Failed to match a room.')
+      }
+    } catch (err: any) {
+      setMatchError(err.message || 'An error occurred during matching.')
+    } finally {
+      setMatching(false)
+    }
+  }
 
   const scrollRight = () => {
     if (scrollRef.current) scrollRef.current.scrollBy({ left: 280, behavior: 'smooth' })
@@ -35,6 +97,13 @@ export default function RecommendRoomMatching() {
         <p className="text-sm text-neutral-600 mb-8 max-w-xl mx-auto">
           Describe what you’re studying and Together AI will match you with study groups that fit your goals.
         </p>
+        
+        {matchError && (
+          <div className="p-3 mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg max-w-xl mx-auto">
+            {matchError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-6">
           <div className="flex flex-col gap-2 text-left">
             <label className="text-sm font-bold text-neutral-900 uppercase">Goal</label>
@@ -57,8 +126,14 @@ export default function RecommendRoomMatching() {
             />
           </div>
         </div>
-        <Button variant="primary" size="lg" className="px-8">
-          Match with AI
+        <Button
+          variant="primary"
+          size="lg"
+          className="px-8"
+          onClick={handleMatchRoom}
+          disabled={matching}
+        >
+          {matching ? 'Matching...' : 'Match with AI'}
         </Button>
       </div>
 
@@ -77,7 +152,7 @@ export default function RecommendRoomMatching() {
             className="flex gap-4 overflow-x-auto pb-2 scroll-smooth scrollbar-thin"
             style={{ scrollbarWidth: 'thin' }}
           >
-            {RECOMMENDED_ROOMS.map((room) => (
+            {rooms.map((room) => (
               <div
                 key={room.id}
                 className="shrink-0 w-64 rounded-lg border-2 border-neutral-200 bg-white p-4 flex flex-col gap-3 shadow-sm"
@@ -88,7 +163,7 @@ export default function RecommendRoomMatching() {
                   <span className="px-2.5 py-1 rounded-lg bg-success text-white text-xs font-bold">
                     {room.active} Active
                   </span>
-                  <Link to="/study-room">
+                  <Link to={`/study-room?roomId=${room.id}`}>
                     <Button variant="secondary" size="sm" className="border-2 border-neutral-200 text-xs">
                       Join
                     </Button>

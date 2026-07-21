@@ -8,4 +8,5 @@ import java.util.List;
 public interface QuickNoteRepository extends JpaRepository<QuickNote, Long> {
 
     List<QuickNote> findByUserSso(String userSso);
+    List<QuickNote> findByUserSsoAndDeletedAtIsNullOrderByIsPinnedDescCreatedAtDesc(String userSso);
 }

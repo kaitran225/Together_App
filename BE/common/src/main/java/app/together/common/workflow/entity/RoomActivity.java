@@ -1,6 +1,8 @@
 package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,6 +38,7 @@ public class RoomActivity extends BaseAuditEntity {
     @Column(name = "duration_minutes")
     Integer durationMinutes;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 }

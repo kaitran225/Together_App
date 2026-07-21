@@ -7,5 +7,6 @@ public enum TransactionType {
     BONUS,
     TRANSFER,
     ADJUSTMENT,
-    PURCHASE
+    PURCHASE,
+    PAID
 }

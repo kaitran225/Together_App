@@ -1,38 +1,25 @@
 package app.together.common.workflow.dto;
 
-import app.together.common.shared.dto.BaseAuditDTO;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.time.Instant;
 import java.time.LocalDate;
 
-@Getter
-@Setter
-@SuperBuilder
-@NoArgsConstructor
-@AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
+/** Entity DTO with audit fields (flat JSON, same as former {@code BaseAuditDTO} subclasses). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ProjectDto extends BaseAuditDTO {
-    Long projectId;
-    Long teamId;
-    String name;
-    String description;
-    String status;
-    LocalDate startDate;
-    LocalDate dueDate;
-    Instant completedAt;
-
+public record ProjectDto(
+        Instant createdAt,
+        String createdBy,
+        Instant updatedAt,
+        String updatedBy,
+        Long projectId,
+        Long teamId,
+        String name,
+        String description,
+        String status,
+        LocalDate startDate,
+        LocalDate dueDate,
+        Instant completedAt
+) {
 }

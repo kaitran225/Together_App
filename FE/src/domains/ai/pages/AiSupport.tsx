@@ -1,7 +1,64 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { AiBotIcon, Button, Card, ChatInputBar, CloseIcon, DocumentIcon, IconButton, Input, MenuIcon, Modal, Progress, QuizletQuizModal, Textarea } from '../../../components/common'
-import { MOCK_QUIZLET_CARDS, SIDEBAR_CHATS, AI_SUPPORT_MESSAGES as MESSAGES, SUMMARY_HISTORY, MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
+import { FlashcardModal } from '../../../components/FlashcardModal'
+import { MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
+import { workflowApi } from '../../../api/client'
+
+function formatRelativeTime(iso?: string): string {
+  if (!iso) return ''
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} Hour${hours > 1 ? 's' : ''} Ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Yesterday'
+  return `${days} Days Ago`
+}
+
+const MessageRenderer = ({ text }: { text: string }) => {
+  try {
+    let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    const firstBrace = cleanText.indexOf('{');
+    const lastBrace = cleanText.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonStr = cleanText.substring(firstBrace, lastBrace + 1);
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.nodes && Array.isArray(parsed.nodes)) {
+        return (
+          <>
+            {firstBrace > 0 && <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{cleanText.substring(0, firstBrace).trim()}</p>}
+            <div className="mt-2 text-xs bg-white/50 p-3 rounded-lg border border-primary/20 shadow-sm">
+              <p className="font-bold mb-3 text-primary text-sm">{parsed.title || 'Mindmap'}</p>
+            <ul className="pl-2 space-y-2 border-l-2 border-primary/30 ml-1">
+              {parsed.nodes.map((node: any) => (
+                <li key={node.id} className="relative before:absolute before:-left-[9px] before:top-2 before:w-2 before:h-0.5 before:bg-primary/30">
+                  <span className="font-semibold text-neutral-800 bg-white px-1.5 py-0.5 rounded border border-neutral-200">{node.label}</span>
+                  {node.children && node.children.length > 0 && (
+                    <ul className="pl-4 mt-2 space-y-2 border-l-2 border-primary/20 ml-2">
+                      {node.children.map((child: any) => (
+                        <li key={child.id} className="relative before:absolute before:-left-[9px] before:top-2 before:w-2 before:h-0.5 before:bg-primary/20">
+                          <span className="text-neutral-600">{child.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+            </div>
+            {lastBrace < cleanText.length - 1 && <p className="text-sm leading-relaxed whitespace-pre-wrap mt-2">{cleanText.substring(lastBrace + 1).trim()}</p>}
+          </>
+        )
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
+}
 
 export default function AiSupport() {
   const [input, setInput] = useState('')
@@ -11,9 +68,84 @@ export default function AiSupport() {
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
   const [summaryText, setSummaryText] = useState('')
   const [notes, setNotes] = useState('')
-  const [quizletCards, setQuizletCards] = useState<typeof MOCK_QUIZLET_CARDS | null>(null)
+  const [quizletCards, setQuizletCards] = useState<any[] | null>(null)
+  const [selectedFlashcardQuizId, setSelectedFlashcardQuizId] = useState<number | null>(null)
   const [showQuizModal, setShowQuizModal] = useState(false)
+  const [selectedQuizId, setSelectedQuizId] = useState<number | undefined>(undefined)
   const summarizeInputRef = useRef<HTMLInputElement>(null)
+  const [lastUploadedDocumentId, setLastUploadedDocumentId] = useState<number | undefined>(undefined)
+  const [sessionDocuments, setSessionDocuments] = useState<{ id: number; name: string; status?: string }[]>([])
+  const [documentHistory, setDocumentHistory] = useState<{ id: number; name: string; time: string }[]>([])
+
+  const loadDocumentHistory = async () => {
+    try {
+      const res = await workflowApi.getDocuments()
+      if (res.success && res.data) {
+        setDocumentHistory(
+          res.data.map((d: any) => ({
+            id: d.documentId,
+            name: d.fileName || d.title || 'Document',
+            time: formatRelativeTime(d.lastAccessedAt),
+          }))
+        )
+      }
+    } catch (err) {
+      console.error('Error loading document history:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadDocumentHistory()
+  }, [])
+
+  useEffect(() => {
+    const hasActiveProcessing = sessionDocuments.some(
+      doc => !doc.status || doc.status === 'PROCESSING' || doc.status === 'PENDING'
+    )
+    if (!hasActiveProcessing) return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await workflowApi.getDocuments()
+        if (res.success && res.data) {
+          const documents = res.data
+          setSessionDocuments(prev => {
+            let changed = false
+            const next = prev.map(doc => {
+              const matched = documents.find((d: any) => d.documentId === doc.id)
+              if (matched && matched.processingStatus !== doc.status) {
+                changed = true
+                return { ...doc, status: matched.processingStatus }
+              }
+              return doc
+            })
+            return changed ? next : prev
+          })
+        }
+      } catch (err) {
+        console.error('Error polling document statuses:', err)
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [sessionDocuments])
+
+  const fetchQuizSets = async () => {
+    try {
+      const res = await workflowApi.getQuizSets()
+      if (res.success && res.data) {
+        setQuizletCards(res.data.map((q: any) => ({
+          id: q.quizId,
+          title: q.title,
+          subtitle: q.description || `${q.questionCount || 0} questions`,
+          source: q.source || 'AI_GENERATED',
+          questionCount: q.questionCount || 0,
+        })))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files
@@ -43,30 +175,183 @@ export default function AiSupport() {
 
   const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
+  // Real API state
+  const [conversations, setConversations] = useState<any[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
+  const [messages, setMessages] = useState<any[]>([])
+
+  const fetchConversations = async () => {
+    try {
+      const res = await workflowApi.getConversations()
+      if (res.success && res.data) {
+        setConversations(res.data)
+        if (res.data.length > 0 && !activeConversationId) {
+          setActiveConversationId(res.data[0].conversationId)
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const fetchMessages = async (convId: number) => {
+    try {
+      const res = await workflowApi.getChatMessages(convId)
+      if (res.success && res.data) {
+        setMessages(res.data)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    fetchConversations()
+    fetchQuizSets()
+  }, [])
+
+  useEffect(() => {
+    if (activeConversationId) {
+      fetchMessages(activeConversationId)
+    } else {
+      setMessages([])
+    }
+  }, [activeConversationId])
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const handleNewChat = async () => {
+    try {
+      const res = await workflowApi.createConversation(`Trò chuyện ngày ${new Date().toLocaleDateString()}`)
+      if (res.success && res.data) {
+        const newConv = res.data
+        setConversations(prev => [newConv, ...prev])
+        setActiveConversationId(newConv.conversationId)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    const text = input.trim()
+    const currentAttachments = [...attachments]
+    if (!text && currentAttachments.length === 0) return
+    setInput('')
+    setAttachments([])
+
+    let convId = activeConversationId
+    if (!convId) {
+      try {
+        const res = await workflowApi.createConversation(`Trò chuyện ngày ${new Date().toLocaleDateString()}`)
+        if (res.success && res.data) {
+          convId = res.data.conversationId
+          setConversations([res.data])
+          setActiveConversationId(convId)
+        } else {
+          return
+        }
+      } catch (err) {
+        console.error(err)
+        return
+      }
+    }
+
+    if (!convId) return
+
+    // Optimistically add user message
+    const tempUserMsg = {
+      messageId: Date.now() + Math.random(),
+      sender: 'USER',
+      messageText: text || `[Đã gửi ${currentAttachments.length} tệp]`,
+      sentAt: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, tempUserMsg])
+
+    try {
+      let uploadedDocumentId = lastUploadedDocumentId
+      if (currentAttachments.length > 0) {
+        setMessages(prev => [...prev, {
+          messageId: Date.now() + Math.random(),
+          sender: 'ASSISTANT',
+          messageText: `Đã tải lên ${currentAttachments.length} file. Hệ thống đang tiến hành xử lý ngầm (tạo Mindmap, tạo 10 câu hỏi Flashcard). Quá trình này có thể mất vài phút. Hãy nhấn 'Refresh Quizzes' sau ít phút để kiểm tra.`,
+          sentAt: new Date().toISOString()
+        }])
+        for (const att of currentAttachments) {
+          const res = await workflowApi.uploadDocument(att.file)
+          if (res.success && res.data && res.data.documentId) {
+            const docId = res.data.documentId
+            uploadedDocumentId = docId
+            setLastUploadedDocumentId(docId)
+            setSessionDocuments(prev => {
+              if (prev.some(d => d.id === docId)) return prev
+              return [...prev, { id: docId, name: att.file.name, status: res.data.processingStatus || 'PROCESSING' }]
+            })
+          }
+        }
+      }
+
+      if (text) {
+        await workflowApi.sendChatMessage(convId, text, uploadedDocumentId)
+      }
+      fetchMessages(convId)
+      // Refresh quizzes in case BE generated new ones
+      setTimeout(fetchQuizSets, 5000)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleDeleteDocument = async (e: React.MouseEvent, docId: number) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this document?')) return
+    
+    try {
+      const res = await workflowApi.deleteDocument(docId)
+      if (res.success) {
+        setSessionDocuments(prev => prev.filter(d => d.id !== docId))
+        if (lastUploadedDocumentId === docId) {
+          setLastUploadedDocumentId(undefined)
+        }
+      } else {
+        alert('Failed to delete document.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error deleting document.')
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] min-h-[520px]">
       <div className="flex-1 grid grid-cols-[20fr_50fr_30fr] min-h-0 rounded-2xl border-2 border-neutral-200 bg-[var(--color-surface)] shadow-sm overflow-hidden">
         {/* Left: 20% */}
         <aside className="min-w-0 flex flex-col border-r-2 border-neutral-200 bg-neutral-50/80">
           <div className="p-3 border-b border-neutral-200">
-            <Link
-              to="/ai-support"
-              className="inline-flex w-full items-center justify-center gap-2 font-medium rounded-xl px-4 py-2 text-sm min-h-[44px] bg-[var(--color-surface)] text-neutral-900 border border-neutral-900 hover:bg-[var(--color-cream-200)]"
+            <Button
+              variant="primary"
+              onClick={handleNewChat}
+              className="inline-flex w-full items-center justify-center gap-2 font-medium rounded-xl px-4 py-2 text-sm min-h-[44px]"
             >
               + New chat
-            </Link>
+            </Button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
             <section>
               <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-2 mb-2">Conversations</p>
               <ul className="space-y-0.5">
-                {SIDEBAR_CHATS.map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      to="#"
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                        c.active
-                          ? 'bg-accent-muted text-neutral-900'
+                {conversations.map((c) => (
+                  <li key={c.conversationId}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveConversationId(c.conversationId)}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
+                        c.conversationId === activeConversationId
+                          ? 'bg-accent-muted text-neutral-900 font-semibold'
                           : 'text-neutral-700 hover:bg-neutral-200/80'
                       }`}
                     >
@@ -76,11 +361,76 @@ export default function AiSupport() {
                         </svg>
                       </span>
                       <span className="min-w-0 truncate flex-1">{c.title}</span>
-                    </Link>
+                    </button>
                   </li>
                 ))}
               </ul>
             </section>
+            
+            {/* Session Documents List (Context Selection) */}
+            {sessionDocuments.length > 0 && (
+              <section className="mt-4 border-t border-neutral-200 pt-4">
+                <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-2 mb-2">
+                  Chat Context (Docs)
+                </p>
+                <div className="flex flex-col gap-2 px-2">
+                  {sessionDocuments.map(doc => (
+                    <button
+                      key={doc.id}
+                      onClick={() => setLastUploadedDocumentId(doc.id)}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium border flex items-center gap-1.5 justify-between transition-all ${
+                        lastUploadedDocumentId === doc.id
+                          ? 'bg-primary text-white border-primary shadow-sm hover:opacity-90'
+                          : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
+                      }`}
+                      title={`${doc.name} (Trạng thái: ${doc.status || 'PROCESSING'})`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate max-w-[120px]">{doc.name}</span>
+                        
+                        {/* Show spinner when processing */}
+                        {(!doc.status || doc.status === 'PROCESSING' || doc.status === 'PENDING') && (
+                          <svg className="animate-spin h-3 w-3 text-current shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        )}
+
+                        {doc.status === 'FAILED' && (
+                          <span className="text-red-500 shrink-0" title="Xử lý lỗi ⚠️">⚠️</span>
+                        )}
+
+                        {doc.status === 'COMPLETED' && lastUploadedDocumentId === doc.id && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+                        )}
+
+                        {doc.status === 'COMPLETED' && lastUploadedDocumentId !== doc.id && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        )}
+                      </div>
+
+                      <div 
+                        onClick={(e) => handleDeleteDocument(e, doc.id)} 
+                        className="ml-1 p-0.5 hover:bg-black/10 rounded-full transition-colors flex items-center justify-center shrink-0"
+                        title="Delete document"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    </button>
+                  ))}
+                  {lastUploadedDocumentId && (
+                     <button
+                       onClick={() => setLastUploadedDocumentId(undefined)}
+                       className="px-2 py-1.5 mt-1 rounded-xl text-[10px] font-medium border border-neutral-200 text-neutral-500 hover:bg-neutral-50 transition-colors"
+                     >
+                       Clear Context
+                     </button>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
           <div className="p-3 border-t border-neutral-200">
             <div className="rounded-xl bg-accent-muted border border-primary/20 p-3">
@@ -98,7 +448,7 @@ export default function AiSupport() {
           <section>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">Summary</h2>
             <Card className="p-4 min-h-[120px] border-2 border-neutral-200 text-neutral-500 text-sm">
-              {quizletCards
+              {quizletCards && quizletCards.length > 0
                 ? 'AI has generated quizlet sets below. Click "Do the quiz" on any card to start.'
                 : 'Session summary will appear here after you study.'}
             </Card>
@@ -110,35 +460,75 @@ export default function AiSupport() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setQuizletCards(quizletCards ? null : MOCK_QUIZLET_CARDS)}
+              onClick={fetchQuizSets}
             >
-              {quizletCards ? 'Hide Quizlet' : 'Generate Quizlet'}
+              Refresh Quizzes
             </Button>
-            <Button variant="secondary" size="sm">Flashcards</Button>
+            <Button variant="secondary" size="sm">Summary</Button>
             <Button variant="secondary" size="sm">Mindmaps</Button>
           </div>
-          {quizletCards && (
-            <section>
+          {quizletCards && quizletCards.length > 0 && (
+            <section className="shrink-0">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">Quizlet sets</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {quizletCards.map((card) => (
-                  <Card key={card.id} className="p-4 border-2 border-neutral-200 flex flex-col min-h-[10rem]">
+              <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
+                {quizletCards.map((card) => {
+                  const isFlashcardSet = card.source === 'FLASHCARD'
+                  return (
+                  <Card key={card.id} className={`p-4 border-2 flex flex-col min-h-[10rem] min-w-[220px] max-w-[280px] shrink-0 snap-start ${
+                    isFlashcardSet 
+                      ? 'border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700' 
+                      : 'border-neutral-200'
+                  }`}>
                     <div className="flex-1 min-h-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
+                          isFlashcardSet
+                            ? 'bg-amber-200 text-amber-700'
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          {isFlashcardSet ? '🃏 Flashcard' : '📝 Quiz'}
+                        </span>
+                      </div>
                       <p className="text-sm font-bold text-neutral-900">{card.title}</p>
-                      <p className="text-xs text-neutral-500 mt-0.5">{card.subtitle}</p>
+                      <p className="text-xs text-neutral-500 mt-0.5">{card.questionCount} câu</p>
                     </div>
                     <div className="flex-shrink-0 pt-3 mt-auto">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setShowQuizModal(true)}
-                      >
-                        Do the quiz
-                      </Button>
+                      {isFlashcardSet ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="w-full !bg-amber-500 !border-amber-500 hover:!bg-amber-600"
+                          onClick={() => setSelectedFlashcardQuizId(card.id)}
+                        >
+                          Open Flashcards
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setSelectedQuizId(card.id)
+                              setShowQuizModal(true)
+                            }}
+                          >
+                            Do the quiz
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={() => setSelectedFlashcardQuizId(card.id)}
+                          >
+                            Flashcards
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </Card>
-                ))}
+                  )
+                })}
               </div>
             </section>
           )}
@@ -165,34 +555,38 @@ export default function AiSupport() {
             </h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-            {MESSAGES.map((msg) => (
-              <div key={msg.id} className={msg.role === 'assistant' ? 'flex justify-center' : 'flex justify-end'}>
-                <div className={msg.role === 'assistant' ? 'flex gap-2 max-w-[85%]' : 'max-w-[85%]'}>
-                  {msg.role === 'assistant' && (
-                    <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
-                      <AiBotIcon className="w-6 h-6" />
-                    </span>
-                  )}
-                  <div
-                    className={`rounded-xl px-3 py-2 border-2 ${
-                      msg.role === 'assistant'
-                        ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
-                        : 'bg-accent-muted border-primary/20 text-neutral-900'
-                    }`}
-                  >
-                    {msg.role === 'user' && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {msg.time}</p>}
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
-                    {msg.role === 'assistant' && msg.time && <p className="text-[10px] text-neutral-500 mt-1">{msg.time}</p>}
+            {messages.map((msg) => {
+              const isAssistant = msg.sender === 'ASSISTANT';
+              return (
+                <div key={msg.messageId} className={isAssistant ? 'flex justify-start' : 'flex justify-end'}>
+                  <div className={isAssistant ? 'flex gap-2 max-w-[85%]' : 'max-w-[85%]'}>
+                    {isAssistant && (
+                      <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
+                        <AiBotIcon className="w-6 h-6" />
+                      </span>
+                    )}
+                    <div
+                      className={`rounded-xl px-3 py-2 border-2 ${
+                        isAssistant
+                          ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
+                          : 'bg-accent-muted border-primary/20 text-neutral-900'
+                      }`}
+                    >
+                      {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                      <p className="text-sm leading-relaxed">{msg.messageText}</p>
+                      {isAssistant && msg.sentAt && <p className="text-[10px] text-neutral-500 mt-1">{new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+            <div ref={messagesEndRef} />
           </div>
           <div className="p-4 border-t-2 border-neutral-200 shrink-0">
             <ChatInputBar
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onSend={() => {}}
+              onSend={handleSendMessage}
               onFileChange={handleFileChange}
               acceptFiles={ACCEPT_FILES}
               placeholder="Type your question..."
@@ -208,7 +602,7 @@ export default function AiSupport() {
       </div>
 
       {showQuizModal && (
-        <QuizletQuizModal onClose={() => setShowQuizModal(false)} />
+        <QuizletQuizModal quizId={selectedQuizId} onClose={() => setShowQuizModal(false)} />
       )}
 
       {/* Chat dialog popup */}
@@ -222,34 +616,37 @@ export default function AiSupport() {
               <IconButton type="button" onClick={() => setDialogOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label="Close" icon={<CloseIcon className="w-5 h-5" />} />
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-              {MESSAGES.map((msg) => (
-                <div key={msg.id} className={msg.role === 'assistant' ? 'flex justify-center' : 'flex justify-end'}>
-                  <div className={msg.role === 'assistant' ? 'flex gap-2 max-w-[90%]' : 'max-w-[90%]'}>
-                    {msg.role === 'assistant' && (
-                      <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
-                        <AiBotIcon className="w-6 h-6" />
-                      </span>
-                    )}
-                    <div
-                      className={`rounded-xl px-3 py-2 border-2 ${
-                        msg.role === 'assistant'
-                          ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
-                          : 'bg-accent-muted border-primary/20 text-neutral-900'
-                      }`}
-                    >
-                      {msg.role === 'user' && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {msg.time}</p>}
-                      <p className="text-sm leading-relaxed">{msg.text}</p>
-                      {msg.role === 'assistant' && msg.time && <p className="text-[10px] text-neutral-500 mt-1">{msg.time}</p>}
+              {messages.map((msg) => {
+                const isAssistant = msg.sender === 'ASSISTANT';
+                return (
+                  <div key={msg.messageId} className={isAssistant ? 'flex justify-start' : 'flex justify-end'}>
+                    <div className={isAssistant ? 'flex gap-2 max-w-[90%]' : 'max-w-[90%]'}>
+                      {isAssistant && (
+                        <span className="w-7 h-7 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
+                          <AiBotIcon className="w-6 h-6" />
+                        </span>
+                      )}
+                      <div
+                        className={`rounded-xl px-3 py-2 border-2 ${
+                          isAssistant
+                            ? 'bg-neutral-100 border-neutral-200 text-neutral-600 text-xs'
+                            : 'bg-accent-muted border-primary/20 text-neutral-900'
+                        }`}
+                      >
+                        {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                        <MessageRenderer text={msg.messageText} />
+                        {isAssistant && msg.sentAt && <p className="text-[10px] text-neutral-500 mt-1">{new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="p-3 border-t-2 border-neutral-200 bg-[var(--color-surface)]">
               <ChatInputBar
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onSend={() => {}}
+                onSend={handleSendMessage}
                 onFileChange={handleFileChange}
                 acceptFiles={ACCEPT_FILES}
                 placeholder="Ask anything..."
@@ -306,18 +703,22 @@ export default function AiSupport() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide">History</p>
-                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label="Refresh" icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
+                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label="Refresh" onClick={loadDocumentHistory} icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
                   </div>
                   <ul className="space-y-1.5">
-                    {SUMMARY_HISTORY.map((item) => (
-                      <li key={item.id}>
-                        <Button type="button" variant="ghost" size="sm" className="w-full !justify-start flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-neutral-50 text-left hover:bg-neutral-100 text-sm font-medium text-neutral-900">
-                          <span className="text-neutral-400 shrink-0" aria-hidden><DocumentIcon className="w-4 h-4" /></span>
-                          <span className="min-w-0 truncate flex-1">{item.name}</span>
-                          <span className="text-[10px] text-neutral-500 shrink-0">{item.time}</span>
-                        </Button>
-                      </li>
-                    ))}
+                    {documentHistory.length === 0 ? (
+                      <li className="text-xs text-neutral-400 px-3 py-2.5">No documents yet.</li>
+                    ) : (
+                      documentHistory.map((item) => (
+                        <li key={item.id}>
+                          <Button type="button" variant="ghost" size="sm" className="w-full !justify-start flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-neutral-50 text-left hover:bg-neutral-100 text-sm font-medium text-neutral-900">
+                            <span className="text-neutral-400 shrink-0" aria-hidden><DocumentIcon className="w-4 h-4" /></span>
+                            <span className="min-w-0 truncate flex-1">{item.name}</span>
+                            <span className="text-[10px] text-neutral-500 shrink-0">{item.time}</span>
+                          </Button>
+                        </li>
+                      ))
+                    )}
                   </ul>
                 </div>
               </div>
@@ -342,6 +743,13 @@ export default function AiSupport() {
             </div>
           </div>
       </Modal>
+
+      {selectedFlashcardQuizId && (
+        <FlashcardModal
+          quizId={selectedFlashcardQuizId}
+          onClose={() => setSelectedFlashcardQuizId(null)}
+        />
+      )}
     </div>
   )
 }

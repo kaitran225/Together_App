@@ -3,7 +3,6 @@
 export const TEAM_TABS = [
   { id: 'management', label: 'Team management' },
   { id: 'scrum', label: 'Scrum Board' },
-  { id: 'sprint', label: 'Sprint Board' },
 ] as const
 
 export type TabId = (typeof TEAM_TABS)[number]['id']

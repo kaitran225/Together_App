@@ -1,0 +1,33 @@
+# Route order: more specific paths first. Catch-all /api goes to auth last.
+# Upstream URIs default to local ports; Docker overrides via AUTH_URI / WORKFLOW_URI / READ_URI.
+spring:
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 10000
+        response-timeout: 120s
+      routes:
+        - id: workflow-ws
+          uri: ${WORKFLOW_URI:http://localhost:8881}
+          predicates:
+            - Path=/ws,/ws/**
+        - id: workflow-api
+          uri: ${WORKFLOW_URI:http://localhost:8881}
+          predicates:
+            - Path=/api/v1/workflow,/api/v1/workflow/**
+        - id: read-api
+          uri: ${READ_URI:http://localhost:8882}
+          predicates:
+            - Path=/api/v1/read,/api/v1/read/**
+        - id: auth-oauth2
+          uri: ${AUTH_URI:http://localhost:8880}
+          predicates:
+            - Path=/oauth2,/oauth2/**
+        - id: auth-well-known
+          uri: ${AUTH_URI:http://localhost:8880}
+          predicates:
+            - Path=/.well-known,/.well-known/**
+        - id: auth-api
+          uri: ${AUTH_URI:http://localhost:8880}
+          predicates:
+            - Path=/api,/api/**

@@ -59,6 +59,6 @@ public class GlobalExceptionHandler {
         log.error("Unhandled error", e);
         return ResponseEntity
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.fail(e.getMessage(), ErrorCodes.INTERNAL_ERROR));
+            .body(ApiResponse.fail("Đã có lỗi xảy ra, vui lòng thử lại sau.", ErrorCodes.INTERNAL_ERROR));
     }
 }

@@ -1,6 +1,8 @@
 package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -50,7 +52,8 @@ public class Notification extends BaseAuditEntity {
     @Column(name = "read_at")
     Instant readAt;
 
-    @Column(name = "sent_via", columnDefinition = "varchar[]")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "sent_via", columnDefinition = "jsonb")
     String sentVia;
 
     @Column(name = "expires_at")

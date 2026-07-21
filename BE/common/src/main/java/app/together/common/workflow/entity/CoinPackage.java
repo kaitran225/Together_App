@@ -2,11 +2,15 @@ package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
+
 
 @Entity
 @Table(name = "coin_packages")
@@ -35,7 +39,7 @@ public class CoinPackage extends BaseAuditEntity {
     Integer bonusCoins;
 
     @Column(name = "price_vnd", nullable = false, precision = 10, scale = 2)
-    BigDecimal priceVnd;
+    Long priceVnd;
 
     @Column(name = "is_popular")
     Boolean isPopular;
@@ -48,4 +52,28 @@ public class CoinPackage extends BaseAuditEntity {
 
     @Column(columnDefinition = "TEXT")
     String description;
+
+    @Column(name = "features", columnDefinition = "TEXT")
+    @Convert(converter = StringListConverter.class)
+    List<String> features;
+
+    /** JPA converter: JSON text ↔ List<String> */
+    @Converter
+    public static class StringListConverter implements AttributeConverter<List<String>, String> {
+        private static final ObjectMapper MAPPER = new ObjectMapper();
+
+        @Override
+        public String convertToDatabaseColumn(List<String> attribute) {
+            if (attribute == null || attribute.isEmpty()) return "[]";
+            try { return MAPPER.writeValueAsString(attribute); }
+            catch (Exception e) { return "[]"; }
+        }
+
+        @Override
+        public List<String> convertToEntityAttribute(String dbData) {
+            if (dbData == null || dbData.isBlank()) return Collections.emptyList();
+            try { return MAPPER.readValue(dbData, new TypeReference<>() {}); }
+            catch (Exception e) { return Collections.emptyList(); }
+        }
+    }
 }

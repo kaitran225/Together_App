@@ -42,6 +42,7 @@ public class MeetingParticipant extends BaseAuditEntity {
     @Column(name = "left_at")
     Instant leftAt;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 

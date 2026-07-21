@@ -1,6 +1,7 @@
 package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
+import app.together.common.workflow.enums.RoomType;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,6 +29,10 @@ public class RoomRequest extends BaseAuditEntity {
     @Column(name = "user_sso", nullable = false)
     String userSso;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type", length = 32)
+    RoomType roomType;
+
     @Column(name = "goal_description", nullable = false, columnDefinition = "TEXT")
     String goalDescription;
 
@@ -37,7 +42,8 @@ public class RoomRequest extends BaseAuditEntity {
     @Column(name = "preferred_size")
     Integer preferredSize;
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "tags", columnDefinition = "jsonb")
     String tags;
 
     @Column(name = "status")

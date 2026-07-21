@@ -7,10 +7,9 @@ import org.mapstruct.MappingConstants;
 
 /**
  * Maps audit columns between {@link BaseAuditEntity} and {@link BaseAuditDTO}.
- * Referenced from entity MapStruct mappers via {@code uses}.
  */
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface BaseAuditMapper {
 
-    BaseAuditDTO toDto(BaseAuditEntity entity);
+    BaseAuditDTO toAuditDto(BaseAuditEntity entity);
 }

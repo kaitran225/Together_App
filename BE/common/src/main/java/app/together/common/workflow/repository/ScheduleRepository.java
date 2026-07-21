@@ -8,4 +8,5 @@ import java.util.List;
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
     List<Schedule> findByUserSso(String userSso);
+    List<Schedule> findByUserSsoAndDeletedAtIsNull(String userSso);
 }

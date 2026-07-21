@@ -1,12 +1,50 @@
+import { useState, useEffect } from 'react'
 import { Button } from '../../../components/common'
 import { ChartContainer, LineChart, PieChart, useChartExport, usePdfExport } from '../charts'
 import { AdminKpiCard, AdminPageSection } from '../components'
-import { revenueDistribution, revenueKpis, revenueOverTime } from '../data/revenueData'
+import { workflowApi } from '../../../api/client'
 
 export default function AdminRevenue() {
   const overTimeExport = useChartExport()
   const distExport = useChartExport()
   const { exportSingleChartPdf, exportPageChartsPdf } = usePdfExport()
+
+  const [kpis, setKpis] = useState([
+    { label: 'Total Revenue', value: '—', hint: 'Loading...' },
+    { label: 'Total Transactions', value: '—', hint: 'Loading...' },
+  ])
+  const [revenueOverTime, setRevenueOverTime] = useState<{ label: string; series: { revenue: number } }[]>([])
+  const [revenueDistribution, setRevenueDistribution] = useState<{ label: string; value: number }[]>([])
+
+  useEffect(() => {
+    workflowApi.getAdminRevenueKpis()
+      .then((res) => {
+        if (res.success && res.data) {
+          const d = res.data
+          setKpis([
+            { label: 'Total Revenue', value: `${Number(d.totalRevenue ?? 0).toLocaleString('vi-VN')} ${d.currency || 'VND'}`, hint: 'Tổng doanh thu' },
+            { label: 'Total Transactions', value: String(d.totalTransactions ?? 0), hint: 'Số giao dịch thành công' },
+          ])
+        }
+      })
+      .catch((err) => console.error('Failed to load revenue kpis:', err))
+
+    workflowApi.getAdminRevenueOverTime(6)
+      .then((res) => {
+        if (res.success && res.data) {
+          setRevenueOverTime(res.data.map((d) => ({ label: d.label, series: { revenue: d.value } })))
+        }
+      })
+      .catch((err) => console.error('Failed to load revenue over time:', err))
+
+    workflowApi.getAdminRevenueDistribution()
+      .then((res) => {
+        if (res.success && res.data) {
+          setRevenueDistribution(res.data)
+        }
+      })
+      .catch((err) => console.error('Failed to load revenue distribution:', err))
+  }, [])
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,7 +67,7 @@ export default function AdminRevenue() {
         }
       >
         <div className="grid gap-3 md:grid-cols-2">
-          {revenueKpis.map((kpi) => (
+          {kpis.map((kpi) => (
             <AdminKpiCard key={kpi.label} label={kpi.label} value={kpi.value} hint={kpi.hint} />
           ))}
         </div>
@@ -78,4 +116,3 @@ export default function AdminRevenue() {
     </div>
   )
 }
-

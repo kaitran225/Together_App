@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import app.together.common.auth.dto.UserDto;
 import app.together.common.auth.dto.ChangePasswordRequest;
 import app.together.common.auth.dto.ConfirmPasswordResetRequest;
+import app.together.common.auth.dto.GoogleLoginRequest;
 import app.together.common.auth.dto.LoginRequest;
 import app.together.common.auth.dto.LoginResponse;
 import app.together.common.auth.dto.RefreshTokenRequest;
@@ -22,14 +23,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 import static app.together.common.shared.dto.ApiResponse.ok;
 
 @Tag(name = "Auth", description = "Auth API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final AuthService authService;
@@ -40,9 +39,8 @@ public class AuthController {
     }
 
     @PostMapping("/google-login")
-    public ResponseEntity<ApiResponse<LoginResponse>> googleLogin(@RequestBody Map<String, String> body) {
-        String idToken = body.get("idToken");
-        return ResponseEntity.ok(ok(authService.loginWithGoogle(idToken)));
+    public ResponseEntity<ApiResponse<LoginResponse>> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        return ResponseEntity.ok(ok(authService.loginWithGoogle(request.idToken())));
     }
 
     @PostMapping("/register")
@@ -52,18 +50,18 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
-        authService.logout(request.getRefreshToken());
+        authService.logout(request.refreshToken());
         return ResponseEntity.ok(ok(null));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<LoginResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(ok(authService.refreshToken(request.getRefreshToken())));
+        return ResponseEntity.ok(ok(authService.refreshToken(request.refreshToken())));
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@Valid @RequestBody ResetPasswordRequest request) {
-        authService.requestPasswordReset(request.getEmail());
+        authService.requestPasswordReset(request.email());
         return ResponseEntity.ok(ok(null));
     }
 
@@ -74,14 +72,20 @@ public class AuthController {
     }
 
     @GetMapping("/verify-email")
-    public ResponseEntity<ApiResponse<String>> verifyEmail(@RequestParam String tokenEmail) {
-        authService.verifyEmail(tokenEmail);
+    public ResponseEntity<ApiResponse<String>> verifyEmail(@RequestParam String rawToken) {
+        authService.verifyEmail(rawToken);
         return ResponseEntity.ok(ApiResponse.ok(MessageConstants.MESSAGE_EMAIL_VERIFY_SUCCESS));
+    }
+
+    @PostMapping("/dev-verify-all")
+    public ResponseEntity<ApiResponse<String>> devVerifyAll() {
+        authService.devVerifyAllUsers();
+        return ResponseEntity.ok(ApiResponse.ok("All users verified successfully"));
     }
 
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<String>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        authService.changePasswordRequest(request.getOldPassword(), request.getNewPassword());
+        authService.changePasswordRequest(request.oldPassword(), request.newPassword());
         return ResponseEntity.ok(ApiResponse.ok(MessageConstants.MESSAGE_PASSWORD_CHANGE_SUCCESS));
     }
 

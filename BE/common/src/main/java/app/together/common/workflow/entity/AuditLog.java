@@ -36,9 +36,11 @@ public class AuditLog extends BaseAuditEntity {
     @EqualsAndHashCode.Include
     Long recordId;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "old_values", columnDefinition = "jsonb")
     String oldValues;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "new_values", columnDefinition = "jsonb")
     String newValues;
 

@@ -39,6 +39,7 @@ public class TaskActivity extends BaseAuditEntity {
     @Column(name = "new_value", columnDefinition = "TEXT")
     String newValue;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 }

@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Button, Card, Checkbox, Input, SegmentedControl } from '../../../components/common'
 import { useAuth } from '../../../contexts/AuthContext'
-import type { UserPreferences } from '../../../mocks/auth'
+
+type UserPreferences = {
+  theme: 'light' | 'dark' | 'system'
+  notifications: { email: boolean; push: boolean; inApp: boolean }
+}
 
 export default function AdminAccountSettings() {
   const { user, updateOwnProfile, changeOwnPassword, updateOwnPreferences } = useAuth()
@@ -12,26 +16,29 @@ export default function AdminAccountSettings() {
     avatarUrl: user?.avatarUrl ?? '',
   })
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
-  const initialPrefs = useMemo<UserPreferences>(() => (
-    user?.preferences ?? {
-      theme: 'system',
-      notifications: { email: true, push: true, inApp: true },
-    }
-  ), [user?.preferences])
+  const initialPrefs = useMemo<UserPreferences>(() => ({
+    theme: 'system',
+    notifications: { email: true, push: true, inApp: true },
+  }), [])
   const [preferences, setPreferences] = useState<UserPreferences>(initialPrefs)
   const [message, setMessage] = useState('')
 
-  const saveProfile = (e: React.FormEvent) => {
+  const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = updateOwnProfile(profile)
+    const result = await updateOwnProfile(profile)
     setMessage(result.ok ? 'Profile updated.' : result.error ?? 'Failed to update profile.')
   }
 
-  const savePassword = (e: React.FormEvent) => {
+  const savePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = changeOwnPassword(passwordForm.current, passwordForm.next, passwordForm.confirm)
-    setMessage(result.ok ? 'Password updated.' : result.error ?? 'Failed to update password.')
-    if (result.ok) setPasswordForm({ current: '', next: '', confirm: '' })
+    setMessage('')
+    try {
+      const result = await changeOwnPassword(passwordForm.current, passwordForm.next, passwordForm.confirm)
+      setMessage(result.ok ? 'Password updated.' : result.error ?? 'Failed to update password.')
+      if (result.ok) setPasswordForm({ current: '', next: '', confirm: '' })
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to update password.')
+    }
   }
 
   const savePreferences = (e: React.FormEvent) => {

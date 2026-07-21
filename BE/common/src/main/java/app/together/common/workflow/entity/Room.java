@@ -1,12 +1,16 @@
 package app.together.common.workflow.entity;
 
 import app.together.common.shared.persistence.BaseAuditEntity;
+import app.together.common.workflow.enums.RoomType;
 
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.Instant;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "rooms")
@@ -37,11 +41,11 @@ public class Room extends BaseAuditEntity {
     @Column(name = "goal_duration_days")
     Integer goalDurationDays;
 
-    @Column(name = "max_members")
-    Integer maxMembers;
-
     @Column(name = "is_premium")
     Boolean isPremium;
+
+    @Column(name = "max_members")
+    Integer maxMembers;
 
     @Column(name = "is_public")
     Boolean isPublic;
@@ -51,6 +55,13 @@ public class Room extends BaseAuditEntity {
 
     @Column(name = "status")
     String status;
+
+    @Column(name = "topic", length = 32)
+    String topic;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type", nullable = false, length = 32)
+    RoomType roomType;
 
     @Column(name = "activated_at")
     Instant activatedAt;
@@ -64,8 +75,13 @@ public class Room extends BaseAuditEntity {
     @Column(name = "closed_by")
     String closedBy;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
+
+    @Version
+    @Column(name = "version")
+    Long version;
 
     @Column(name = "deleted_at")
     Instant deletedAt;

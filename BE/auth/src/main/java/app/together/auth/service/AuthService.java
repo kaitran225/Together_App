@@ -4,7 +4,6 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
-import app.together.common.auth.dto.ChangePasswordRequest;
 import app.together.common.auth.dto.ConfirmPasswordResetRequest;
 import app.together.common.auth.dto.LoginRequest;
 import app.together.common.auth.dto.LoginResponse;
@@ -13,7 +12,6 @@ import app.together.common.auth.dto.UserDto;
 import app.together.common.auth.entity.EmailVerification;
 import app.together.common.auth.entity.PasswordReset;
 import app.together.common.auth.entity.User;
-import app.together.common.auth.enums.BusinessRole;
 import app.together.common.auth.enums.SystemRole;
 import app.together.common.auth.mapper.UserMapper;
 import app.together.common.auth.repository.EmailVerificationRepository;
@@ -21,6 +19,7 @@ import app.together.common.auth.repository.PasswordResetRepository;
 import app.together.common.auth.repository.UserRepository;
 import app.together.common.shared.constant.ErrorCodes;
 import app.together.common.shared.constant.MessageConstants;
+import app.together.common.shared.dto.ApiResponse;
 import app.together.common.shared.exception.BadRequestException;
 import app.together.common.shared.exception.ConflictException;
 import app.together.common.shared.exception.ResourceNotFoundException;
@@ -37,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -54,43 +54,48 @@ public class AuthService {
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String googleClientId;
 
-    @Value("${spring.jwt.expiration}")
-    private long expirationTime;
-
-    @Value("${spring.jwt.refresh-token-expiration}")
-    private long refreshTokenExpirationTime;
-
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        if (request == null || request.email() == null || request.email().isBlank()
+                || request.password() == null || request.password().isBlank()) {
+            throw new UnauthorizedException(
+                    MessageConstants.MESSAGE_LOGIN_INVALID_CREDENTIALS,
+                    ErrorCodes.UNAUTHORIZED);
+        }
+
+        User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new UnauthorizedException(
                         MessageConstants.MESSAGE_LOGIN_INVALID_CREDENTIALS, ErrorCodes.UNAUTHORIZED));
 
-        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new UnauthorizedException(MessageConstants.MESSAGE_LOGIN_INVALID_CREDENTIALS, ErrorCodes.UNAUTHORIZED);
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new UnauthorizedException(MessageConstants.MESSAGE_LOGIN_INVALID_CREDENTIALS,
+                    ErrorCodes.UNAUTHORIZED);
         }
 
+        checkValidUser(user);
         return buildLoginResponse(user);
     }
 
     @Transactional
     public UserDto register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmail(request.email())) {
             throw new ConflictException(
-                    MessageConstants.MESSAGE_USER_EMAIL_ALREADY_EXISTS, MessageConstants.MESSAGE_USER_EMAIL_ALREADY_EXISTS);
+                    MessageConstants.MESSAGE_USER_EMAIL_ALREADY_EXISTS,
+                    ErrorCodes.USER_EMAIL_ALREADY_EXISTS);
         }
 
         User user = User.builder()
-                .email(request.getEmail())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .email(request.email())
+                .passwordHash(passwordEncoder.encode(request.password()))
+                .fullName(request.fullName())
                 .userSso(generateUserSso())
                 .planType(SubcriptionType.FREE.toString())
-                .metadata("{}")
                 .exp(0)
+                .level(1)
+                .metadata("{}")
                 .emailVerified(false)
-                .status(UserStatus.ACTIVE.toString())
+                .status(UserStatus.PENDING.toString())
                 .systemRole(SystemRole.USER)
-                .businessRole(BusinessRole.MEMBER)
                 .build();
 
         user = userRepository.save(user);
@@ -124,7 +129,7 @@ public class AuthService {
         User user = tokenService.validateRefreshToken(refreshToken)
                 .orElseThrow(() -> new UnauthorizedException(
                         MessageConstants.MESSAGE_REFRESH_TOKEN_INVALID,
-                        MessageConstants.MESSAGE_REFRESH_TOKEN_INVALID));
+                        ErrorCodes.UNAUTHORIZED_TOKEN));
 
         tokenService.revokeRefreshToken(refreshToken);
         return buildLoginResponse(user);
@@ -150,41 +155,41 @@ public class AuthService {
 
     @Transactional
     public void confirmPasswordReset(ConfirmPasswordResetRequest request) {
-        if (request == null || request.getToken() == null || request.getToken().isBlank()) {
+        if (request == null || request.token() == null || request.token().isBlank()) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_PASSWORD_RESET_TOKEN_REQUIRED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_INVALID);
+                    ErrorCodes.VALIDATION_FAILED_TOKEN);
         }
-        if (request.getNewPassword() == null || request.getNewPassword().isBlank()) {
+        if (request.newPassword() == null || request.newPassword().isBlank()) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_USER_NEW_PASSWORD_REQUIRED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_INVALID);
+                    ErrorCodes.VALIDATION_FAILED);
         }
 
-        String tokenHash = tokenService.hashToken(request.getToken());
+        String tokenHash = tokenService.hashToken(request.token());
         PasswordReset reset = passwordResetRepository.findByResetTokenHash(tokenHash)
                 .orElseThrow(() -> new BadRequestException(
                         MessageConstants.MESSAGE_PASSWORD_RESET_INVALID,
-                        MessageConstants.MESSAGE_PASSWORD_RESET_INVALID));
+                        ErrorCodes.VALIDATION_FAILED_TOKEN));
 
         if (reset.getUsedAt() != null) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_PASSWORD_RESET_TOKEN_USED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_INVALID);
+                    ErrorCodes.VALIDATION_FAILED_TOKEN);
         }
 
         if (reset.getExpiresAt().isBefore(Instant.now())) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_PASSWORD_RESET_EXPIRED,
-                    MessageConstants.MESSAGE_PASSWORD_RESET_EXPIRED);
+                    ErrorCodes.EXPIRED_TOKEN);
         }
 
         User user = userRepository.findById(reset.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.USER_NOT_FOUND));
 
-        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
 
         reset.setUsedAt(Instant.now());
@@ -198,7 +203,7 @@ public class AuthService {
         User user = userRepository.findByUserSso(userSso)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.NOT_FOUND));
         return userMapper.toDto(user);
     }
 
@@ -206,18 +211,7 @@ public class AuthService {
         String accessToken = tokenService.generateAccessToken(user);
         String refreshToken = tokenService.generateRefreshToken(user);
 
-        LoginResponse response = new LoginResponse();
-        response.setAccessToken(accessToken);
-        response.setRefreshToken(refreshToken);
-        response.setTokenType("Bearer");
-        response.setExpiresIn(expirationTime);
-        response.setRefreshTokenExpiresIn(refreshTokenExpirationTime);
-
-        response.setPlan_type(user.getPlanType());
-        response.setExp(user.getExp());
-        response.setSystemRole(user.getSystemRole() != null ? user.getSystemRole().name() : SystemRole.USER.name());
-        response.setBusinessRole(user.getBusinessRole() != null ? user.getBusinessRole().name() : BusinessRole.MEMBER.name());
-        return response;
+        return new LoginResponse(accessToken, refreshToken);
     }
 
     private String generateUserSso() {
@@ -228,7 +222,7 @@ public class AuthService {
         return "GOOGLE_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
-    public String verifyAndGetMailFromGoogle(String idTokenString) {
+    private Map<String, String> verifyAndGetMailFromGoogle(String idTokenString) {
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(),
                     new GsonFactory())
@@ -238,7 +232,18 @@ public class AuthService {
 
             if (idToken != null) {
                 GoogleIdToken.Payload payload = idToken.getPayload();
-                return payload.getEmail();
+                String email = payload.getEmail();
+                if (email == null || email.isBlank()) {
+                    throw new UnauthorizedException(MessageConstants.MESSAGE_GOOGLE_TOKEN_INVALID, ErrorCodes.UNAUTHORIZED);
+                }
+                String fullName = (String) payload.get("name");
+                if (fullName == null || fullName.isBlank()) {
+                    fullName = email;
+                }
+
+                return Map.of(
+                        "email", email,
+                        "fullName", fullName);
             } else {
                 throw new UnauthorizedException(MessageConstants.MESSAGE_GOOGLE_TOKEN_INVALID, ErrorCodes.UNAUTHORIZED);
             }
@@ -253,81 +258,127 @@ public class AuthService {
 
     @Transactional
     public LoginResponse loginWithGoogle(String googleToken) {
-        String email = verifyAndGetMailFromGoogle(googleToken);
+        if (googleToken == null || googleToken.isBlank()) {
+            throw new UnauthorizedException(
+                    MessageConstants.MESSAGE_GOOGLE_TOKEN_INVALID,
+                    ErrorCodes.UNAUTHORIZED);
+        }
+
+        Map<String, String> emailAndFullName = verifyAndGetMailFromGoogle(googleToken);
+        String email = emailAndFullName.get("email");
+        String fullName = emailAndFullName.get("fullName");
 
         User user = userRepository.findByEmail(email).orElseGet(() -> {
             User newUser = User.builder()
                     .email(email)
                     .userSso(generateGoogleUserSso())
                     .planType(SubcriptionType.FREE.toString())
-                    .metadata("{}")
+                    .fullName(fullName)
                     .exp(0)
+                    .level(1)
+                    .metadata("{}")
                     .emailVerified(true)
                     .status(UserStatus.ACTIVE.toString())
                     .systemRole(SystemRole.USER)
-                    .businessRole(BusinessRole.MEMBER)
                     .build();
             return userRepository.save(newUser);
         });
 
+        checkValidUser(user);
         return buildLoginResponse(user);
     }
 
     @Transactional
     public void verifyEmail(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new BadRequestException(
+                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID,
+                    ErrorCodes.EMAIL_VERIFICATION_INVALID);
+        }
+
         String hashedToken = tokenService.hashToken(rawToken);
 
         EmailVerification verification = emailVerificationRepository.findByVerificationCode(hashedToken)
                 .orElseThrow(() -> new BadRequestException(
                         MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID,
-                        MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID
-                ));
+                        ErrorCodes.EMAIL_VERIFICATION_INVALID));
 
-        if (verification.getAttempts() != null && verification.getAttempts() >= 5) {
-            throw new BadRequestException(
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_INVALID);
-        }
+        ensureEmailVerificationAttemptsAllowed(verification);
 
         if (verification.getVerifiedAt() != null) {
-            throw new BadRequestException(
+            rejectEmailVerificationAttempt(
+                    verification,
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_ALREADY_USED,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_ALREADY_USED);
+                    ErrorCodes.EMAIL_VERIFICATION_ALREADY_USED);
         }
 
         if (verification.getExpiresAt().isBefore(Instant.now())) {
-            throw new BadRequestException(
+            rejectEmailVerificationAttempt(
+                    verification,
                     MessageConstants.MESSAGE_EMAIL_VERIFICATION_EXPIRED,
-                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_EXPIRED);
+                    ErrorCodes.EMAIL_VERIFICATION_ALREADY_USED);
         }
 
         User user = userRepository.findById(verification.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.NOT_FOUND));
 
         user.setEmailVerified(true);
+        user.setStatus(UserStatus.ACTIVE.toString());
         userRepository.save(user);
 
         verification.setVerifiedAt(Instant.now());
-        verification.setAttempts((verification.getAttempts() == null ? 0 : verification.getAttempts()) + 1);
-
         emailVerificationRepository.save(verification);
     }
 
+    private void ensureEmailVerificationAttemptsAllowed(EmailVerification verification) {
+        if (emailVerificationAttempts(verification) >= 5) {
+            throw new BadRequestException(
+                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS,
+                    ErrorCodes.EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS);
+        }
+    }
+
+    private void rejectEmailVerificationAttempt(
+            EmailVerification verification,
+            String message,
+            String errorCode) {
+        int attempts = emailVerificationAttempts(verification);
+        verification.setAttempts(attempts + 1);
+        emailVerificationRepository.save(verification);
+
+        if (verification.getAttempts() >= 5) {
+            throw new BadRequestException(
+                    MessageConstants.MESSAGE_EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS,
+                    ErrorCodes.EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS);
+        }
+
+        throw new BadRequestException(message, errorCode);
+    }
+
+    private static int emailVerificationAttempts(EmailVerification verification) {
+        return verification.getAttempts() == null ? 0 : verification.getAttempts();
+    }
+
     @Transactional
-    public ChangePasswordRequest changePasswordRequest(String oldPassword, String newPassword) {
+    public ApiResponse<String> changePasswordRequest(String oldPassword, String newPassword) {
         String userSsoOrNull = SecurityUtils.getCurrentUserSsoOrNull();
+        if (userSsoOrNull == null || userSsoOrNull.isBlank()) {
+            throw new UnauthorizedException(
+                    MessageConstants.MESSAGE_LOGIN_INVALID_CREDENTIALS,
+                    ErrorCodes.UNAUTHORIZED);
+        }
 
         User user = userRepository.findByUserSso(userSsoOrNull)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         MessageConstants.MESSAGE_USER_NOT_FOUND,
-                        MessageConstants.MESSAGE_USER_NOT_FOUND));
+                        ErrorCodes.USER_NOT_FOUND));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
             throw new BadRequestException(
                     MessageConstants.MESSAGE_USER_OLD_PASSWORD_INCORRECT,
-                    MessageConstants.MESSAGE_USER_OLD_PASSWORD_INCORRECT);
+                    ErrorCodes.INVALID);
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -335,8 +386,35 @@ public class AuthService {
 
         tokenService.revokeAllUserRefreshTokens(user.getUserId());
 
-        ChangePasswordRequest response = new ChangePasswordRequest();
-        response.setNewPassword(MessageConstants.MESSAGE_PASSWORD_CHANGE_SUCCESS);
-        return response;
+        return ApiResponse.ok(MessageConstants.MESSAGE_PASSWORD_CHANGE_SUCCESS);
+    }
+
+    @Transactional
+    public void devVerifyAllUsers() {
+        userRepository.findAll().forEach(user -> {
+            user.setEmailVerified(true);
+            user.setStatus(UserStatus.ACTIVE.toString());
+            userRepository.save(user);
+        });
+    }
+
+    private void checkValidUser(User user) {
+        if (user == null) {
+            throw new ResourceNotFoundException(
+                    MessageConstants.MESSAGE_USER_NOT_FOUND,
+                    ErrorCodes.USER_NOT_FOUND);
+        }
+
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new UnauthorizedException(
+                    MessageConstants.MESSAGE_USER_EMAIL_INVALID,
+                    ErrorCodes.UNAUTHORIZED);
+        }
+
+        if (!UserStatus.ACTIVE.toString().equals(user.getStatus())) {
+            throw new UnauthorizedException(
+                    MessageConstants.MESSAGE_USER_NOT_ACTIVATED,
+                    ErrorCodes.USER_NOT_ACTIVATED);
+        }
     }
 }

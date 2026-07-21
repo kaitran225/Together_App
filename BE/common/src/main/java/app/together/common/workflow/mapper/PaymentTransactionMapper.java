@@ -1,7 +1,5 @@
 package app.together.common.workflow.mapper;
 
-import app.together.common.shared.mapper.BaseAuditMapper;
-
 import app.together.common.workflow.dto.PaymentTransactionDto;
 import app.together.common.workflow.entity.PaymentTransaction;
 import org.mapstruct.Mapper;
@@ -9,7 +7,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = BaseAuditMapper.class)
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface PaymentTransactionMapper {
 
     PaymentTransactionDto toDto(PaymentTransaction entity);

@@ -7,7 +7,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Entity
-@Table(name = "oauth_accounts")
+@Table(name = "oauth_accounts", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,6 +36,7 @@ public class OAuthAccount extends BaseAuditEntity {
     @Column(name = "email")
     String email;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "provider_data", columnDefinition = "jsonb")
     String providerData;
 }

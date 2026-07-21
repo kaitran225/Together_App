@@ -8,4 +8,5 @@ import java.util.List;
 public interface MindmapRepository extends JpaRepository<Mindmap, Long> {
 
     List<Mindmap> findByDocumentId(Long documentId);
+    List<Mindmap> findByUserSso(String userSso);
 }

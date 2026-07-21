@@ -21,6 +21,8 @@ export type MockUser = {
   avatarUrl?: string
   password: string
   preferences: UserPreferences
+  skills?: string[]
+  learningGoals?: string[]
 }
 
 export type PublicUser = Omit<MockUser, 'password'>

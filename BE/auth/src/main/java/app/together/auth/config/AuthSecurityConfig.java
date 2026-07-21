@@ -5,10 +5,6 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
-import app.together.common.auth.entity.User;
-import app.together.common.auth.enums.BusinessRole;
-import app.together.common.auth.enums.SystemRole;
-import app.together.common.auth.enums.UserTier;
 import app.together.auth.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -19,17 +15,13 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -37,8 +29,6 @@ import org.springframework.security.oauth2.server.authorization.config.annotatio
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
-import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
@@ -57,6 +47,15 @@ import java.util.UUID;
 @Configuration
 @EnableWebSecurity
 public class AuthSecurityConfig {
+
+    @Value("${app.cors.allowed-origins:http://localhost:5174}")
+    private String allowedOrigins;
+
+    @Value("${app.oauth2.client-secret:{noop}secret}")
+    private String clientSecret;
+
+    @Value("${app.oauth2.redirect-uris:http://localhost:5173/callback,http://localhost:5174/callback}")
+    private String redirectUris;
 
     @Bean
     @Order(1)
@@ -87,15 +86,21 @@ public class AuthSecurityConfig {
                 "/swagger-ui.html",
                 "/v3/api-docs/**",
                 "/v3/api-docs",
-                "/webjars/**"
+                "/webjars/**",
+                "/api/v1/auth/logout",
+                "/api/v1/auth/verify-email",
+                "/api/auth/health/check"
         };
         String[] PUBLIC_AUTH = {
-                "/api/auth/login",
-                "/api/auth/register",
-                "/api/auth/refresh",
-                "/api/auth/google-login",
-                "/api/auth/reset-password",
-                "/api/auth/reset-password/confirm"
+                "/api/v1/auth/login",
+                "/api/v1/auth/register",
+                "/api/v1/auth/refresh",
+                "/api/v1/auth/google-login",
+                "/api/v1/auth/reset-password",
+                "/api/v1/auth/reset-password/confirm",
+                "/api/v1/auth/dev-verify-all",
+                "/api/v1/public/**",
+                "/error"
         };
         http
                 .cors(Customizer.withDefaults())
@@ -115,8 +120,13 @@ public class AuthSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        List<String> origins = List.of(allowedOrigins.split(",")).stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        // Patterns allow LAN IP changes (e.g. http://192.168.*.*:5173) without hardcoding every IP
+        configuration.setAllowedOriginPatterns(origins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -126,14 +136,13 @@ public class AuthSecurityConfig {
 
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
-        RegisteredClient exe101Web = RegisteredClient.withId(UUID.randomUUID().toString())
+        String[] uris = redirectUris.split(",");
+        var clientBuilder = RegisteredClient.withId(UUID.randomUUID().toString())
             .clientId("exe101-web")
-            .clientSecret("{noop}secret")
+            .clientSecret(clientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-            .redirectUri("http://localhost:5173/callback")
-            .redirectUri("http://localhost:5173")
             .scope(OidcScopes.OPENID)
             .scope("read")
             .scope("write")
@@ -141,9 +150,11 @@ public class AuthSecurityConfig {
             .tokenSettings(TokenSettings.builder()
                 .accessTokenTimeToLive(Duration.ofHours(1))
                 .refreshTokenTimeToLive(Duration.ofDays(7))
-                .build())
-            .build();
-        return new InMemoryRegisteredClientRepository(exe101Web);
+                .build());
+        for (String uri : uris) {
+            clientBuilder.redirectUri(uri.trim());
+        }
+        return new InMemoryRegisteredClientRepository(clientBuilder.build());
     }
 
     //Giữ lại key trong quá trình server chạy
@@ -191,33 +202,5 @@ public class AuthSecurityConfig {
     UserDetailsService userDetailsService(UserService userService){
         return new CustomUserDetailService(userService);
     }
-
-    @Bean
-    OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService userService){
-        return context -> {
-            if(OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())){
-                Authentication principal = context.getPrincipal();
-
-                String userSso = principal.getName();
-
-                User user = userService.getUserBySso(userSso);
-
-                if(user != null){
-                    context.getClaims().claims(claims -> {
-                        claims.put("sub", user.getUserSso());
-                        claims.put("user_id", user.getUserId());
-                        claims.put("user_sso", user.getUserSso());
-                        claims.put("plan_type", user.getPlanType());
-                        claims.put("user_tier", UserTier.parse(user.getPlanType()).name());
-                        claims.put("system_role",
-                                user.getSystemRole() != null ? user.getSystemRole().name() : SystemRole.USER.name());
-                        claims.put("business_role",
-                                user.getBusinessRole() != null ? user.getBusinessRole().name() : BusinessRole.MEMBER.name());
-                        claims.put("is_admin", user.getSystemRole() == SystemRole.ADMIN
-                                || Boolean.TRUE.equals(user.getIsAdmin()));
-                    });
-                }
-            }
-        };
-    }
+   
 }

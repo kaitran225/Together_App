@@ -1,22 +1,348 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Button, Card, Textarea } from '../../../components/common'
-import { todayTasks, studyBars, upcomingItems, teamCards, cardCompact } from '../../../mocks'
+import { Badge, Button, Card, Textarea, Progress, Toast, Modal } from '../../../components/common'
+import { cardCompact } from '../../../mocks'
+import { workflowApi, readApi } from '../../../api/client'
+import { useAuth } from '../../../contexts/AuthContext'
+import { useTranslation } from '../../../contexts/LanguageContext'
+
+function formatTime(isoString: string) {
+  try {
+    const d = new Date(isoString)
+    return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch (e) {
+    return isoString
+  }
+}
 
 export default function Dashboard() {
+  const { t } = useTranslation()
+  const { user, refreshProfile } = useAuth()
+  const [teams, setTeams] = useState<any[]>([])
+  const [rooms, setRooms] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
+  const [schedules, setSchedules] = useState<any[]>([])
+  const [notes, setNotes] = useState<any[]>([])
+  const [noteText, setNoteText] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [selectedNote, setSelectedNote] = useState<any | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number>(0)
+  const [weeklyHours, setWeeklyHours] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
+
+  // Thêm task mới
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim()) return
+    setAddingTask(true)
+    try {
+      const res = await workflowApi.createFocusRoomTask(
+        newTaskTitle.trim(),
+        newTaskDueDate ? new Date(newTaskDueDate).toISOString() : undefined
+      )
+      if (res.success) {
+        setNewTaskTitle('')
+        setNewTaskDueDate('')
+        setShowAddTaskModal(false)
+        await loadUpcomingTasks()
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAddingTask(false)
+    }
+  }
+
+  // Chức năng tự học
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('active_study_session_id')
+    return saved ? Number(saved) : null
+  })
+  const [isStudyLoading, setIsStudyLoading] = useState(false)
+  const [sessionExpEarned, setSessionExpEarned] = useState<number | null>(null)
+
+  const handleToggleStudySession = async () => {
+    setIsStudyLoading(true)
+    setSessionExpEarned(null)
+    try {
+      if (activeSessionId) {
+        // Kết thúc phiên học
+        const res = await workflowApi.endSession(activeSessionId)
+        if (res.success && res.data) {
+          const exp = res.data.expEarned ?? 1
+          setSessionExpEarned(exp)
+          setActiveSessionId(null)
+          localStorage.removeItem('active_study_session_id')
+          // Tự động tải lại profile để cập nhật EXP, Level, Streak mới nhất
+          await refreshProfile()
+          try {
+            const weeklyRes = await workflowApi.getWeeklyStudyHours()
+            if (weeklyRes.success && weeklyRes.data) {
+              setWeeklyHours(weeklyRes.data)
+            }
+          } catch (err) {
+            console.error('Error reloading weekly hours:', err)
+          }
+        } else {
+          alert(res.message || 'Không thể kết thúc phiên học.')
+        }
+      } else {
+        // Bắt đầu phiên học
+        const res = await workflowApi.startSession(null, 'SELF_STUDY')
+        if (res.success && res.data) {
+          const sid = res.data.sessionId
+          setActiveSessionId(sid)
+          localStorage.setItem('active_study_session_id', String(sid))
+        } else {
+          alert(res.message || 'Không thể bắt đầu phiên học.')
+        }
+      }
+    } catch (e: any) {
+      console.error(e)
+      alert('Có lỗi xảy ra khi thực hiện chức năng tự học.')
+    } finally {
+      setIsStudyLoading(false)
+    }
+  }
+
+  const loadUpcomingTasks = async () => {
+    const allTasks: any[] = []
+    try {
+      const teamsRes = await workflowApi.getMyTeams()
+      const myTeams = teamsRes.success && teamsRes.data ? teamsRes.data : []
+
+      // 1. Fetch team tasks
+      for (const team of myTeams) {
+        try {
+          const projRes = await workflowApi.getProjects(team.teamId)
+          if (projRes.success && projRes.data) {
+            for (const proj of projRes.data) {
+              const boardRes = await workflowApi.getBoard(proj.projectId)
+              if (boardRes.success && boardRes.data && boardRes.data.columns) {
+                for (const col of boardRes.data.columns) {
+                  if (col.name?.toLowerCase() !== 'done' && col.name?.toLowerCase() !== 'completed' && col.tasks) {
+                    for (const task of col.tasks) {
+                      allTasks.push({
+                        ...task,
+                        projectName: proj.name,
+                        teamName: team.name,
+                        isPersonal: false,
+                      })
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching team projects/tasks:', err)
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+
+    // 2. Fetch personal tasks from focus room
+    try {
+      const personalRes = await workflowApi.getFocusRoomTasks()
+      if (personalRes.success && personalRes.data) {
+        const personalUncompleted = personalRes.data.filter((t: any) => !t.isCompleted)
+        for (const t of personalUncompleted) {
+          allTasks.push({
+            id: t.id,
+            title: t.title,
+            priority: 'MEDIUM',
+            isPersonal: true,
+            dueDate: t.dueDate,
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching personal focus tasks:', err)
+    }
+
+    setTasks(allTasks)
+  }
+
+  const handleToggleTaskCompletion = async (item: any) => {
+    if (item.isPersonal) {
+      try {
+        const res = await workflowApi.updateFocusRoomTask(item.id, undefined, undefined, true)
+        if (res.success) {
+          await loadUpcomingTasks()
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      alert('Công việc nhóm cần được cập nhật trạng thái trên bảng Kanban của nhóm.')
+    }
+  }
+
+  const handleDeleteTask = async (item: any) => {
+    if (item.isPersonal) {
+      try {
+        const res = await workflowApi.deleteFocusRoomTask(item.id)
+        if (res.success) {
+          await loadUpcomingTasks()
+        }
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      alert('Không thể xóa công việc nhóm từ Dashboard. Vui lòng thực hiện trên bảng Kanban.')
+    }
+  }
+
+  useEffect(() => {
+    loadUpcomingTasks()
+
+    workflowApi.getMyTeams()
+      .then((res) => {
+        if (res.success && res.data) {
+          setTeams(res.data.slice(0, 4).map((t: any) => ({
+            name: t.name,
+            active: `${t.currentMemberCount || 1} members`,
+            id: t.teamId,
+          })))
+        }
+      })
+      .catch(() => {})
+
+    readApi.getRooms()
+      .then((res) => {
+        if (res.success && res.data) {
+          setRooms(res.data.slice(0, 4).map((r: any) => ({
+            name: r.title,
+            active: `${r.members?.length || 0}/${r.maxMembers || 10}`,
+            id: r.roomId,
+          })))
+        }
+      })
+      .catch(() => {})
+
+    workflowApi.getSchedules()
+      .then((res) => {
+        if (res.success && res.data) {
+          setSchedules(res.data)
+        }
+      })
+      .catch(() => {})
+
+    workflowApi.getNotes()
+      .then((res) => {
+        if (res.success && res.data) {
+          setNotes(res.data)
+        }
+      })
+      .catch(() => {})
+
+    workflowApi.getUserWallet()
+      .then((res) => {
+        if (res.success && res.data) {
+          setWalletBalance(res.data.balance || 0)
+        }
+      })
+      .catch(() => {})
+
+    workflowApi.getWeeklyStudyHours()
+      .then((res) => {
+        if (res.success && res.data) {
+          setWeeklyHours(res.data)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim()) return
+    setSavingNote(true)
+    try {
+      const res = await workflowApi.createNote(noteText.trim())
+      if (res.success) {
+        setNoteText('')
+        const noteRes = await workflowApi.getNotes()
+        if (noteRes.success && noteRes.data) {
+          setNotes(noteRes.data)
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSavingNote(false)
+    }
+  }
+  const totalExp = user?.exp ?? 0
+  
+  let tempLevel = 1
+  let remainingExp = totalExp
+  let nextLevelExp = 100
+  
+  while (true) {
+    nextLevelExp = (Math.floor((tempLevel - 1) / 10) + 1) * 100
+    if (remainingExp >= nextLevelExp) {
+      remainingExp -= nextLevelExp
+      tempLevel++
+    } else {
+      break
+    }
+  }
+  
+  const userLevel = tempLevel
+  const currentLevelXp = remainingExp
+  const xpTarget = nextLevelExp
+
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const maxHours = Math.max(...weeklyHours, 2)
+  const studyBars = weeklyHours.map((hours, i) => ({
+    day: days[i],
+    h: Math.max((hours / maxHours) * 100, 10),
+    label: `${hours.toFixed(1)}h`,
+    active: hours > 0
+  }))
+
   return (
     <div className="flex flex-col gap-6 w-full">
       <Card variant="featured" className="p-6 md:p-7 border border-[var(--color-border)]">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <Badge variant="milestone" className="normal-case tracking-[0.12em] mb-3">Daily momentum</Badge>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-neutral-900 tracking-tight uppercase tracking-[0.04em]">Welcome back, keep your streak alive</h1>
-            <p className="text-sm text-neutral-500 mt-2">You have 3 tasks due today and your team is actively studying.</p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-neutral-900 tracking-tight uppercase tracking-[0.04em]">
+              {t('dashboard.welcome')}{user?.fullName ? `, ${user.fullName}` : ''}
+            </h1>
+            <p className="text-sm text-neutral-500 mt-2">{t('dashboard.subWelcome')}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="cta" size="md">Start focus session</Button>
-            <Link to="/meetings">
-              <Button variant="tonal" size="md">Join meeting</Button>
-            </Link>
+            {activeSessionId ? (
+              <>
+                <span className="flex items-center gap-2 text-xs font-bold text-error animate-pulse mr-2 relative">
+                  <span className="w-2.5 h-2.5 rounded-full bg-error inline-block animate-ping absolute" style={{ width: '10px', height: '10px' }} />
+                  <span className="w-2.5 h-2.5 rounded-full bg-error inline-block" />
+                  ĐANG HỌC TẬP TRUNG
+                </span>
+                <Link to="/focus-room">
+                  <Button variant="cta" size="md">
+                    Vào lại phòng
+                  </Button>
+                </Link>
+                <Button 
+                  variant="tonal" 
+                  size="md"
+                  onClick={handleToggleStudySession}
+                  disabled={isStudyLoading}
+                >
+                  {isStudyLoading ? 'Đang xử lý...' : 'Dừng học'}
+                </Button>
+              </>
+            ) : (
+              <Link to="/focus-room">
+                <Button variant="cta" size="md">
+                  Bắt đầu học
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </Card>
@@ -29,73 +355,115 @@ export default function Dashboard() {
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">Current streak</p>
-            <p className="text-2xl font-extrabold text-neutral-900">15 Days</p>
-            <Badge variant="streak" className="mt-1 normal-case tracking-normal">On fire</Badge>
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.currentStreak')}</p>
+            <p className="text-2xl font-extrabold text-neutral-900">{user ? `${user.streak ?? 0} ${t('dashboard.days')}` : `-- ${t('dashboard.days')}`}</p>
+            <Badge variant="streak" className="mt-1 normal-case tracking-normal">{t('dashboard.keepGoing')}</Badge>
           </div>
         </Card>
-        <Card variant="interactive" className={`flex items-center gap-3 py-3 ${cardCompact}`}>
-          <div className="flex-shrink-0 text-neutral-800 dark:text-primary">
-            <svg width="24" height="24" viewBox="0 0 50 50" fill="none" className="w-6 h-6" aria-hidden>
-              <rect x="2" y="2" width="46" height="46" rx="23" stroke="currentColor" strokeWidth="3" />
-              <rect x="25" y="15.1" width="14" height="14" transform="rotate(45 25 15.1)" stroke="currentColor" strokeWidth="3" />
-            </svg>
+        <Card variant="interactive" className={`flex flex-col gap-2 py-3 ${cardCompact}`}>
+          <div className="flex items-center gap-3 w-full">
+            <div className="flex-shrink-0 text-neutral-800 dark:text-primary">
+              <svg width="24" height="24" viewBox="0 0 50 50" fill="none" className="w-6 h-6" aria-hidden>
+                <rect x="2" y="2" width="46" height="46" rx="23" stroke="currentColor" strokeWidth="3" />
+                <rect x="25" y="15.1" width="14" height="14" transform="rotate(45 25 15.1)" stroke="currentColor" strokeWidth="3" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.experiencePoints')}</p>
+              <div className="flex items-baseline justify-between gap-2 mt-1">
+                <p className="text-xl font-extrabold text-neutral-900 leading-none">{user ? `${user.exp ?? 0} XP` : '-- XP'}</p>
+                <Badge variant="milestone" className="normal-case tracking-normal">Level {userLevel}</Badge>
+              </div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">Experience points</p>
-            <p className="text-2xl font-extrabold text-neutral-900">12,450 XP</p>
-            <Badge variant="milestone" className="mt-1 normal-case tracking-normal">Level up soon</Badge>
+          <div className="w-full mt-1">
+            <Progress 
+              value={currentLevelXp} 
+              max={xpTarget} 
+              size="sm" 
+              label={<span className="text-[9px] text-neutral-500 font-semibold">{currentLevelXp} / {xpTarget} XP to Lv.{userLevel + 1}</span>}
+              showPercentage
+            />
           </div>
         </Card>
-        <Card variant="interactive" className={`flex items-center gap-3 py-3 ${cardCompact}`}>
+        <Card variant="interactive" className={`flex items-center justify-between gap-3 py-3 ${cardCompact}`}>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">Coins in wallet</p>
-            <p className="text-2xl font-extrabold text-neutral-900">1000</p>
-            <Badge variant="focus" className="mt-1 normal-case tracking-normal">Reward ready</Badge>
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.plan')}</p>
+            <p className="text-2xl font-extrabold text-neutral-900">{user?.planType ?? 'FREE'}</p>
+            <Badge variant="focus" className="mt-1 normal-case tracking-normal">{user?.systemRole ?? 'USER'}</Badge>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.walletBalance')}</p>
+            <p className="text-2xl font-extrabold text-primary">{walletBalance.toLocaleString()} Xu</p>
+            <Link to="/shop">
+              <Badge variant="streak" className="mt-1 normal-case tracking-normal cursor-pointer hover:brightness-95 transition-all">{t('dashboard.topUp')}</Badge>
+            </Link>
           </div>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[24fr_36fr_40fr] gap-4 w-full">
-        <Card variant="interactive" className={`${cardCompact}`} heading="Today's work">
-          <ul className="space-y-2">
-            {todayTasks.map((t, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2 p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)]"
-              >
-                <Badge variant="outline" className="mt-0.5 px-1.5 py-0 text-[10px]">Task</Badge>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-neutral-900 truncate">{t.title}</p>
-                  <p className="text-xs text-neutral-500">{t.due}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <Button variant="tonal" size="sm" className="w-full mt-3">+ Add task</Button>
-        </Card>
-
         <Card variant="interactive" className={`${cardCompact}`} heading="Teams joined">
-          <div className="grid grid-cols-2 gap-2.5">
-            {teamCards.map((team, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] flex flex-col gap-2"
-              >
-                <p className="text-sm font-semibold text-neutral-900 truncate">{team.name}</p>
-                <Badge variant="focus" className="normal-case tracking-normal w-fit">{team.active}</Badge>
-                <Link to="/teams">
-                  <Button variant="secondary" size="sm" className="w-full">Join</Button>
-                </Link>
-              </div>
-            ))}
-          </div>
+          {teams.length === 0 ? (
+            <div className="flex flex-col items-center py-6 text-neutral-500">
+              <p className="text-sm">No teams yet.</p>
+              <Link to="/teams">
+                <Button variant="tonal" size="sm" className="mt-2">Browse teams</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {teams.map((team, i) => (
+                <div
+                  key={i}
+                  className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] flex flex-col gap-2"
+                >
+                  <p className="text-sm font-semibold text-neutral-900 truncate">{team.name}</p>
+                  <Badge variant="focus" className="normal-case tracking-normal w-fit">{team.active}</Badge>
+                  <Link to={`/teams/board?teamId=${team.id}`}>
+                    <Button variant="secondary" size="sm" className="w-full">Go to board</Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
-        <Card variant="featured" className={`${cardCompact}`} heading="Study time today">
+        <Card variant="interactive" className={`${cardCompact}`}>
+          <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Open study rooms</h3>
+            <Link to="/study-rooms">
+              <Button variant="ghost" size="sm" className="text-xs shrink-0">Browse all</Button>
+            </Link>
+          </div>
+          {rooms.length === 0 ? (
+            <div className="flex flex-col items-center py-6 text-neutral-500">
+              <p className="text-sm">No rooms open.</p>
+              <Link to="/study-rooms/create">
+                <Button variant="tonal" size="sm" className="mt-2">Create room</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {rooms.map((room, i) => (
+                <div
+                  key={i}
+                  className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] flex flex-col gap-2"
+                >
+                  <p className="text-sm font-semibold text-neutral-900 truncate">{room.name}</p>
+                  <Badge variant="focus" className="normal-case tracking-normal w-fit">{room.active}</Badge>
+                  <Link to={`/study-room?roomId=${room.id}`}>
+                    <Button variant="secondary" size="sm" className="w-full">Enter</Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card variant="featured" className={`${cardCompact}`} heading="Study time Weekly">
           <div className="flex justify-between items-center mb-2">
             <Badge variant="primary" className="normal-case tracking-normal">Weekly pace</Badge>
-            <Button variant="ghost" size="sm" className="text-xs">View analytics</Button>
           </div>
           <div className="flex items-end gap-1.5 h-[180px]">
             {studyBars.map((b, i) => (
@@ -115,75 +483,274 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-[24fr_36fr_40fr] gap-4 w-full">
         <Card variant="interactive" className={`${cardCompact}`} heading="Upcoming meetings">
-          <ul className="space-y-2">
-            {upcomingItems.map((item, i) => (
-              <li
-                key={i}
-                className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)]"
-              >
-                <div className="flex justify-between items-start gap-2">
-                  <Badge variant={item.tagClass.includes('error') ? 'error' : 'outline'} className="normal-case tracking-normal">{item.tag}</Badge>
-                  <span className="text-xs text-neutral-600 dark:text-neutral-400">{item.time}</span>
-                </div>
-                <p className="text-sm font-semibold text-neutral-900 mt-1 truncate">{item.title}</p>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card variant="interactive" className={`${cardCompact}`}>
-          <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
-            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Open study rooms</h3>
-            <Button variant="ghost" size="sm" className="text-xs shrink-0">Join randomly</Button>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            {teamCards.map((room, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] flex flex-col gap-2"
-              >
-                <p className="text-sm font-semibold text-neutral-900 truncate">{room.name}</p>
-                <Badge variant="focus" className="normal-case tracking-normal w-fit">{room.active}</Badge>
-                <Link to="/study-room">
-                  <Button variant="secondary" size="sm" className="w-full">Enter</Button>
-                </Link>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Card variant="interactive" className={`${cardCompact}`}>
-            <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
-              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Upcoming tasks</h3>
-              <Link to="/meetings">
-                <Button variant="tonal" size="sm" className="shrink-0">Start / Join</Button>
+          {schedules.length === 0 ? (
+            <div className="flex flex-col items-center py-6 text-neutral-500">
+              <p className="text-sm">No meetings scheduled.</p>
+              <Link to="/calendar">
+                <Button variant="tonal" size="sm" className="mt-2">Schedule one</Button>
               </Link>
             </div>
-            <ul className="space-y-2">
-              {upcomingItems.slice(0, 2).map((item, i) => (
+          ) : (
+            <ul className="space-y-2 max-h-[220px] overflow-y-auto">
+              {schedules.slice(0, 4).map((item, i) => (
                 <li
                   key={i}
                   className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)]"
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <Badge variant={item.tagClass.includes('error') ? 'error' : 'outline'} className="normal-case tracking-normal">{item.tag}</Badge>
-                    <span className="text-xs text-neutral-600 dark:text-neutral-400">{item.time}</span>
+                    <Badge variant="outline" className="normal-case tracking-normal">
+                      {item.location || 'Online'}
+                    </Badge>
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400">
+                      {formatTime(item.startTime)}
+                    </span>
                   </div>
                   <p className="text-sm font-semibold text-neutral-900 mt-1 truncate">{item.title}</p>
+                  {item.description && (
+                    <p className="text-xs text-neutral-500 mt-0.5 truncate">{item.description}</p>
+                  )}
                 </li>
               ))}
             </ul>
+          )}
+        </Card>
+
+        <Card variant="interactive" className={`${cardCompact}`}>
+          <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Quick links</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Link to="/ai-support" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
+              <p className="text-sm font-semibold text-neutral-900">AI Support</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">Chat</Badge>
+            </Link>
+            <Link to="/calendar" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
+              <p className="text-sm font-semibold text-neutral-900">Calendar</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">View</Badge>
+            </Link>
+            <Link to="/shop" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
+              <p className="text-sm font-semibold text-neutral-900">Shop</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">Coins</Badge>
+            </Link>
+            <Link to="/subscription" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
+              <p className="text-sm font-semibold text-neutral-900">Subscription</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">Plans</Badge>
+            </Link>
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[58fr_42fr] gap-3">
+          <Card variant="interactive" className={`${cardCompact}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
+              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500 break-words">
+                Upcoming tasks
+              </h3>
+              
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button variant="tonal" size="sm" onClick={() => setShowAddTaskModal(true)} className="font-semibold text-xs px-2">
+                  + Add
+                </Button>
+                <Link to="/teams">
+                  <Button variant="tonal" size="sm" className="text-xs px-2">Boards</Button>
+                </Link>
+              </div>
+            </div>
+            {tasks.length === 0 ? (
+              <div className="flex flex-col items-center py-6 text-neutral-500">
+                <p className="text-sm">No tasks assigned.</p>
+              </div>
+            ) : (
+              <ul className="space-y-2 max-h-[220px] overflow-y-auto">
+                {tasks.slice(0, 4).map((item, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/30 transition-all duration-200 group"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTaskCompletion(item)}
+                      className={`w-5 h-5 rounded-full border shrink-0 flex items-center justify-center transition-all ${
+                        item.isCompleted
+                          ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                          : 'border-neutral-400 dark:border-neutral-600 hover:bg-primary/10 hover:border-primary'
+                      }`}
+                      title={item.isPersonal ? "Mark as completed" : "Team task (update on board)"}
+                    >
+                      {item.isCompleted ? (
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-center gap-2 mb-1">
+                        <div className="flex gap-1.5">
+                          <Badge 
+                            variant={item.isPersonal ? 'info' : (item.priority === 'HIGH' ? 'error' : item.priority === 'MEDIUM' ? 'warning' : 'focus')} 
+                            className="normal-case tracking-normal text-[9px]"
+                          >
+                            {item.isPersonal ? 'Cá nhân' : item.priority}
+                          </Badge>
+                          {!item.isPersonal && (
+                            <Badge variant="outline" className="normal-case tracking-normal text-[9px] border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.15)]">
+                              Team
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-neutral-500 truncate max-w-[100px]">
+                          {item.isPersonal ? 'Personal Task' : item.teamName}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(item)}
+                      className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-error shrink-0 transition-all p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
+                      title={item.isPersonal ? "Delete task" : "Team task (delete on board)"}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
-          <Card variant="interactive" className={`${cardCompact}`} heading="Quick notes">
-            <Textarea placeholder="Start typing a note..." className="min-h-[120px] resize-y text-sm py-2" />
-            <Button variant="tonal" size="sm" className="w-full mt-2">+ Add note</Button>
+          <Card variant="interactive" className={`${cardCompact}`} heading={t('dashboard.personalNotes')}>
+            <Textarea
+              placeholder={t('dashboard.notePlaceholder')}
+              className="!min-h-[40px] !py-1.5 resize-y text-sm"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+            />
+            
+            <Button
+              variant="tonal"
+              size="sm"
+              className="w-full mt-2"
+              onClick={handleSaveNote}
+              disabled={savingNote}
+            >
+              {savingNote ? t('dashboard.saving') : `+ ${t('dashboard.saveNote')}`}
+            </Button>
+
+            {notes.length > 0 && (
+              <div className="mt-3 border-t border-[var(--color-border)] pt-3 max-h-[105px] overflow-y-auto space-y-1.5">
+                <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">{t('dashboard.savedNotesTitle')}</p>
+                {notes.slice().sort((a, b) => b.noteId - a.noteId).slice(0, 3).map((n) => (
+                  <div key={n.noteId} className="flex justify-between items-start gap-2 p-2 rounded bg-neutral-100 dark:bg-neutral-800 text-xs">
+                    <p
+                      onClick={() => setSelectedNote(n)}
+                      className="text-neutral-800 dark:text-neutral-200 truncate flex-1 cursor-pointer hover:underline"
+                      title="Click to view details"
+                    >
+                      {n.content}
+                    </p>
+                    <button
+                      onClick={async () => {
+                        await workflowApi.deleteNote(n.noteId)
+                        setNotes(prev => prev.filter(item => item.noteId !== n.noteId))
+                      }}
+                      className="text-[var(--color-error)] hover:underline shrink-0 text-[10px]"
+                    >
+                      {t('dashboard.delete')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>
+
+      {selectedNote && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <Card className="w-full max-w-md p-6 bg-white dark:bg-neutral-900 border border-[var(--color-border)] shadow-2xl rounded-3xl relative">
+            <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 border-b border-[var(--color-border)] pb-3 mb-4">
+              {t('dashboard.noteDetails')}
+            </h3>
+            
+            <div className="max-h-[300px] overflow-y-auto text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap mb-6 leading-relaxed">
+              {selectedNote.content}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-3 border-t border-[var(--color-border)]">
+              <Button
+                variant="cta"
+                size="sm"
+                onClick={async () => {
+                  await workflowApi.deleteNote(selectedNote.noteId)
+                  setNotes(prev => prev.filter(item => item.noteId !== selectedNote.noteId))
+                  setSelectedNote(null)
+                }}
+              >
+                {t('dashboard.delete')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setSelectedNote(null)}
+              >
+                {t('dashboard.close')}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {sessionExpEarned !== null && (
+        <div className="fixed bottom-4 right-4 z-[999] max-w-sm animate-scale-in">
+          <Toast 
+            variant="success" 
+            onClose={() => setSessionExpEarned(null)} 
+            className="shadow-2xl border border-emerald-200 bg-emerald-50"
+          >
+            <div className="flex flex-col gap-0.5 text-emerald-950">
+              <span className="font-extrabold text-sm">🎉 Phiên học hoàn thành!</span>
+              <span className="text-xs">Bạn đã nhận được <strong className="text-emerald-700 font-black">+{sessionExpEarned} XP</strong>. Cố gắng phát huy nhé!</span>
+            </div>
+          </Toast>
+        </div>
+      )}
+      {showAddTaskModal && (
+        <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title="Tạo nhiệm vụ cá nhân">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Tên nhiệm vụ</label>
+              <input
+                type="text"
+                placeholder="Nhiệm vụ cần làm..."
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                className="w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl text-sm px-3 py-2 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Hạn chót (Không bắt buộc)</label>
+              <input
+                type="date"
+                value={newTaskDueDate}
+                onChange={(e) => setNewTaskDueDate(e.target.value)}
+                className="w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl text-sm px-3 py-2 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t border-[var(--color-border)]">
+              <Button variant="secondary" size="sm" onClick={() => setShowAddTaskModal(false)}>Hủy</Button>
+              <Button variant="primary" size="sm" onClick={handleCreateTask} disabled={addingTask || !newTaskTitle.trim()}>
+                {addingTask ? 'Đang tạo...' : 'Tạo nhiệm vụ'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

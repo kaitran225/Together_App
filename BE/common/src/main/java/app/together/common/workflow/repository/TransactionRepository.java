@@ -8,4 +8,6 @@ import java.util.List;
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
     List<Transaction> findByUserMasterDataId(Long userMasterDataId);
+
+    List<Transaction> findByUserMasterDataIdOrderByCreatedAtDesc(Long userMasterDataId);
 }

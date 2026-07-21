@@ -1,0 +1,299 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: together-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_ROOT_USERNAME}
+      POSTGRES_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [together-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_ROOT_USERNAME} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Host tools (DBeaver/pgAdmin): localhost:5433 → container 5432
+    # (5432 is often reserved on Windows Hyper-V)
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  auth:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.auth
+    container_name: together-auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8880
+      DB_AUTH_URL: jdbc:postgresql://postgres:5432/postgres?currentSchema=auth
+      DB_AUTH_USERNAME: ${DB_ROOT_USERNAME}
+      DB_AUTH_PASSWORD: ${DB_ROOT_PASSWORD}
+      DB_IDLE_TIMEOUT: 30000
+      DB_MAXIMUM_POOL_SIZE: 15
+      DB_MINIMUM_IDLE: 2
+      DB_CONNECTION_TIMEOUT: 20000
+      DB_MAX_LIFETIME: 1800000
+      DB_FLYWAY_ENABLED: "true"
+      DB_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      AUTH_ISSUER_URI: https://${DOMAIN}
+      EMAIL_SERVICE_BASE_URL: http://email:8895
+      EMAIL_SERVICE_INTERNAL_API_KEY: ${EMAIL_SERVICE_INTERNAL_API_KEY}
+      APP_FRONTEND_PUBLIC_BASE_URL: https://${DOMAIN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      AI_MODEL: ${AI_MODEL:-gemini-2.0-flash}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL:-https://generativelanguage.googleapis.com}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      # LAN_TEST_ORIGIN lets you test via the machine's LAN IP (e.g. https://192.168.1.19) before
+      # the real domain is publicly reachable. Remove it from .env once testing is done externally.
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN}${LAN_TEST_ORIGIN:+,${LAN_TEST_ORIGIN}}
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
+      OAUTH2_REDIRECT_URIS: https://${DOMAIN}/callback,https://${DOMAIN}
+    networks: [together-net]
+
+  workflow:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.workflow
+    container_name: together-workflow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8881
+      DB_URL: jdbc:postgresql://postgres:5432/postgres?currentSchema=workflow
+      DB_USERNAME: ${DB_ROOT_USERNAME}
+      DB_PASSWORD: ${DB_ROOT_PASSWORD}
+      DB_IDLE_TIMEOUT: 30000
+      DB_MAXIMUM_POOL_SIZE: 15
+      DB_MINIMUM_IDLE: 2
+      DB_CONNECTION_TIMEOUT: 20000
+      DB_MAX_LIFETIME: 1800000
+      DB_FLYWAY_ENABLED: "true"
+      DB_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      JWT_JWK_SET_URI: http://auth:8880/oauth2/jwks
+      UNDERTOW_ACCESSLOG_ENABLED: "false"
+      UNDERTOW_ACCESSLOG_PATTERN: '%h %l %u %t "%r" %s %b'
+      UNDERTOW_IO_THREADS: 4
+      UNDERTOW_WORKER_THREADS: 32
+      UNDERTOW_MAX_HTTP_POST_SIZE: 10485760
+      LOGGING_LEVEL_SPRING_SECURITY: WARN
+      # WebRTC — browser reaches coturn on the VPS public IP (see WEBRTC_* in .env).
+      WEBRTC_STUN_URLS: ${WEBRTC_STUN_URLS:-stun:103.20.97.225:3478}
+      WEBRTC_TURN_URLS: ${WEBRTC_TURN_URLS:-turn:103.20.97.225:3478}
+      WEBRTC_TURN_USERNAME: ${TURN_USERNAME}
+      WEBRTC_TURN_CREDENTIAL: ${TURN_CREDENTIAL}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-https://dev-together-ai-gateway.onrender.com/}
+      AI_SERVICE_TIMEOUT: 8000
+      # Ollama runs natively on this host (already pulled qwen2.5:3b) — reach it via Docker Desktop's host gateway.
+      SPRING_AI_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      SPRING_AI_OLLAMA_CHAT_OPTIONS_MODEL: qwen2.5:3b
+      SPRING_AI_OLLAMA_CHAT_OPTIONS_TEMPERATURE: 0.7
+      SPRING_AI_OLLAMA_CHAT_OPTIONS_NUM_PREDICT: 2048
+      # Ollama defaults to a 2048-token context window regardless of the model's real max context
+      # unless set explicitly — without this, document Q&A prompts get silently truncated.
+      SPRING_AI_OLLAMA_CHAT_OPTIONS_NUM_CTX: 8192
+      SPRING_AI_OLLAMA_INIT_TIMEOUT: 120s
+      SPRING_AI_OLLAMA_INIT_PULL_MODEL_STRATEGY: when_missing
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID}
+      PAYOS_API_KEY: ${PAYOS_API_KEY}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY}
+      PAYOS_RETURN_URL: https://${DOMAIN}/billing/payment-result
+      PAYOS_CANCEL_URL: https://${DOMAIN}/billing/payment-result
+      # LAN_TEST_ORIGIN lets you test via the machine's LAN IP (e.g. https://192.168.1.19) before
+      # the real domain is publicly reachable. Remove it from .env once testing is done externally.
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN}${LAN_TEST_ORIGIN:+,${LAN_TEST_ORIGIN}}
+      EMAIL_SERVICE_BASE_URL: http://email:8895
+      EMAIL_SERVICE_INTERNAL_API_KEY: ${EMAIL_SERVICE_INTERNAL_API_KEY}
+      FRONTEND_PUBLIC_BASE_URL: https://${DOMAIN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [together-net]
+
+  read:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.read
+    container_name: together-read
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      workflow:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8882
+      DB_URL: jdbc:postgresql://postgres:5432/postgres?currentSchema=workflow
+      DB_USERNAME: ${DB_ROOT_USERNAME}
+      DB_PASSWORD: ${DB_ROOT_PASSWORD}
+      DB_IDLE_TIMEOUT: 30000
+      DB_MAXIMUM_POOL_SIZE: 10
+      DB_MINIMUM_IDLE: 2
+      DB_CONNECTION_TIMEOUT: 20000
+      DB_MAX_LIFETIME: 1800000
+      UNDERTOW_ACCESSLOG_ENABLED: "false"
+      UNDERTOW_ACCESSLOG_PATTERN: '%h %l %u %t "%r" %s %b'
+      UNDERTOW_IO_THREADS: 4
+      UNDERTOW_WORKER_THREADS: 32
+      UNDERTOW_MAX_HTTP_POST_SIZE: 10485760
+      LOGGING_LEVEL_SPRING_SECURITY: WARN
+      # Not present in read's application-prod.properties as a placeholder, but Spring Boot
+      # binds this env var to spring.security.oauth2.resourceserver.jwt.jwk-set-uri directly.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://auth:8880/oauth2/jwks
+    networks: [together-net]
+
+  cronjob:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.cronjob
+    container_name: together-cronjob
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      workflow:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8883
+      DB_URL: jdbc:postgresql://postgres:5432/postgres?currentSchema=workflow
+      DB_USERNAME: ${DB_ROOT_USERNAME}
+      DB_PASSWORD: ${DB_ROOT_PASSWORD}
+      DB_IDLE_TIMEOUT: 30000
+      DB_MAXIMUM_POOL_SIZE: 10
+      DB_MINIMUM_IDLE: 2
+      DB_CONNECTION_TIMEOUT: 20000
+      DB_MAX_LIFETIME: 1800000
+      UNDERTOW_ACCESSLOG_ENABLED: "false"
+      UNDERTOW_ACCESSLOG_PATTERN: '%h %l %u %t "%r" %s %b'
+      UNDERTOW_IO_THREADS: 4
+      UNDERTOW_WORKER_THREADS: 32
+      UNDERTOW_MAX_HTTP_POST_SIZE: 10485760
+      LOGGING_LEVEL_SPRING_SECURITY: WARN
+    networks: [together-net]
+
+  email:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.email
+    container_name: together-email
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8895
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      EMAIL_SERVICE_INTERNAL_API_KEY: ${EMAIL_SERVICE_INTERNAL_API_KEY}
+    networks: [together-net]
+
+  # Single public entry for VPS nginx → Tailscale → this host:8890.
+  # Auth/workflow/read stay on the internal Docker network only.
+  gateway:
+    build:
+      context: ./BE
+      dockerfile: render/Dockerfile.gateway
+    container_name: together-gateway
+    restart: unless-stopped
+    depends_on:
+      - auth
+      - workflow
+      - read
+    ports:
+      - "8890:8890"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8890
+      AUTH_URI: http://auth:8880
+      WORKFLOW_URI: http://workflow:8881
+      READ_URI: http://read:8882
+    networks: [together-net]
+
+  frontend:
+    build:
+      context: ./FE
+      dockerfile: Dockerfile
+    container_name: together-frontend
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+    networks: [together-net]
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: together-coturn
+    restart: unless-stopped
+    volumes:
+      - ./deploy/coturn/turnserver.conf:/etc/turnserver.conf:ro
+    command: ["-c", "/etc/turnserver.conf"]
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "49152-49252:49152-49252/udp"
+    networks: [together-net]
+
+  nginx:
+    image: nginx:alpine
+    container_name: together-nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - auth
+      - workflow
+      - read
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/templates:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    networks: [together-net]
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: together-certbot
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+
+  duckdns:
+    image: alpine:latest
+    container_name: together-duckdns
+    restart: unless-stopped
+    environment:
+      DUCKDNS_SUBDOMAIN: ${DUCKDNS_SUBDOMAIN}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN}
+      DUCKDNS_IP: ${DUCKDNS_IP:-103.20.97.225}
+    entrypoint: /bin/sh -c "apk add --no-cache curl >/dev/null; while :; do [ -n \"$$DUCKDNS_SUBDOMAIN\" ] && curl -fsS \"https://www.duckdns.org/update?domains=$$DUCKDNS_SUBDOMAIN&token=$$DUCKDNS_TOKEN&ip=$$DUCKDNS_IP\" || true; sleep 300; done"
+
+networks:
+  together-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  certbot-conf:
+  certbot-www:

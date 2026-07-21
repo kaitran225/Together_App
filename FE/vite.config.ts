@@ -10,10 +10,14 @@ export default defineConfig({
     globals: true,
   },
   server: {
-    port: 5173,
+    port: 5174,
+    host: true,
     proxy: {
+      '/api/v1/workflow': { target: 'http://localhost:8881', changeOrigin: true },
+      '/api/v1/read': { target: 'http://localhost:8882', changeOrigin: true },
       '/api': { target: 'http://localhost:8880', changeOrigin: true },
       '/oauth2': { target: 'http://localhost:8880', changeOrigin: true },
+      '/ws': { target: 'http://localhost:8881', ws: true, changeOrigin: true },
     },
   },
 })

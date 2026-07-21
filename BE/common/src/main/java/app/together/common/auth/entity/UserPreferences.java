@@ -7,7 +7,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Entity
-@Table(name = "user_preferences")
+@Table(name = "user_preferences", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -55,9 +55,11 @@ public class UserPreferences extends BaseAuditEntity {
     @Column(name = "theme")
     String theme;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "settings_json", columnDefinition = "jsonb")
     String settingsJson;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "unlocked_features", columnDefinition = "jsonb")
     String unlockedFeatures;
 }

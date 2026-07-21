@@ -1,9 +1,25 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Button, Card, Input, SegmentedControl } from '../../../components/common'
-import { FILTERS, FAKE_ROOMS, MY_ROOM_IDS, SUGGESTED_IDS, STUDY_ROOMS_TABS, type Room } from '../../../mocks'
+import { FILTERS, FAKE_ROOMS, STUDY_ROOMS_TABS, type Room } from '../../../mocks'
+import { readApi } from '../../../api/client'
 
 type TabKey = (typeof STUDY_ROOMS_TABS)[number]['key']
+
+function mapApiRoom(r: any): Room {
+  const activeCount = r.members ? r.members.filter((m: any) => m.isActive).length : 0
+  const validTopics = ['math', 'science', 'lang']
+  const topic: Room['topic'] = validTopics.includes(r.topic) ? r.topic : 'other'
+  return {
+    id: String(r.roomId),
+    title: r.title || 'Untitled room',
+    topic,
+    tags: ['Study', topic.toUpperCase()],
+    description: r.description || '',
+    membersCurrent: activeCount,
+    membersMax: r.maxMembers || 10,
+  }
+}
 
 function matchRoom(room: Room, query: string, category: string): boolean {
   const q = query.trim().toLowerCase()
@@ -20,17 +36,45 @@ export default function StudyRoomDiscovery() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
   const [tab, setTab] = useState<TabKey>('explore')
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
-  const filteredBySearch = useMemo(
-    () => FAKE_ROOMS.filter((room: Room) => matchRoom(room, search, category)),
-    [search, category]
+  const loadRooms = useCallback(async (activeTab: TabKey) => {
+    setLoading(true)
+    setLoadError('')
+    const isMock = import.meta.env.VITE_USE_MOCK === 'true'
+    try {
+      const res =
+        activeTab === 'my'
+          ? await readApi.getMyRooms()
+          : activeTab === 'suggested'
+            ? await readApi.getSuggestedRooms()
+            : await readApi.getRooms()
+
+      if (res.success && Array.isArray(res.data)) {
+        const mapped = res.data.map(mapApiRoom)
+        setRooms(mapped.length > 0 ? mapped : (isMock ? FAKE_ROOMS : []))
+      } else {
+        setRooms(isMock ? FAKE_ROOMS : [])
+        if (!isMock) setLoadError(res.message || 'Không tải được danh sách phòng.')
+      }
+    } catch {
+      setRooms(isMock ? FAKE_ROOMS : [])
+      if (!isMock) setLoadError('Không kết nối được server phòng học. Hãy đảm bảo Workflow (và Read nếu cần) đang chạy.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadRooms(tab)
+  }, [tab, loadRooms])
+
+  const roomsToShow = useMemo(
+    () => rooms.filter((room: Room) => matchRoom(room, search, category)),
+    [rooms, search, category]
   )
-
-  const roomsToShow = useMemo(() => {
-    if (tab === 'explore') return filteredBySearch
-    if (tab === 'my') return filteredBySearch.filter((r) => MY_ROOM_IDS.includes(r.id))
-    return filteredBySearch.filter((r) => SUGGESTED_IDS.includes(r.id))
-  }, [tab, filteredBySearch])
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,7 +101,6 @@ export default function StudyRoomDiscovery() {
         </div>
       </div>
 
-      {/* Tabs: Explore | My rooms | Suggested */}
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
           value={tab}
@@ -90,16 +133,23 @@ export default function StudyRoomDiscovery() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {roomsToShow.length === 0 ? (
+        {loading ? (
+          <Card variant="featured" className="col-span-full p-8 text-center">
+            <p className="text-sm text-neutral-600">Loading rooms…</p>
+          </Card>
+        ) : roomsToShow.length === 0 ? (
           <Card variant="featured" className="col-span-full p-8 text-center">
             <p className="text-sm font-semibold text-neutral-900 mb-1">No rooms found</p>
             <p className="text-sm text-neutral-500">
-              {tab === 'my'
-                ? 'You haven’t joined any rooms yet. Switch to Explore to find one.'
-                : 'No rooms match this filter. Try different keywords or category.'}
+              {loadError
+                ? loadError
+                : tab === 'my'
+                  ? 'You haven’t joined any rooms yet. Switch to Explore to find one.'
+                  : 'No rooms match this filter. Try different keywords or category.'}
             </p>
-            <div className="mt-4">
+            <div className="mt-4 flex justify-center gap-2">
               <Button variant="tonal" size="sm" onClick={() => { setSearch(''); setCategory('all') }}>Reset filters</Button>
+              <Button variant="secondary" size="sm" onClick={() => void loadRooms(tab)}>Retry</Button>
             </div>
           </Card>
         ) : (
@@ -119,7 +169,7 @@ export default function StudyRoomDiscovery() {
                   ))}
                 </div>
               )}
-              <Link to="/study-room">
+              <Link to={`/study-room?roomId=${room.id}`}>
                 <Button variant="secondary" size="sm" className="text-xs border-2 border-neutral-200">Join</Button>
               </Link>
             </Card>

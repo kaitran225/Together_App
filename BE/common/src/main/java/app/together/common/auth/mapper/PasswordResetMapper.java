@@ -1,7 +1,5 @@
 package app.together.common.auth.mapper;
 
-import app.together.common.shared.mapper.BaseAuditMapper;
-
 import app.together.common.auth.dto.PasswordResetDto;
 import app.together.common.auth.entity.PasswordReset;
 import org.mapstruct.Mapper;
@@ -9,7 +7,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.MappingTarget;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = BaseAuditMapper.class)
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface PasswordResetMapper {
 
     PasswordResetDto toDto(PasswordReset entity);

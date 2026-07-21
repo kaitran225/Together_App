@@ -7,6 +7,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "quick_notes")
@@ -34,7 +36,8 @@ public class QuickNote extends BaseAuditEntity {
     @Column(name = "is_pinned")
     Boolean isPinned;
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "tags", columnDefinition = "jsonb")
     String tags;
 
     @Column(name = "linked_to_type")

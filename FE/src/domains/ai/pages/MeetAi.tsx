@@ -1,17 +1,134 @@
-import { useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { AiBotIcon, AttachIcon, Button, Card, ChatInputBar, CloseIcon, DocumentIcon, IconButton, Input, MenuIcon, Modal, Textarea } from '../../../components/common'
-import { QUICK_PROMPTS, RECENT_CHATS, MEET_AI_MESSAGES as MESSAGES, MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB, SUMMARY_HISTORY } from '../../../mocks'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { AiBotIcon, Button, CloseIcon, IconButton } from '../../../components/common'
+import { QUICK_PROMPTS, MAX_FILE_SIZE_MB, ACCEPT_FILES } from '../../../mocks'
+import { workflowApi } from '../../../api/client'
+import { useAuth } from '../../../contexts/AuthContext'
+
+type ChatMessage = {
+  messageId: number | string
+  sender: string
+  messageText: string
+  sentAt?: string
+  pending?: boolean
+}
+
+const MessageRenderer = ({ text }: { text: string }) => {
+  try {
+    let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+    const firstBrace = cleanText.indexOf('{')
+    const lastBrace = cleanText.lastIndexOf('}')
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonStr = cleanText.substring(firstBrace, lastBrace + 1)
+      const parsed = JSON.parse(jsonStr)
+      if (parsed.nodes && Array.isArray(parsed.nodes)) {
+        return (
+          <>
+            {firstBrace > 0 && (
+              <p className="text-[15px] leading-7 whitespace-pre-wrap mb-3 text-neutral-800">
+                {cleanText.substring(0, firstBrace).trim()}
+              </p>
+            )}
+            <div className="mt-1 rounded-xl border border-neutral-200 bg-neutral-50/80 p-4 text-sm">
+              <p className="font-semibold mb-3 text-neutral-900">{parsed.title || 'Mindmap'}</p>
+              <ul className="pl-2 space-y-2 border-l-2 border-neutral-300 ml-1">
+                {parsed.nodes.map((node: any) => (
+                  <li key={node.id}>
+                    <span className="font-medium text-neutral-800">{node.label}</span>
+                    {node.children?.length > 0 && (
+                      <ul className="pl-4 mt-1.5 space-y-1 text-neutral-600">
+                        {node.children.map((child: any) => (
+                          <li key={child.id}>{child.label}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {lastBrace < cleanText.length - 1 && (
+              <p className="text-[15px] leading-7 whitespace-pre-wrap mt-3 text-neutral-800">
+                {cleanText.substring(lastBrace + 1).trim()}
+              </p>
+            )}
+          </>
+        )
+      }
+    }
+  } catch {
+    // plain text
+  }
+  return <p className="text-[15px] leading-7 whitespace-pre-wrap text-neutral-800">{text}</p>
+}
 
 export default function MeetAi() {
-  const [query, setQuery] = useState('')
+  const { user } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file: File }[]>([])
-  const [chatDialogOpen, setChatDialogOpen] = useState(false)
-  const [chatInput, setChatInput] = useState('')
-  const [summarizeOpen, setSummarizeOpen] = useState(false)
-  const [droppedFile, setDroppedFile] = useState<File | null>(null)
-  const [summaryText, setSummaryText] = useState('')
-  const summarizeInputRef = useRef<HTMLInputElement>(null)
+  const [conversations, setConversations] = useState<any[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [sending, setSending] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  const fetchConversations = async () => {
+    try {
+      const res = await workflowApi.getConversations()
+      if (res.success && res.data) {
+        setConversations(res.data)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const fetchMessages = async (convId: number) => {
+    try {
+      const res = await workflowApi.getChatMessages(convId)
+      if (res.success && res.data) {
+        setMessages(res.data)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  useEffect(() => {
+    void fetchConversations()
+  }, [])
+
+  useEffect(() => {
+    if (activeConversationId) {
+      void fetchMessages(activeConversationId)
+    } else {
+      setMessages([])
+    }
+  }, [activeConversationId])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, sending, scrollToBottom])
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+  }, [input])
+
+  const handleNewChat = async () => {
+    setActiveConversationId(null)
+    setMessages([])
+    setInput('')
+    setAttachments([])
+    textareaRef.current?.focus()
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files
@@ -20,265 +137,318 @@ export default function MeetAi() {
       .filter((f) => f.size <= MAX_FILE_SIZE_MB * 1024 * 1024)
       .map((f) => ({ id: `${Date.now()}-${f.name}`, file: f }))
     setAttachments((prev) => [...prev, ...newEntries])
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const removeAttachment = (id: string) => setAttachments((prev) => prev.filter((a) => a.id !== id))
 
-  const handleSummarizeFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size <= MAX_PDF_MB * 1024 * 1024) setDroppedFile(file)
-    if (summarizeInputRef.current) summarizeInputRef.current.value = ''
+  const handleSend = async (presetText?: string) => {
+    const text = (presetText ?? input).trim()
+    const currentAttachments = [...attachments]
+    if ((!text && currentAttachments.length === 0) || sending) return
+
+    setSending(true)
+    setInput('')
+    setAttachments([])
+
+    let convId = activeConversationId
+    if (!convId) {
+      try {
+        const title = text.slice(0, 48) || `Chat ${new Date().toLocaleDateString('vi-VN')}`
+        const res = await workflowApi.createConversation(title)
+        if (res.success && res.data) {
+          convId = res.data.conversationId
+          setConversations((prev) => [res.data, ...prev])
+          setActiveConversationId(convId)
+        } else {
+          setSending(false)
+          return
+        }
+      } catch (err) {
+        console.error(err)
+        setSending(false)
+        return
+      }
+    }
+
+    if (!convId) {
+      setSending(false)
+      return
+    }
+
+    const tempUserMsg: ChatMessage = {
+      messageId: `temp-${Date.now()}`,
+      sender: 'USER',
+      messageText: text || `[Đã gửi ${currentAttachments.length} tệp]`,
+      sentAt: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, tempUserMsg])
+
+    try {
+      let uploadedDocumentId: number | undefined
+      if (currentAttachments.length > 0) {
+        for (const att of currentAttachments) {
+          const res = await workflowApi.uploadDocument(att.file)
+          if (res.success && res.data?.documentId) {
+            uploadedDocumentId = res.data.documentId
+          }
+        }
+      }
+
+      if (text) {
+        await workflowApi.sendChatMessage(convId, text, uploadedDocumentId)
+      }
+      await fetchMessages(convId)
+      await fetchConversations()
+    } catch (err) {
+      console.error(err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          messageId: `err-${Date.now()}`,
+          sender: 'ASSISTANT',
+          messageText: 'Xin lỗi, đã có lỗi khi gửi tin nhắn. Vui lòng thử lại.',
+          sentAt: new Date().toISOString(),
+        },
+      ])
+    } finally {
+      setSending(false)
+    }
   }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (file?.type === 'application/pdf' && file.size <= MAX_PDF_MB * 1024 * 1024) setDroppedFile(file)
-  }
-
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault()
+  const hasChat = messages.length > 0 || sending
+  const displayName = user?.fullName?.split(' ')[0] || 'bạn'
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full items-start">
-      <header className="lg:col-span-3">
-        <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">Meet AI Tutor</h1>
-        <p className="text-neutral-600 mt-1">Get instant help with concepts, summaries, and practice. Ask anything or paste your notes.</p>
-      </header>
-
-      {/* Column 1: Ask a question */}
-      <Card className="p-5 shadow-sm border-2 border-neutral-200 min-w-0">
-        <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide mb-3">Ask a question or paste content</h2>
-        <div className="relative mb-4">
-          <Textarea
-            id="ai-question"
-            placeholder="e.g. Explain photosynthesis, summarize chapter 3, or paste your notes..."
-            className="min-h-[100px] resize-y pr-12"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <IconButton
-            type="button"
-            onClick={() => setSummarizeOpen(true)}
-            className="absolute bottom-3 right-3 w-9 h-9 border-2 border-neutral-200 text-neutral-600 hover:bg-neutral-100"
-            label="Attach file — open Summarize"
-            icon={<AttachIcon className="w-4 h-4" />}
-          />
-        </div>
-        <div className="flex flex-wrap gap-2 mb-3">
-          <Button variant="primary" size="md">Send</Button>
-          <Link to="/ai-support">
-            <Button variant="secondary" size="md">Open full chat</Button>
-          </Link>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => setChatDialogOpen(true)} className="!px-0 !py-0 min-h-0 text-xs font-medium text-neutral-700 hover:text-neutral-900 mb-4">
-          Open chat in popup
-        </Button>
-        <div className="pt-4 border-t border-neutral-200">
-          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-2">Quick prompts</p>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_PROMPTS.map((prompt) => (
-              <Button
-                key={prompt}
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setQuery(prompt)}
-                className="px-3 py-1.5 min-h-0 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 transition-colors"
-              >
-                {prompt}
-              </Button>
-            ))}
+    <div className="-m-3 md:-m-4 md:-my-6 flex h-[calc(100vh-3.5rem)] min-h-[560px] overflow-hidden rounded-none bg-[var(--color-surface)] md:rounded-2xl md:border md:border-[var(--color-border)]">
+      {/* Sidebar */}
+      <aside
+        className={`${
+          sidebarOpen ? 'w-[260px]' : 'w-0'
+        } shrink-0 overflow-hidden border-r border-[var(--color-border)] bg-neutral-50 transition-[width] duration-200 ease-out`}
+      >
+        <div className="flex h-full w-[260px] flex-col">
+          <div className="flex items-center gap-2 border-b border-[var(--color-border)] p-3">
+            <Button variant="secondary" size="sm" className="flex-1 justify-start gap-2 rounded-xl" onClick={handleNewChat}>
+              <span className="text-base leading-none">+</span>
+              New chat
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            <p className="px-2 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Chats</p>
+            {conversations.length === 0 ? (
+              <p className="px-2 text-xs text-neutral-400">Chưa có hội thoại.</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {conversations.map((c) => {
+                  const active = c.conversationId === activeConversationId
+                  return (
+                    <li key={c.conversationId}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveConversationId(c.conversationId)}
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                          active
+                            ? 'bg-neutral-200/90 font-medium text-neutral-900'
+                            : 'text-neutral-700 hover:bg-neutral-200/60'
+                        }`}
+                      >
+                        <svg className="h-4 w-4 shrink-0 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span className="min-w-0 flex-1 truncate">{c.title || 'Untitled'}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
         </div>
-      </Card>
-
-      {/* Column 2: Recent conversations */}
-      <Card heading="Recent conversations" className="shadow-sm border-2 border-neutral-200 min-w-0 lg:max-w-[480px]">
-        <p className="text-sm text-neutral-500 mb-4">Pick up where you left off or start a new chat.</p>
-        <ul className="space-y-2">
-          {RECENT_CHATS.map((c) => (
-            <li key={c.id}>
-              <Link
-                to="/ai-support"
-                className="flex items-center gap-3 p-3 rounded-xl border border-neutral-200 hover:bg-neutral-50 hover:border-neutral-300 transition-colors group"
-              >
-                <span className="w-10 h-10 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center text-neutral-800 dark:text-primary group-hover:bg-primary/20" aria-hidden>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-neutral-900 truncate">{c.title}</p>
-                  <p className="text-xs text-neutral-500 truncate">{c.preview}</p>
-                </div>
-                <span className="text-xs text-neutral-400 flex-shrink-0">{c.time}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <Link to="/ai-support" className="inline-block mt-4 pt-4 border-t border-neutral-200">
-          <Button variant="ghost" size="sm">View all in AI Support</Button>
-        </Link>
-      </Card>
-
-      {/* Right column: info + CTA (fills bottom on tall screens) */}
-      <aside className="hidden lg:flex flex-col gap-4 w-[300px] shrink-0 min-h-[420px]">
-        <Card className="p-5 shadow-sm border-2 border-neutral-200 bg-neutral-50/50 shrink-0">
-          <h3 className="text-sm font-semibold text-neutral-900 mb-3">How AI Tutor helps</h3>
-          <ul className="space-y-2 text-sm text-neutral-600">
-            <li className="flex gap-2">
-              <span className="text-neutral-700 dark:text-primary shrink-0">•</span>
-              Explain concepts in simpler terms
-            </li>
-            <li className="flex gap-2">
-              <span className="text-neutral-700 dark:text-primary shrink-0">•</span>
-              Summarize long notes or chapters
-            </li>
-            <li className="flex gap-2">
-              <span className="text-neutral-700 dark:text-primary shrink-0">•</span>
-              Generate practice questions
-            </li>
-            <li className="flex gap-2">
-              <span className="text-neutral-700 dark:text-primary shrink-0">•</span>
-              Walk through problem solving
-            </li>
-          </ul>
-        </Card>
-        <Card className="p-5 shadow-sm border-2 border-neutral-200 shrink-0">
-          <h3 className="text-sm font-semibold text-neutral-900 mb-3">Tip</h3>
-          <p className="text-sm text-neutral-600">
-            Paste your lecture notes or a paragraph, then ask &quot;Summarize this&quot; or &quot;Quiz me on this&quot; for best results.
-          </p>
-        </Card>
-        <Link
-          to="/ai-support"
-          className="flex-1 min-h-[120px] flex flex-col justify-center p-5 rounded-xl border-2 border-primary/20 bg-accent-muted hover:bg-primary/10 transition-colors"
-        >
-          <p className="text-sm font-semibold text-neutral-900">Open full chat</p>
-          <p className="text-xs text-neutral-700 dark:text-primary mt-0.5">Continue in AI Support with full conversation history.</p>
-        </Link>
       </aside>
 
-      {/* Summarize popup — opened by attachment icon; user drops/selects file here */}
-      <Modal open={summarizeOpen} onClose={() => setSummarizeOpen(false)} title="Summarize" size="max-w-4xl">
-          <div className="bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-200 shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b-2 border-neutral-200">
-              <div className="flex items-center gap-2">
-                <Link to="/focus-room">
-                  <Button variant="primary" size="sm" className="rounded-lg text-xs font-bold">Focus room</Button>
-                </Link>
-                <IconButton type="button" onClick={() => setSummarizeOpen(false)} className="p-2 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label="Close" icon={<CloseIcon className="w-5 h-5" />} />
-              </div>
-            </div>
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1fr] min-h-0 overflow-hidden">
-              <div className="p-4 border-r border-neutral-200 flex flex-col gap-4 overflow-y-auto">
-                <div>
-                  <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide mb-2">Drop file here</p>
-                  <Input ref={summarizeInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleSummarizeFile} aria-label="Choose PDF" />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => summarizeInputRef.current?.click()}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    className="w-full min-h-[180px] rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 flex flex-col items-center justify-center gap-2 text-neutral-500 hover:border-neutral-400 hover:bg-neutral-100 transition-colors"
-                  >
-                    <svg className="w-12 h-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    <span className="text-sm font-semibold text-neutral-600">Drop PDF</span>
-                    <span className="text-xs">Max {MAX_PDF_MB}MB</span>
-                    {droppedFile && <span className="text-xs font-medium text-neutral-800 dark:text-primary mt-1 truncate max-w-full px-2">{droppedFile.name}</span>}
-                  </Button>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide">History</p>
-                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label="Refresh" icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
-                  </div>
-                  <ul className="space-y-1.5">
-                    {SUMMARY_HISTORY.map((item) => (
-                      <li key={item.id}>
-                        <Button type="button" variant="ghost" size="sm" className="w-full !justify-start flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 bg-neutral-50 text-left hover:bg-neutral-100 text-sm font-medium text-neutral-900">
-                          <span className="text-neutral-400 shrink-0" aria-hidden><DocumentIcon className="w-4 h-4" /></span>
-                          <span className="min-w-0 truncate flex-1">{item.name}</span>
-                          <span className="text-[10px] text-neutral-500 shrink-0">{item.time}</span>
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="p-4 flex flex-col min-h-0">
-                <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide mb-2 flex items-center gap-1">
-                <MenuIcon className="w-3.5 h-3.5 text-neutral-500" />
-                Executive summary</p>
-                <div className="flex-1 min-h-[200px] rounded-xl border-2 border-neutral-200 bg-[var(--color-surface)] p-4 overflow-y-auto">
-                  {summaryText ? (
-                    <p className="text-sm text-neutral-700 whitespace-pre-wrap">{summaryText}</p>
-                  ) : (
-                    <div className="space-y-2 text-neutral-300">
-                      <div className="h-3 rounded bg-neutral-200 w-full" /><div className="h-3 rounded bg-neutral-200 w-4/5" /><div className="h-3 rounded bg-neutral-200 w-full" /><div className="h-3 rounded bg-neutral-200 w-3/4" /><div className="h-3 rounded bg-neutral-200 w-5/6" /><div className="h-3 rounded border border-dashed border-neutral-300 w-2/3" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <Button variant="primary" size="sm" className="rounded-lg bg-accent hover:bg-accent border-0" onClick={() => setSummaryText(droppedFile ? 'Summary will appear here after processing. (Mock: This is a placeholder summary for ' + droppedFile.name + '.)' : 'Drop or select a PDF first.')}>Summarize</Button>
-                  <Button variant="secondary" size="sm" className="rounded-lg" onClick={() => setSummaryText('')}>Download</Button>
-                </div>
-              </div>
-            </div>
+      {/* Main chat */}
+      <section className="relative flex min-w-0 flex-1 flex-col bg-[var(--color-surface)]">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-[var(--color-border)] px-3">
+          <IconButton
+            type="button"
+            size="sm"
+            variant="ghost"
+            label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="rounded-lg text-neutral-600"
+            icon={
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            }
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-sm font-semibold text-neutral-900">Together AI</h1>
           </div>
-      </Modal>
+        </header>
 
-      {/* Chat dialog popup */}
-      <Modal open={chatDialogOpen} onClose={() => setChatDialogOpen(false)} title="Together AI - Chat" size="max-w-2xl">
-          <div className="bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-200 shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b-2 border-neutral-200 bg-neutral-50">
-              <div className="flex items-center gap-2">
-                <AiBotIcon className="w-8 h-8" />
-                <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wide">Together AI — Chat</h2>
-              </div>
-              <IconButton type="button" onClick={() => setChatDialogOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label="Close" icon={<CloseIcon className="w-5 h-5" />} />
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-              {MESSAGES.map((msg) => (
-                <div key={msg.id} className={`flex gap-3 max-w-[90%] ${msg.role === 'user' ? 'ml-auto' : ''}`}>
-                  {msg.role === 'assistant' && (
-                    <span className="w-8 h-8 rounded-full bg-accent-muted flex-shrink-0 flex items-center justify-center overflow-hidden" aria-hidden>
-                      <AiBotIcon className="w-7 h-7" />
-                    </span>
-                  )}
-                  <div className={`rounded-xl px-3 py-2 text-sm ${msg.role === 'assistant' ? 'bg-neutral-100 text-neutral-900 border border-neutral-200' : 'bg-accent-muted text-neutral-900 border border-primary/20'}`}>
-                    <p className="leading-relaxed">{msg.text}</p>
-                    <p className="text-[10px] text-neutral-500 mt-1">{msg.time}</p>
-                  </div>
+        <div className="flex-1 overflow-y-auto">
+          {!hasChat ? (
+            <div className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-8 px-4 pb-8 pt-10">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100">
+                  <AiBotIcon className="h-10 w-10" />
                 </div>
-              ))}
+                <h2 className="text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+                  Xin chào, {displayName}
+                </h2>
+                <p className="max-w-md text-sm text-neutral-500">
+                  Hỏi bất cứ điều gì về học tập — giải thích khái niệm, tóm tắt ghi chú, hoặc luyện bài tập.
+                </p>
+              </div>
+
+              <div className="grid w-full gap-2 sm:grid-cols-2">
+                {QUICK_PROMPTS.slice(0, 4).map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => void handleSend(prompt)}
+                    className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="p-3 border-t-2 border-neutral-200">
-              <ChatInputBar
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onSend={() => {}}
-                onFileChange={handleFileChange}
-                acceptFiles={ACCEPT_FILES}
-                placeholder="Ask anything..."
-                attachmentsSlot={
-                  attachments.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {attachments.map(({ id, file }) => (
-                        <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 text-xs">
-                          <span className="max-w-[100px] truncate">{file.name}</span>
-                          <IconButton type="button" size="sm" variant="ghost" onClick={() => removeAttachment(id)} className="!p-0 min-h-0 text-neutral-500 hover:text-neutral-900" label={`Remove ${file.name}`} icon={<CloseIcon className="w-3 h-3" />} />
-                        </span>
-                      ))}
+          ) : (
+            <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+              <div className="space-y-6">
+                {messages.map((msg) => {
+                  const isUser = String(msg.sender).toUpperCase() === 'USER'
+                  return (
+                    <div key={msg.messageId} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
+                      {!isUser && (
+                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100">
+                          <AiBotIcon className="h-7 w-7" />
+                        </div>
+                      )}
+                      <div className={`max-w-[min(100%,42rem)] ${isUser ? '' : 'min-w-0 flex-1'}`}>
+                        {!isUser && (
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">Together AI</p>
+                        )}
+                        <div
+                          className={
+                            isUser
+                              ? 'rounded-3xl bg-neutral-900 px-4 py-3 text-[15px] leading-7 text-white'
+                              : 'rounded-2xl text-neutral-800'
+                          }
+                        >
+                          {isUser ? (
+                            <p className="whitespace-pre-wrap">{msg.messageText}</p>
+                          ) : (
+                            <MessageRenderer text={msg.messageText} />
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  ) : undefined
+                  )
+                })}
+                {sending && (
+                  <div className="flex gap-3">
+                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100">
+                      <AiBotIcon className="h-7 w-7" />
+                    </div>
+                    <div className="flex items-center gap-1.5 pt-2">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.2s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.1s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400" />
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Composer */}
+        <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pb-4 pt-3 sm:px-6">
+          <div className="mx-auto w-full max-w-3xl">
+            {attachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachments.map(({ id, file }) => (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-neutral-50 px-3 py-1 text-xs text-neutral-700"
+                  >
+                    <span className="max-w-[140px] truncate">{file.name}</span>
+                    <IconButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      label={`Remove ${file.name}`}
+                      onClick={() => removeAttachment(id)}
+                      className="!min-h-0 !p-0 text-neutral-500"
+                      icon={<CloseIcon className="h-3.5 w-3.5" />}
+                    />
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-end gap-2 rounded-[28px] border border-[var(--color-border)] bg-neutral-50 px-2 py-2 shadow-sm focus-within:border-neutral-400 focus-within:bg-[var(--color-surface)]">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ACCEPT_FILES}
+                className="hidden"
+                onChange={handleFileChange}
+                aria-label="Attach file"
+              />
+              <IconButton
+                type="button"
+                size="sm"
+                variant="ghost"
+                label="Attach file"
+                onClick={() => fileInputRef.current?.click()}
+                className="mb-0.5 shrink-0 rounded-full text-neutral-600"
+                icon={
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
                 }
               />
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    void handleSend()
+                  }
+                }}
+                placeholder="Nhắn tin cho Together AI..."
+                className="max-h-[200px] min-h-[40px] flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-neutral-900 outline-none placeholder:text-neutral-400"
+                aria-label="Message"
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                className="mb-0.5 h-9 w-9 shrink-0 rounded-full !px-0"
+                disabled={sending || (!input.trim() && attachments.length === 0)}
+                onClick={() => void handleSend()}
+                aria-label="Send"
+              >
+                <svg className="mx-auto h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.25}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-7.5-15-7.5v6l10 1.5-10 1.5v6z" />
+                </svg>
+              </Button>
             </div>
+            <p className="mt-2 text-center text-[11px] text-neutral-400">
+              Together AI có thể sai. Hãy kiểm tra thông tin quan trọng.
+            </p>
           </div>
-      </Modal>
+        </div>
+      </section>
     </div>
   )
 }

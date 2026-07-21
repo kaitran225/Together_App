@@ -1,5 +1,6 @@
 package app.together.common.shared.persistence;
 
+import app.together.common.shared.util.SecurityUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
@@ -34,10 +35,15 @@ public abstract class BaseAuditEntity {
         Instant now = Instant.now();
         if (createdAt == null) createdAt = now;
         updatedAt = now;
+        String sso = SecurityUtils.getCurrentUserSsoOrNull();
+        if (createdBy == null && sso != null) createdBy = sso;
+        if (updatedBy == null && sso != null) updatedBy = sso;
     }
 
     @PreUpdate
     public void preUpdate() {
         updatedAt = Instant.now();
+        String sso = SecurityUtils.getCurrentUserSsoOrNull();
+        if (sso != null) updatedBy = sso;
     }
 }

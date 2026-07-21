@@ -11,4 +11,6 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
     List<TaskAssignment> findByTaskId(Long taskId);
 
     List<TaskAssignment> findByUserSso(String userSso);
+
+    List<TaskAssignment> findByTaskIdIn(List<Long> taskIds);
 }

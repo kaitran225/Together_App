@@ -12,7 +12,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 
 @Entity
-@Table(name = "user_wallets")
+@Table(name = "user_wallets", schema = "auth")
 @Getter
 @Setter
 @NoArgsConstructor

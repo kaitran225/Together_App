@@ -1,31 +1,101 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { Button, Card, Input } from '../../../components/common'
 import { useAuth } from '../../../contexts/AuthContext'
+import { getReturnToPath } from '../../../components/auth/RequireAuth'
 
 export default function Welcome() {
   const navigate = useNavigate()
-  const { login, user, isAuthenticated } = useAuth()
+  const location = useLocation()
+  const { login, loginWithGoogle, user, isAuthenticated, isAuthReady } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    const result = login({ identifier, password })
-    if (!result.ok) {
-      setError(result.error ?? 'Login failed.')
-      return
+  const resolvePostLoginPath = (role?: string | null) => {
+    const fallback = role === 'ADMIN' ? '/admin' : '/dashboard'
+    const fromState = (location.state as { from?: string } | null)?.from
+    if (fromState && fromState.startsWith('/') && !fromState.startsWith('//')) {
+      if (
+        !fromState.startsWith('/welcome') &&
+        !fromState.startsWith('/sign-up') &&
+        !fromState.startsWith('/login') &&
+        !fromState.startsWith('/callback')
+      ) {
+        try {
+          sessionStorage.removeItem('auth_return_to')
+        } catch {
+          // ignore
+        }
+        return fromState
+      }
     }
+    return getReturnToPath(fallback)
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
     setError('')
-    const role = result.user?.role
-    navigate(role === 'ADMIN' ? '/admin' : '/dashboard')
+    try {
+      const result = await login({ identifier, password })
+      if (!result.ok) {
+        setError(result.error ?? 'Login failed.')
+        return
+      }
+      navigate(resolvePostLoginPath(result.user?.systemRole), { replace: true })
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.')
+    }
   }
 
   useEffect(() => {
-    if (!isAuthenticated) return
-    navigate(user?.role === 'ADMIN' ? '/admin' : '/dashboard')
-  }, [isAuthenticated, navigate, user?.role])
+    if (!isAuthReady || !isAuthenticated) return
+    navigate(resolvePostLoginPath(user?.systemRole), { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthReady, isAuthenticated, navigate, user?.systemRole])
+
+  useEffect(() => {
+    const handleGoogleCredential = async (response: any) => {
+      try {
+        const result = await loginWithGoogle(response.credential)
+        if (!result.ok) {
+          setError(result.error ?? 'Google Login failed.')
+          return
+        }
+        setError('')
+        navigate(resolvePostLoginPath(result.user?.systemRole), { replace: true })
+      } catch (err: any) {
+        setError(err.message || 'An unexpected error occurred during Google Login.')
+      }
+    }
+
+    const initializeGoogle = () => {
+      const { google } = window as any
+      if (google && google.accounts) {
+        google.accounts.id.initialize({
+          client_id: '86569125365-696pntgpnum4je6iontfukfq4p8hhh57.apps.googleusercontent.com',
+          callback: handleGoogleCredential,
+        })
+        google.accounts.id.renderButton(
+          document.getElementById('google-btn'),
+          { theme: 'outline', size: 'large', width: 364 }
+        )
+      }
+    }
+
+    initializeGoogle()
+
+    const interval = setInterval(() => {
+      const { google } = window as any
+      if (google && google.accounts) {
+        initializeGoogle()
+        clearInterval(interval)
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginWithGoogle, navigate])
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full w-full max-w-[440px] mx-auto">
@@ -38,14 +108,7 @@ export default function Welcome() {
           <p className="text-neutral-600 text-sm">Log in to continue your study plans, tasks, and focus sessions.</p>
         </div>
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
-            <span className="text-[#4285F4] font-bold">G</span>
-            <span>Continue with Google</span>
-          </Button>
-          <Button type="button" variant="secondary" size="lg" className="w-full min-h-[48px] border border-[var(--color-border)] rounded-xl bg-[var(--color-surface)]">
-            <span className="text-[#1877F2] font-bold">f</span>
-            <span>Continue with Facebook</span>
-          </Button>
+          <div id="google-btn" className="w-full flex justify-center min-h-[44px]"></div>
           <div className="relative py-2">
             <hr className="border-t border-[var(--color-border)]" />
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--color-surface)] px-3 text-sm text-neutral-500">or</span>

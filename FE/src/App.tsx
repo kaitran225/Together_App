@@ -12,6 +12,7 @@ import {
   SignUp,
   ConfirmMail,
   ResetPassword,
+  VerifyEmail,
   Dashboard,
   StudyRoomDiscovery,
   CreateNewRoomStudy,
@@ -32,6 +33,7 @@ import {
   Quizlet,
   QuizletResult,
   ProfileWithSidebar,
+  PublicProfile,
   Personalize,
   Personalize2,
   Personalize3,
@@ -40,7 +42,7 @@ import {
   Transaction,
   Subscription,
   Shop,
-  AdminUsers,
+  ContactSupport,
   AdminAccountSettings,
   AdminOverview,
   AdminUserManagement,
@@ -49,9 +51,10 @@ import {
   AdminReports,
   AdminRevenue,
   AdminSupport,
+  AdminBilling,
 } from './pages/app'
 
-const STANDALONE_PATHS = ['/callback', '/welcome', '/sign-up', '/confirm-mail', '/reset-password', '/debug']
+const STANDALONE_PATHS = ['/callback', '/welcome', '/sign-up', '/confirm-mail', '/reset-password', '/verify-email', '/debug']
 
 function ProtectedDashboardRoute({ element }: { element: ReactElement }) {
   return (
@@ -59,6 +62,10 @@ function ProtectedDashboardRoute({ element }: { element: ReactElement }) {
       <DashboardLayout>{element}</DashboardLayout>
     </RequireAuth>
   )
+}
+
+function PublicDashboardRoute({ element }: { element: ReactElement }) {
+  return <DashboardLayout>{element}</DashboardLayout>
 }
 
 function AdminRoute({ element }: { element: ReactElement }) {
@@ -73,20 +80,32 @@ function AdminRoute({ element }: { element: ReactElement }) {
 
 export default function App() {
   const location = useLocation()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isAuthReady, user } = useAuth()
   const isStandalone = STANDALONE_PATHS.includes(location.pathname)
-  const defaultAuthedRoute = user?.role === 'ADMIN' ? '/admin' : '/dashboard'
+  const defaultAuthedRoute = user?.systemRole === 'ADMIN' ? '/admin' : '/dashboard'
 
   return (
-    <div className={isStandalone ? 'min-h-screen bg-neutral-100 dark:bg-neutral-900' : ''}>
+    <div className={isStandalone ? 'min-h-screen' : ''}>
       <Routes>
-        <Route path="/" element={<Navigate to={isAuthenticated ? defaultAuthedRoute : '/welcome'} replace />} />
+        <Route
+          path="/"
+          element={
+            !isAuthReady ? (
+              <div className="min-h-[40vh] w-full flex items-center justify-center text-sm text-neutral-500">
+                Loading...
+              </div>
+            ) : (
+              <Navigate to={isAuthenticated ? defaultAuthedRoute : '/welcome'} replace />
+            )
+          }
+        />
         <Route path="/login" element={<Navigate to="/welcome" replace />} />
         <Route path="/callback" element={<main className="p-3 md:p-4 md:py-6 max-w-[1200px] mx-auto min-h-[calc(100vh-4rem)]"><Callback /></main>} />
         <Route path="/welcome" element={<AuthLayout><Welcome /></AuthLayout>} />
         <Route path="/sign-up" element={<AuthLayout><SignUp /></AuthLayout>} />
         <Route path="/confirm-mail" element={<AuthLayout><ConfirmMail /></AuthLayout>} />
         <Route path="/reset-password" element={<AuthLayout><ResetPassword /></AuthLayout>} />
+        <Route path="/verify-email" element={<AuthLayout><VerifyEmail /></AuthLayout>} />
         <Route path="/debug" element={<DebugComponents />} />
         <Route path="/dashboard" element={<ProtectedDashboardRoute element={<Dashboard />} />} />
         <Route path="/study-rooms" element={<ProtectedDashboardRoute element={<StudyRoomDiscovery />} />} />
@@ -110,6 +129,7 @@ export default function App() {
         <Route path="/quizlet" element={<ProtectedDashboardRoute element={<Quizlet />} />} />
         <Route path="/quizlet-result" element={<ProtectedDashboardRoute element={<QuizletResult />} />} />
         <Route path="/profile" element={<ProtectedDashboardRoute element={<ProfileWithSidebar />} />} />
+        <Route path="/profile/:sso" element={<PublicDashboardRoute element={<PublicProfile />} />} />
         <Route path="/personalize" element={<ProtectedDashboardRoute element={<Personalize />} />} />
         <Route path="/personalize-2" element={<ProtectedDashboardRoute element={<Personalize2 />} />} />
         <Route path="/personalize-3" element={<ProtectedDashboardRoute element={<Personalize3 />} />} />
@@ -118,6 +138,7 @@ export default function App() {
         <Route path="/transaction" element={<ProtectedDashboardRoute element={<Transaction />} />} />
         <Route path="/subscription" element={<ProtectedDashboardRoute element={<Subscription />} />} />
         <Route path="/shop" element={<ProtectedDashboardRoute element={<Shop />} />} />
+        <Route path="/support" element={<ProtectedDashboardRoute element={<ContactSupport />} />} />
         <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
         <Route path="/admin/overview" element={<AdminRoute element={<AdminOverview />} />} />
         <Route path="/admin/users-management" element={<AdminRoute element={<AdminUserManagement />} />} />
@@ -126,7 +147,7 @@ export default function App() {
         <Route path="/admin/reports" element={<AdminRoute element={<AdminReports />} />} />
         <Route path="/admin/revenue" element={<AdminRoute element={<AdminRevenue />} />} />
         <Route path="/admin/support" element={<AdminRoute element={<AdminSupport />} />} />
-        <Route path="/admin/users" element={<AdminRoute element={<AdminUsers />} />} />
+        <Route path="/admin/billing" element={<AdminRoute element={<AdminBilling />} />} />
         <Route path="/admin/account" element={<AdminRoute element={<AdminAccountSettings />} />} />
       </Routes>
     </div>

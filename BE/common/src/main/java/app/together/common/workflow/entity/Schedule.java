@@ -8,6 +8,8 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "schedules")
@@ -69,12 +71,13 @@ public class Schedule extends BaseAuditEntity {
     @EqualsAndHashCode.Include
     String externalId;
 
-    @Column(name = "reminder_minutes", columnDefinition = "integer[]")
-    String reminderMinutes;
+    @Column(name = "reminder_minutes")
+    Integer reminderMinutes;
 
     @Column(name = "status")
     String status;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 

@@ -33,6 +33,7 @@ public class QuizQuestion extends BaseAuditEntity {
     @Column(name = "question_text", nullable = false, columnDefinition = "TEXT")
     String questionText;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "options", columnDefinition = "jsonb")
     String options;
 
@@ -48,6 +49,7 @@ public class QuizQuestion extends BaseAuditEntity {
     @Column(name = "position")
     Integer position;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     String metadata;
 }

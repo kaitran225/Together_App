@@ -20,6 +20,7 @@ public final class MessageConstants {
 
     // User / Auth
     public static final String MESSAGE_USER_NOT_FOUND = "USER_NOT_FOUND";
+    public static final String MESSAGE_USER_NOT_ACTIVATED = "USER_NOT_ACTIVATED";
     public static final String MESSAGE_USER_INVALID = "USER_INVALID";
     public static final String MESSAGE_USER_EMAIL_INVALID = "USER_EMAIL_INVALID";
     public static final String MESSAGE_USER_EMAIL_REQUIRED = "USER_EMAIL_REQUIRED";
@@ -35,6 +36,8 @@ public final class MessageConstants {
     public static final String MESSAGE_COIN_PACKAGE_NOT_FOUND = "COIN_PACKAGE_NOT_FOUND";
     public static final String MESSAGE_COIN_PACKAGE_INVALID = "COIN_PACKAGE_INVALID";
     public static final String MESSAGE_COIN_PACKAGE_NAME_REQUIRED = "COIN_PACKAGE_NAME_REQUIRED";
+    public static final String MESSAGE_SUBSCRIPTION_PLAN_NOT_FOUND = "SUBSCRIPTION_PLAN_NOT_FOUND";
+    public static final String MESSAGE_SUBSCRIPTION_PLAN_NAME_REQUIRED = "SUBSCRIPTION_PLAN_NAME_REQUIRED";
     public static final String MESSAGE_EMAIL_VERIFICATION_NOT_FOUND = "EMAIL_VERIFICATION_NOT_FOUND";
     public static final String MESSAGE_EMAIL_VERIFICATION_INVALID = "EMAIL_VERIFICATION_INVALID";
     public static final String MESSAGE_EMAIL_VERIFICATION_EXPIRED = "EMAIL_VERIFICATION_EXPIRED";
@@ -63,6 +66,7 @@ public final class MessageConstants {
     public static final String MESSAGE_USER_NEW_PASSWORD_REQUIRED = "USER_NEW_PASSWORD_REQUIRED";
     public static final String MESSAGE_USER_OLD_PASSWORD_INCORRECT = "USER_OLD_PASSWORD_INCORRECT";
     public static final String MESSAGE_LOGIN_INVALID_CREDENTIALS = "LOGIN_INVALID_CREDENTIALS";
+    public static final String MESSAGE_GOOGLE_ID_TOKEN_REQUIRED = "GOOGLE_ID_TOKEN_REQUIRED";
     public static final String MESSAGE_GOOGLE_TOKEN_INVALID = "GOOGLE_TOKEN_INVALID";
     public static final String MESSAGE_GOOGLE_TOKEN_VERIFICATION_FAILED = "GOOGLE_TOKEN_VERIFICATION_FAILED";
     public static final String MESSAGE_EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS = "EMAIL_VERIFICATION_TOO_MANY_ATTEMPTS";
@@ -93,6 +97,20 @@ public final class MessageConstants {
     public static final String MESSAGE_ROOM_REQUEST_GOAL_REQUIRED = "ROOM_REQUEST_GOAL_REQUIRED";
     public static final String MESSAGE_ROOM_MEMBER_NOT_FOUND = "ROOM_MEMBER_NOT_FOUND";
     public static final String MESSAGE_ROOM_MEMBER_INVALID = "ROOM_MEMBER_INVALID";
+    public static final String MESSAGE_ROOM_MEMBER_ALREADY_ACTIVE = "ROOM_MEMBER_ALREADY_ACTIVE";
+    public static final String MESSAGE_ROOM_MEMBER_CANNOT_LEAVE = "ROOM_MEMBER_CANNOT_LEAVE";
+    public static final String MESSAGE_ROOM_MEMBER_CANNOT_JOIN = "ROOM_MEMBER_CANNOT_JOIN";
+    public static final String MESSAGE_ROOM_MEMBER_LEFT = "ROOM_MEMBER_LEFT";
+    public static final String MESSAGE_ROOM_MEMBER_JOINED = "ROOM_MEMBER_JOINED";
+    public static final String MESSAGE_ROOM_CLOSED = "ROOM_CLOSED";
+    public static final String MESSAGE_ROOM_OPENED = "ROOM_OPENED";
+    public static final String MESSAGE_ROOM_MEMBER_CANNOT_KICK_SELF = "ROOM_MEMBER_CANNOT_KICK_SELF";
+    public static final String MESSAGE_ROOM_HOST_TRANSFER_REQUIRED = "ROOM_HOST_TRANSFER_REQUIRED";
+    public static final String MESSAGE_ROOM_HOST_TRANSFERRED = "ROOM_HOST_TRANSFERRED";
+    public static final String MESSAGE_ROOM_SIGNAL_MESSAGE_REQUIRED = "ROOM_SIGNAL_MESSAGE_REQUIRED";
+    public static final String MESSAGE_ROOM_SIGNAL_ROOM_ID_REQUIRED = "ROOM_SIGNAL_ROOM_ID_REQUIRED";
+    public static final String MESSAGE_ROOM_SIGNAL_TYPE_REQUIRED = "ROOM_SIGNAL_TYPE_REQUIRED";
+    public static final String MESSAGE_ROOM_SIGNAL_ROOM_ID_INVALID = "ROOM_SIGNAL_ROOM_ID_INVALID";
     public static final String MESSAGE_ROOM_POST_NOT_FOUND = "ROOM_POST_NOT_FOUND";
     public static final String MESSAGE_ROOM_POST_INVALID = "ROOM_POST_INVALID";
     public static final String MESSAGE_ROOM_POST_CONTENT_REQUIRED = "ROOM_POST_CONTENT_REQUIRED";
@@ -154,6 +172,8 @@ public final class MessageConstants {
     public static final String MESSAGE_TASK_NOT_FOUND = "TASK_NOT_FOUND";
     public static final String MESSAGE_TASK_INVALID = "TASK_INVALID";
     public static final String MESSAGE_TASK_TITLE_REQUIRED = "TASK_TITLE_REQUIRED";
+    public static final String MESSAGE_TASK_CANNOT_DEPEND_ON_ITSELF = "TASK_CANNOT_DEPEND_ON_ITSELF";
+    public static final String MESSAGE_TASK_MUST_BE_PROJECT = "TASK_MUST_BE_PROJECT";
     public static final String MESSAGE_TASK_ASSIGNMENT_NOT_FOUND = "TASK_ASSIGNMENT_NOT_FOUND";
     public static final String MESSAGE_TASK_ASSIGNMENT_INVALID = "TASK_ASSIGNMENT_INVALID";
     public static final String MESSAGE_TASK_DEPENDENCY_NOT_FOUND = "TASK_DEPENDENCY_NOT_FOUND";
@@ -167,6 +187,16 @@ public final class MessageConstants {
     public static final String MESSAGE_TASK_ATTACHMENT_INVALID = "TASK_ATTACHMENT_INVALID";
     public static final String MESSAGE_TASK_ATTACHMENT_TITLE_REQUIRED = "TASK_ATTACHMENT_TITLE_REQUIRED";
     public static final String MESSAGE_TASK_ATTACHMENT_URL_REQUIRED = "TASK_ATTACHMENT_URL_REQUIRED";
+    public static final String MESSAGE_TASK_ALREADY_ASSIGNED = "MESSAGE_TASK_ALREADY_ASSIGNED";
+    public static final String MESSAGE_BOARD_COLUMN_NOT_FOUND = "BOARD_COLUMN_NOT_FOUND";
+    public static final String MESSAGE_BOARD_COLUMN_INVALID = "BOARD_COLUMN_INVALID";
+    public static final String MESSAGE_BOARD_COLUMN_NAME_REQUIRED = "BOARD_COLUMN_NAME_REQUIRED";
+    public static final String MESSAGE_BOARD_COLUMN_POSITION_REQUIRED = "BOARD_COLUMN_POSITION_REQUIRED";
+    public static final String MESSAGE_BOARD_COLUMN_COLOR_CODE_REQUIRED = "BOARD_COLUMN_COLOR_CODE_REQUIRED";
+    public static final String MESSAGE_BOARD_COLUMN_PROJECT_ID_REQUIRED = "BOARD_COLUMN_PROJECT_ID_REQUIRED";
+    public static final String MESSAGE_BOARD_COLUMN_PROJECT_ID_INVALID = "BOARD_COLUMN_PROJECT_ID_INVALID";
+    public static final String MESSAGE_TASK_SUBMISSION_CONTENT_REQUIRED = "TASK_SUBMISSION_CONTENT_REQUIRED";
+    public static final String MESSAGE_TASK_SUBMISSION_GRADE_INVALID = "TASK_SUBMISSION_GRADE_INVALID";
 
     // Meetings
     public static final String MESSAGE_MEETING_NOT_FOUND = "MEETING_NOT_FOUND";
@@ -190,4 +220,22 @@ public final class MessageConstants {
     public static final String MESSAGE_APP_CONFIG_NOT_FOUND = "APP_CONFIG_NOT_FOUND";
     public static final String MESSAGE_APP_CONFIG_INVALID = "APP_CONFIG_INVALID";
     public static final String MESSAGE_APP_CONFIG_KEY_REQUIRED = "APP_CONFIG_KEY_REQUIRED";
+
+    // Personal / Space Repetition
+    public static final String MESSAGE_FLASHCARD_QUALITY_INVALID = "FLASHCARD_QUALITY_INVALID";
+
+    // AI
+    public static final String MESSAGE_AI_NOT_FOUND = "AI_NOT_FOUND";
+    public static final String MESSAGE_FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA = "FAILED_TO_PARSE_AI_GENERATED_QUIZ_METADATA";
+    public static final String MESSAGE_DELETE_DOCUMENT_NOT_ALLOWED = "DELETE_DOCUMENT_NOT_ALLOWED";
+    public static final String MESSAGE_SAVE_MINDMAP_NOT_ALLOWED = "SAVE_MINDMAP_NOT_ALLOWED";
+
+    // Payment/ PayOs
+    public static final String MESSAGE_SIGNATURE_INVALID = "SIGNATURE_INVALID";
+    public static final String MESSAGE_PACKAGE_NOT_FOUND = "PACKAGE_NOT_FOUND";
+    public static final String MESSAGE_PACKAGE_INVALID = "PACKAGE_INVALID";
+    public static final String MESSAGE_DURATION_INVALID = "DURATION_INVALID";
+    public static final String MESSAGE_PLAN_TYPE_INVALID = "PLAN_TYPE_INVALID";
+    public static final String MESSAGE_ROOM_ALREADY_CLOSED = "ROOM_ALREADY_CLOSED";
+    public static final String MESSAGE_NOT_ENOUGH_COINS = "NOT_ENOUGH_COINS";
 }

@@ -2,31 +2,33 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AiBotIcon, Button } from '../common'
 import { useAuth } from '../../contexts/AuthContext'
-import type { UserRole } from '../../mocks/auth'
+import { useTranslation } from '../../contexts/LanguageContext'
 
 const userNavItems = [
-  { to: '/dashboard', label: 'Home' },
-  { to: '/study-rooms', label: 'Study Rooms' },
-  { to: '/meetings', label: 'Meetings' },
-  { to: '/teams', label: 'Teams' },
-  { to: '/calendar', label: 'Calendar' },
-  { to: '/subscription', label: 'Subscription' },
-  { to: '/shop', label: 'Shop' },
-  { to: '/meet-ai', label: 'Together AI' },
+  { to: '/dashboard', labelKey: 'nav.home' },
+  { to: '/study-rooms', labelKey: 'nav.studyRooms' },
+  { to: '/meetings', labelKey: 'nav.meetings' },
+  { to: '/teams', labelKey: 'nav.teams' },
+  { to: '/calendar', labelKey: 'nav.calendar' },
+  { to: '/subscription', labelKey: 'nav.subscription' },
+  { to: '/shop', labelKey: 'nav.shop' },
+  { to: '/meet-ai', labelKey: 'nav.togetherAi' },
+  { to: '/support', labelKey: 'nav.support' },
 ] as const
 
 const adminNavItems = [
-  { to: '/admin/overview', label: 'Dashboard' },
-  { to: '/admin/users-management', label: 'Users' },
-  { to: '/admin/moderation', label: 'Moderation' },
-  { to: '/admin/social-rooms', label: 'Social Rooms' },
-  { to: '/admin/reports', label: 'Reports' },
-  { to: '/admin/revenue', label: 'Revenue' },
-  { to: '/admin/support', label: 'Support' },
+  { to: '/admin/overview', labelKey: 'nav.admin.dashboard' },
+  { to: '/admin/users-management', labelKey: 'nav.admin.users' },
+  { to: '/admin/moderation', labelKey: 'nav.admin.moderation' },
+  { to: '/admin/social-rooms', labelKey: 'nav.admin.socialRooms' },
+  { to: '/admin/reports', labelKey: 'nav.admin.reports' },
+  { to: '/admin/revenue', labelKey: 'nav.admin.revenue' },
+  { to: '/admin/support', labelKey: 'nav.admin.support' },
+  { to: '/admin/billing', labelKey: 'nav.admin.billing' },
 ] as const
 
 const iconKeys: Array<'home' | 'study' | 'meetings' | 'teams' | 'calendar' | 'gift' | 'shop' | 'ai' | 'admin' | 'users' | 'settings' | 'moderation' | 'rooms' | 'reports' | 'revenue' | 'support'> = [
-  'home', 'study', 'meetings', 'teams', 'calendar', 'gift', 'shop', 'ai',
+  'home', 'study', 'meetings', 'teams', 'calendar', 'gift', 'shop', 'ai', 'support',
 ]
 
 function NavIcon({ icon }: { icon: (typeof iconKeys)[number] }) {
@@ -126,12 +128,13 @@ function NavIcon({ icon }: { icon: (typeof iconKeys)[number] }) {
 }
 
 export function DashboardSidebar() {
+  const { t } = useTranslation()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const { user, logout } = useAuth()
-  const role = (user?.role ?? 'USER') as UserRole
+  const role = (user?.systemRole ?? 'USER') as string
   const navItems = role === 'ADMIN' ? adminNavItems : userNavItems
-  const navIcons = role === 'ADMIN' ? (['admin', 'users', 'moderation', 'rooms', 'reports', 'revenue', 'support'] as const) : iconKeys
+  const navIcons = role === 'ADMIN' ? (['admin', 'users', 'moderation', 'rooms', 'reports', 'revenue', 'support', 'shop'] as const) : iconKeys
   const homePath = role === 'ADMIN' ? '/admin/overview' : '/dashboard'
 
   return (
@@ -151,16 +154,16 @@ export function DashboardSidebar() {
           </div>
         </Link>
         <nav className="flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto" aria-label="Main">
-          {navItems.map(({ to, label }, i) => {
+          {navItems.map(({ to, labelKey }, i) => {
             const active =
               location.pathname === to ||
               (to !== homePath && location.pathname.startsWith(to + '/')) ||
               (to === homePath && location.pathname === homePath)
             return (
               <Link
-                key={`${to}-${label}`}
+                key={`${to}-${labelKey}`}
                 to={to}
-                title={label}
+                title={t(labelKey)}
                 className={`self-stretch flex items-center gap-3 rounded-lg py-2 transition-colors duration-150 ${collapsed ? 'justify-center px-2' : 'justify-start px-2.5'
                   } ${active
                     ? 'bg-primary text-primary-foreground'
@@ -169,7 +172,7 @@ export function DashboardSidebar() {
               >
                 <NavIcon icon={navIcons[i]} />
                 {!collapsed && (
-                  <span className={`text-sm font-medium truncate ${active ? 'font-semibold' : ''}`}>{label}</span>
+                  <span className={`text-sm font-medium truncate ${active ? 'font-semibold' : ''}`}>{t(labelKey)}</span>
                 )}
               </Link>
             )
@@ -186,19 +189,6 @@ export function DashboardSidebar() {
             </Link>
           ) : (
             <>
-              <Link
-                to="/profile"
-                className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-[var(--color-charcoal)] transition-colors duration-150"
-                aria-label="Go to profile"
-              >
-                <div className="w-7 h-7 rounded-full bg-[var(--color-charcoal)] border border-[var(--color-border)] flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-neutral-900 truncate">{user?.fullName ?? 'Admin User'}</p>
-                  <p className="text-[10px] text-neutral-500 truncate">
-                    {(user?.role ?? role).toString()} · @{user?.username ?? 'admin'}
-                  </p>
-                </div>
-              </Link>
               <Button
                 type="button"
                 onClick={logout}
@@ -206,7 +196,7 @@ export function DashboardSidebar() {
                 size="sm"
                 className="w-full !justify-start text-left text-xs font-semibold px-2 py-1.5 rounded-lg text-neutral-700 hover:text-neutral-900 hover:bg-[var(--color-charcoal)] transition-colors"
               >
-                Logout
+                {t('nav.logout')}
               </Button>
             </>
           )}
@@ -216,10 +206,10 @@ export function DashboardSidebar() {
             className={`w-full inline-flex items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-charcoal)] text-neutral-700 hover:text-neutral-900 hover:brightness-[0.98] transition-colors ${
               collapsed ? 'justify-center px-2 py-2' : 'justify-between px-2.5 py-2'
             }`}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+            title={collapsed ? t('nav.expand') : t('nav.collapse')}
           >
-            {!collapsed && <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">Collapse</span>}
+            {!collapsed && <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">{t('nav.collapse')}</span>}
             <svg
               className={`w-4 h-4 transition-transform duration-200 ease-out ${collapsed ? 'rotate-180' : ''}`}
               viewBox="0 0 24 24"

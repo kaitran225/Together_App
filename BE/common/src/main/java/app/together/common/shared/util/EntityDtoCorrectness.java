@@ -338,6 +338,9 @@ public final class EntityDtoCorrectness {
     }
 
     private static Object tryInstantiate(Class<?> clazz) throws Exception {
+        if (clazz.isRecord()) {
+            return instantiateRecord(clazz);
+        }
         try {
             Constructor<?> c = clazz.getDeclaredConstructor();
             c.setAccessible(true);
@@ -346,5 +349,43 @@ public final class EntityDtoCorrectness {
             Object builder = clazz.getMethod("builder").invoke(null);
             return builder.getClass().getMethod("build").invoke(builder);
         }
+    }
+
+    private static Object instantiateRecord(Class<?> recordClass) throws Exception {
+        var components = recordClass.getRecordComponents();
+        Object[] args = new Object[components.length];
+        for (int i = 0; i < components.length; i++) {
+            args[i] = defaultValue(components[i].getType());
+        }
+        return recordClass.getDeclaredConstructor(
+                java.util.Arrays.stream(components)
+                        .map(java.lang.reflect.RecordComponent::getType)
+                        .toArray(Class[]::new))
+                .newInstance(args);
+    }
+
+    private static Object defaultValue(Class<?> type) {
+        if (!type.isPrimitive()) {
+            return null;
+        }
+        if (type == boolean.class) {
+            return false;
+        }
+        if (type == char.class) {
+            return '\0';
+        }
+        if (type == byte.class || type == short.class || type == int.class) {
+            return 0;
+        }
+        if (type == long.class) {
+            return 0L;
+        }
+        if (type == float.class) {
+            return 0f;
+        }
+        if (type == double.class) {
+            return 0d;
+        }
+        return null;
     }
 }

@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { Button, IconButton, Input } from '../ui'
 import { AttachIcon } from '../icons'
 
-const DEFAULT_ACCEPT_FILES = '.pdf,.doc,.docx,.txt,.md,image/*'
+const DEFAULT_ACCEPT_FILES = '.pdf'
 
 export interface ChatInputBarProps {
   value: string
@@ -66,6 +66,12 @@ export function ChatInputBar({
             value={value}
             onChange={onChange}
             aria-label={ariaLabelMessage}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                onSend()
+              }
+            }}
           />
         </div>
         <Button variant="cta" size="sm" className="h-10 rounded-lg shrink-0 px-4" onClick={onSend}>

@@ -10,7 +10,7 @@ describe('useAdminActions', () => {
         username: 'alpha',
         email: 'a@test.com',
         status: 'Active',
-        plan: 'Basic',
+        plan: 'FREE',
         registerDate: '2025-01-01',
         expiryDate: '2026-01-01',
       },

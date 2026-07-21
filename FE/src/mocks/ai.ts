@@ -30,13 +30,8 @@ export const MEET_AI_MESSAGES = [
   { id: '3', role: 'assistant' as const, text: "Wave-particle duality means light and matter can behave like a wave or a particle depending on how we measure them.", time: '10:04' },
 ]
 
-export const SUMMARY_HISTORY = [
-  { id: '1', name: 'Quantum_Computing.pdf', time: '2 Hours Ago' },
-  { id: '2', name: 'History_of_Rome.pdf', time: 'Yesterday' },
-  { id: '3', name: 'Bio_101_Chapter_4.pdf', time: '3 Days Ago' },
-]
-
 export const QUICK_PROMPTS = [
+  'Tóm tắt lịch của tôi và cho biết thời gian rảnh tuần này',
   'Explain this concept in simple terms',
   'Summarize my notes',
   'Generate practice questions',
@@ -85,5 +80,7 @@ export const MOCK_QUESTIONS: QuizQuestion[] = [
 ]
 
 export const MAX_FILE_SIZE_MB = 10
-export const ACCEPT_FILES = '.pdf,.doc,.docx,.txt,.md,image/*'
+// Only PDF is actually parsed/extracted by the backend (Apache PDFBox) — other types
+// upload fine but the AI can never read their content, so don't offer them here.
+export const ACCEPT_FILES = '.pdf'
 export const MAX_PDF_MB = 25

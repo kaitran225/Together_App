@@ -2,7 +2,6 @@ package app.together.auth.service;
 
 import app.together.common.auth.entity.RefreshToken;
 import app.together.common.auth.entity.User;
-import app.together.common.auth.enums.BusinessRole;
 import app.together.common.auth.enums.SystemRole;
 import app.together.common.auth.enums.UserTier;
 import app.together.common.auth.repository.RefreshTokenRepository;
@@ -49,15 +48,13 @@ public class TokenService {
                 .issuedAt(now)
                 .expiresAt(expiry)
                 .subject(user.getUserSso())
-                .id(user.getUserId().toString())
+                .id(UUID.randomUUID().toString())
                 .claim("user_id", user.getUserId())
                 .claim("plan_type", user.getPlanType())
                 .claim("user_tier", UserTier.parse(user.getPlanType()).name())
                 .claim("user_email", user.getEmail())
                 .claim("system_role", user.getSystemRole() != null ? user.getSystemRole().name() : SystemRole.USER.name())
-                .claim("business_role", user.getBusinessRole() != null
-                        ? user.getBusinessRole().name()
-                        : BusinessRole.MEMBER.name())
+                .claim("status", user.getStatus())
                 .claim("is_admin", user.getSystemRole() == SystemRole.ADMIN
                         || Boolean.TRUE.equals(user.getIsAdmin()))
                 .build();
