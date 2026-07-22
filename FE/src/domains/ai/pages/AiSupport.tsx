@@ -4,21 +4,25 @@ import { AiBotIcon, Button, Card, ChatInputBar, CloseIcon, DocumentIcon, IconBut
 import { FlashcardModal } from '../../../components/FlashcardModal'
 import { MAX_FILE_SIZE_MB, ACCEPT_FILES, MAX_PDF_MB } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
-function formatRelativeTime(iso?: string): string {
+type TFunc = (key: string, params?: Record<string, string | number>) => string
+
+function formatRelativeTime(iso: string | undefined, t: TFunc): string {
   if (!iso) return ''
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diffMs / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins} min ago`
+  if (mins < 1) return t('ai.justNow')
+  if (mins < 60) return t('ai.minsAgo', { mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} Hour${hours > 1 ? 's' : ''} Ago`
+  if (hours < 24) return t('ai.hoursAgo', { hours })
   const days = Math.floor(hours / 24)
-  if (days === 1) return 'Yesterday'
-  return `${days} Days Ago`
+  if (days === 1) return t('ai.yesterday')
+  return t('ai.daysAgo', { days })
 }
 
 const MessageRenderer = ({ text }: { text: string }) => {
+  const { t } = useTranslation()
   try {
     let cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     const firstBrace = cleanText.indexOf('{');
@@ -31,7 +35,7 @@ const MessageRenderer = ({ text }: { text: string }) => {
           <>
             {firstBrace > 0 && <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{cleanText.substring(0, firstBrace).trim()}</p>}
             <div className="mt-2 text-xs bg-white/50 p-3 rounded-lg border border-primary/20 shadow-sm">
-              <p className="font-bold mb-3 text-primary text-sm">{parsed.title || 'Mindmap'}</p>
+              <p className="font-bold mb-3 text-primary text-sm">{parsed.title || t('ai.mindmapFallback')}</p>
             <ul className="pl-2 space-y-2 border-l-2 border-primary/30 ml-1">
               {parsed.nodes.map((node: any) => (
                 <li key={node.id} className="relative before:absolute before:-left-[9px] before:top-2 before:w-2 before:h-0.5 before:bg-primary/30">
@@ -61,6 +65,7 @@ const MessageRenderer = ({ text }: { text: string }) => {
 }
 
 export default function AiSupport() {
+  const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<{ id: string; file: File }[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -84,8 +89,8 @@ export default function AiSupport() {
         setDocumentHistory(
           res.data.map((d: any) => ({
             id: d.documentId,
-            name: d.fileName || d.title || 'Document',
-            time: formatRelativeTime(d.lastAccessedAt),
+            name: d.fileName || d.title || t('ai.documentFallback'),
+            time: formatRelativeTime(d.lastAccessedAt, t),
           }))
         )
       }
@@ -226,7 +231,7 @@ export default function AiSupport() {
 
   const handleNewChat = async () => {
     try {
-      const res = await workflowApi.createConversation(`Trò chuyện ngày ${new Date().toLocaleDateString()}`)
+      const res = await workflowApi.createConversation(t('ai.conversationTitle', { date: new Date().toLocaleDateString() }))
       if (res.success && res.data) {
         const newConv = res.data
         setConversations(prev => [newConv, ...prev])
@@ -247,7 +252,7 @@ export default function AiSupport() {
     let convId = activeConversationId
     if (!convId) {
       try {
-        const res = await workflowApi.createConversation(`Trò chuyện ngày ${new Date().toLocaleDateString()}`)
+        const res = await workflowApi.createConversation(t('ai.conversationTitle', { date: new Date().toLocaleDateString() }))
         if (res.success && res.data) {
           convId = res.data.conversationId
           setConversations([res.data])
@@ -267,7 +272,7 @@ export default function AiSupport() {
     const tempUserMsg = {
       messageId: Date.now() + Math.random(),
       sender: 'USER',
-      messageText: text || `[Đã gửi ${currentAttachments.length} tệp]`,
+      messageText: text || t('ai.sentFiles', { count: currentAttachments.length }),
       sentAt: new Date().toISOString()
     }
     setMessages(prev => [...prev, tempUserMsg])
@@ -278,7 +283,7 @@ export default function AiSupport() {
         setMessages(prev => [...prev, {
           messageId: Date.now() + Math.random(),
           sender: 'ASSISTANT',
-          messageText: `Đã tải lên ${currentAttachments.length} file. Hệ thống đang tiến hành xử lý ngầm (tạo Mindmap, tạo 10 câu hỏi Flashcard). Quá trình này có thể mất vài phút. Hãy nhấn 'Refresh Quizzes' sau ít phút để kiểm tra.`,
+          messageText: t('ai.uploadProcessingNotice', { count: currentAttachments.length }),
           sentAt: new Date().toISOString()
         }])
         for (const att of currentAttachments) {
@@ -308,7 +313,7 @@ export default function AiSupport() {
 
   const handleDeleteDocument = async (e: React.MouseEvent, docId: number) => {
     e.stopPropagation()
-    if (!confirm('Are you sure you want to delete this document?')) return
+    if (!confirm(t('ai.confirmDeleteDocument'))) return
     
     try {
       const res = await workflowApi.deleteDocument(docId)
@@ -318,31 +323,31 @@ export default function AiSupport() {
           setLastUploadedDocumentId(undefined)
         }
       } else {
-        alert('Failed to delete document.')
+        alert(t('ai.deleteDocumentFailed'))
       }
     } catch (err) {
       console.error(err)
-      alert('Error deleting document.')
+      alert(t('ai.deleteDocumentError'))
     }
   }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] min-h-[520px]">
-      <div className="flex-1 grid grid-cols-[20fr_50fr_30fr] min-h-0 rounded-2xl border-2 border-neutral-200 bg-[var(--color-surface)] shadow-sm overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-[20fr_50fr_30fr] min-h-0 rounded-2xl border-2 border-neutral-200 bg-[var(--color-surface)] shadow-sm overflow-y-auto md:overflow-hidden">
         {/* Left: 20% */}
-        <aside className="min-w-0 flex flex-col border-r-2 border-neutral-200 bg-neutral-50/80">
+        <aside className="order-2 md:order-1 min-w-0 flex flex-col border-b md:border-b-0 md:border-r-2 border-neutral-200 bg-neutral-50/80 max-h-56 md:max-h-none">
           <div className="p-3 border-b border-neutral-200">
             <Button
               variant="primary"
               onClick={handleNewChat}
               className="inline-flex w-full items-center justify-center gap-2 font-medium rounded-xl px-4 py-2 text-sm min-h-[44px]"
             >
-              + New chat
+              {t('ai.newChatPlus')}
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
             <section>
-              <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-2 mb-2">Conversations</p>
+              <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-2 mb-2">{t('ai.conversations')}</p>
               <ul className="space-y-0.5">
                 {conversations.map((c) => (
                   <li key={c.conversationId}>
@@ -371,7 +376,7 @@ export default function AiSupport() {
             {sessionDocuments.length > 0 && (
               <section className="mt-4 border-t border-neutral-200 pt-4">
                 <p className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider px-2 mb-2">
-                  Chat Context (Docs)
+                  {t('ai.chatContextDocs')}
                 </p>
                 <div className="flex flex-col gap-2 px-2">
                   {sessionDocuments.map(doc => (
@@ -383,7 +388,7 @@ export default function AiSupport() {
                           ? 'bg-primary text-white border-primary shadow-sm hover:opacity-90'
                           : 'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
                       }`}
-                      title={`${doc.name} (Trạng thái: ${doc.status || 'PROCESSING'})`}
+                      title={t('ai.docStatusTitle', { name: doc.name, status: doc.status || 'PROCESSING' })}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="truncate max-w-[120px]">{doc.name}</span>
@@ -397,7 +402,7 @@ export default function AiSupport() {
                         )}
 
                         {doc.status === 'FAILED' && (
-                          <span className="text-red-500 shrink-0" title="Xử lý lỗi ⚠️">⚠️</span>
+                          <span className="text-red-500 shrink-0" title={t('ai.processingFailed')}>⚠️</span>
                         )}
 
                         {doc.status === 'COMPLETED' && lastUploadedDocumentId === doc.id && (
@@ -412,7 +417,7 @@ export default function AiSupport() {
                       <div 
                         onClick={(e) => handleDeleteDocument(e, doc.id)} 
                         className="ml-1 p-0.5 hover:bg-black/10 rounded-full transition-colors flex items-center justify-center shrink-0"
-                        title="Delete document"
+                        title={t('ai.deleteDocument')}
                       >
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -425,7 +430,7 @@ export default function AiSupport() {
                        onClick={() => setLastUploadedDocumentId(undefined)}
                        className="px-2 py-1.5 mt-1 rounded-xl text-[10px] font-medium border border-neutral-200 text-neutral-500 hover:bg-neutral-50 transition-colors"
                      >
-                       Clear Context
+                       {t('ai.clearContext')}
                      </button>
                   )}
                 </div>
@@ -435,7 +440,7 @@ export default function AiSupport() {
           <div className="p-3 border-t border-neutral-200">
             <div className="rounded-xl bg-accent-muted border border-primary/20 p-3">
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-xs font-medium text-neutral-900">Tokens used</span>
+                <span className="text-xs font-medium text-neutral-900">{t('ai.tokensUsed')}</span>
                 <span className="text-xs font-semibold text-neutral-900 dark:text-primary">64%</span>
               </div>
               <Progress value={64} max={100} className="h-2 rounded-full" />
@@ -444,32 +449,32 @@ export default function AiSupport() {
         </aside>
 
         {/* Center: 50% — Focus Room layout */}
-        <main className="min-w-0 flex flex-col p-6 gap-4 overflow-y-auto bg-[var(--color-surface)] border-r-2 border-neutral-200">
+        <main className="order-1 md:order-2 min-w-0 flex flex-col p-4 md:p-6 gap-4 overflow-y-auto bg-[var(--color-surface)] border-b md:border-b-0 md:border-r-2 border-neutral-200 min-h-[50vh] md:min-h-0">
           <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">Summary</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">{t('ai.summary')}</h2>
             <Card className="p-4 min-h-[120px] border-2 border-neutral-200 text-neutral-500 text-sm">
               {quizletCards && quizletCards.length > 0
-                ? 'AI has generated quizlet sets below. Click "Do the quiz" on any card to start.'
-                : 'Session summary will appear here after you study.'}
+                ? t('ai.summaryWithQuizlets')
+                : t('ai.summaryEmpty')}
             </Card>
           </section>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => setSummarizeOpen(true)}>
-              Summarize
+              {t('ai.summarize')}
             </Button>
             <Button
               variant="secondary"
               size="sm"
               onClick={fetchQuizSets}
             >
-              Refresh Quizzes
+              {t('ai.refreshQuizzes')}
             </Button>
-            <Button variant="secondary" size="sm">Summary</Button>
-            <Button variant="secondary" size="sm">Mindmaps</Button>
+            <Button variant="secondary" size="sm">{t('ai.summary')}</Button>
+            <Button variant="secondary" size="sm">{t('ai.mindmaps')}</Button>
           </div>
           {quizletCards && quizletCards.length > 0 && (
             <section className="shrink-0">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">Quizlet sets</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">{t('ai.quizletSets')}</h2>
               <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
                 {quizletCards.map((card) => {
                   const isFlashcardSet = card.source === 'FLASHCARD'
@@ -486,11 +491,11 @@ export default function AiSupport() {
                             ? 'bg-amber-200 text-amber-700'
                             : 'bg-primary/10 text-primary'
                         }`}>
-                          {isFlashcardSet ? '🃏 Flashcard' : '📝 Quiz'}
+                          {isFlashcardSet ? `🃏 ${t('ai.badgeFlashcard')}` : `📝 ${t('ai.badgeQuiz')}`}
                         </span>
                       </div>
                       <p className="text-sm font-bold text-neutral-900">{card.title}</p>
-                      <p className="text-xs text-neutral-500 mt-0.5">{card.questionCount} câu</p>
+                      <p className="text-xs text-neutral-500 mt-0.5">{t('ai.questionsCount', { count: card.questionCount })}</p>
                     </div>
                     <div className="flex-shrink-0 pt-3 mt-auto">
                       {isFlashcardSet ? (
@@ -500,7 +505,7 @@ export default function AiSupport() {
                           className="w-full !bg-amber-500 !border-amber-500 hover:!bg-amber-600"
                           onClick={() => setSelectedFlashcardQuizId(card.id)}
                         >
-                          Open Flashcards
+                          {t('ai.openFlashcards')}
                         </Button>
                       ) : (
                         <>
@@ -513,7 +518,7 @@ export default function AiSupport() {
                               setShowQuizModal(true)
                             }}
                           >
-                            Do the quiz
+                            {t('ai.doTheQuiz')}
                           </Button>
                           <Button
                             variant="secondary"
@@ -521,7 +526,7 @@ export default function AiSupport() {
                             className="w-full mt-2"
                             onClick={() => setSelectedFlashcardQuizId(card.id)}
                           >
-                            Flashcards
+                            {t('ai.flashcards')}
                           </Button>
                         </>
                       )}
@@ -533,25 +538,25 @@ export default function AiSupport() {
             </section>
           )}
           <section className="mt-auto pt-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">Quick notes</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-600 mb-2">{t('ai.quickNotes')}</h2>
             <div className="flex gap-2">
               <Textarea
-                placeholder="Start writing notes..."
+                placeholder={t('ai.notesPlaceholder')}
                 className="flex-1 min-h-[80px] resize-y border-2 border-neutral-200"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
-              <Button variant="secondary" size="sm" className="shrink-0 self-end">Add</Button>
+              <Button variant="secondary" size="sm" className="shrink-0 self-end">{t('ai.add')}</Button>
             </div>
           </section>
         </main>
 
         {/* Right: 30% — Conversation chat */}
-        <aside className="min-w-0 flex flex-col border-l-2 border-neutral-200 bg-[var(--color-surface)]">
+        <aside className="order-3 min-w-0 flex flex-col border-t md:border-t-0 md:border-l-2 border-neutral-200 bg-[var(--color-surface)] max-h-[28rem] md:max-h-none min-h-[20rem] md:min-h-0">
           <div className="flex items-center gap-2 px-4 py-3 border-b-2 border-neutral-200">
             <AiBotIcon className="w-7 h-7" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-700 dark:text-accent">
-              Conversation
+              {t('ai.conversation')}
             </h2>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
@@ -572,7 +577,7 @@ export default function AiSupport() {
                           : 'bg-accent-muted border-primary/20 text-neutral-900'
                       }`}
                     >
-                      {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                      {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">{t('ai.youLabel')} · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
                       <p className="text-sm leading-relaxed">{msg.messageText}</p>
                       {isAssistant && msg.sentAt && <p className="text-[10px] text-neutral-500 mt-1">{new Date(msg.sentAt).toLocaleTimeString()}</p>}
                     </div>
@@ -589,11 +594,11 @@ export default function AiSupport() {
               onSend={handleSendMessage}
               onFileChange={handleFileChange}
               acceptFiles={ACCEPT_FILES}
-              placeholder="Type your question..."
+              placeholder={t('ai.typeQuestion')}
               secondaryActions={
                 <>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setSummarizeOpen(true)} className="!px-0 !py-0 min-h-0 text-xs font-medium text-neutral-700 hover:text-neutral-900">Summarize</Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setDialogOpen(true)} className="!px-0 !py-0 min-h-0 text-xs font-medium text-neutral-700 hover:text-neutral-900">Open chat in popup</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSummarizeOpen(true)} className="!px-0 !py-0 min-h-0 text-xs font-medium text-neutral-700 hover:text-neutral-900">{t('ai.summarize')}</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setDialogOpen(true)} className="!px-0 !py-0 min-h-0 text-xs font-medium text-neutral-700 hover:text-neutral-900">{t('ai.openChatPopup')}</Button>
                 </>
               }
             />
@@ -606,14 +611,14 @@ export default function AiSupport() {
       )}
 
       {/* Chat dialog popup */}
-      <Modal open={dialogOpen} onClose={() => setDialogOpen(false)} title="Together AI - Chat" size="max-w-2xl">
+      <Modal open={dialogOpen} onClose={() => setDialogOpen(false)} title={t('ai.chatModalTitle')} size="max-w-2xl">
           <div className="bg-[var(--color-surface)] rounded-2xl border-2 border-neutral-200 shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b-2 border-neutral-200 bg-neutral-50">
               <div className="flex items-center gap-2">
                 <AiBotIcon className="w-8 h-8" />
-                <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wide">Together AI — Chat</h2>
+                <h2 className="text-sm font-bold text-neutral-900 uppercase tracking-wide">{t('ai.chatModalTitle')}</h2>
               </div>
-              <IconButton type="button" onClick={() => setDialogOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label="Close" icon={<CloseIcon className="w-5 h-5" />} />
+              <IconButton type="button" onClick={() => setDialogOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label={t('common.close')} icon={<CloseIcon className="w-5 h-5" />} />
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
               {messages.map((msg) => {
@@ -633,7 +638,7 @@ export default function AiSupport() {
                             : 'bg-accent-muted border-primary/20 text-neutral-900'
                         }`}
                       >
-                        {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">You · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
+                        {!isAssistant && <p className="text-[10px] font-semibold text-neutral-500 mb-0.5">{t('ai.youLabel')} · {new Date(msg.sentAt).toLocaleTimeString()}</p>}
                         <MessageRenderer text={msg.messageText} />
                         {isAssistant && msg.sentAt && <p className="text-[10px] text-neutral-500 mt-1">{new Date(msg.sentAt).toLocaleTimeString()}</p>}
                       </div>
@@ -649,7 +654,7 @@ export default function AiSupport() {
                 onSend={handleSendMessage}
                 onFileChange={handleFileChange}
                 acceptFiles={ACCEPT_FILES}
-                placeholder="Ask anything..."
+                placeholder={t('ai.askAnything')}
                 attachmentsSlot={
                   attachments.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -659,7 +664,7 @@ export default function AiSupport() {
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 text-xs"
                         >
                           <span className="max-w-[100px] truncate">{file.name}</span>
-                          <IconButton type="button" size="sm" variant="ghost" onClick={() => removeAttachment(id)} className="!p-0 min-h-0 text-neutral-500 hover:text-neutral-900" label={`Remove ${file.name}`} icon={<CloseIcon className="w-3 h-3" />} />
+                          <IconButton type="button" size="sm" variant="ghost" onClick={() => removeAttachment(id)} className="!p-0 min-h-0 text-neutral-500 hover:text-neutral-900" label={t('ai.removeAttachment', { name: file.name })} icon={<CloseIcon className="w-3 h-3" />} />
                         </span>
                       ))}
                     </div>
@@ -676,16 +681,16 @@ export default function AiSupport() {
             <div className="flex items-center justify-between px-4 py-3 border-b-2 border-neutral-200">
               <div className="flex items-center gap-2">
                 <Link to="/focus-room">
-                  <Button variant="primary" size="sm" className="rounded-lg text-xs font-bold">Focus room</Button>
+                  <Button variant="primary" size="sm" className="rounded-lg text-xs font-bold">{t('ai.focusRoom')}</Button>
                 </Link>
-                <IconButton type="button" onClick={() => setSummarizeOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label="Close" icon={<CloseIcon className="w-5 h-5" />} />
+                <IconButton type="button" onClick={() => setSummarizeOpen(false)} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900" label={t('common.close')} icon={<CloseIcon className="w-5 h-5" />} />
               </div>
             </div>
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1fr] min-h-0 overflow-hidden">
               <div className="p-4 border-r border-neutral-200 flex flex-col gap-4 overflow-y-auto">
                 <div>
-                  <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide mb-2">Drop file here</p>
-                  <Input ref={summarizeInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleSummarizeFile} aria-label="Choose PDF" />
+                  <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide mb-2">{t('ai.dropFileHere')}</p>
+                  <Input ref={summarizeInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleSummarizeFile} aria-label={t('ai.choosePdf')} />
                   <Button
                     type="button"
                     variant="ghost"
@@ -695,19 +700,19 @@ export default function AiSupport() {
                     className="w-full min-h-[180px] rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 flex flex-col items-center justify-center gap-2 text-neutral-500 hover:border-neutral-400 hover:bg-neutral-100 transition-colors"
                   >
                     <svg className="w-12 h-12 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    <span className="text-sm font-semibold text-neutral-600">Drop PDF</span>
-                    <span className="text-xs">Max {MAX_PDF_MB}MB</span>
+                    <span className="text-sm font-semibold text-neutral-600">{t('ai.dropPdf')}</span>
+                    <span className="text-xs">{t('ai.maxMb', { mb: MAX_PDF_MB })}</span>
                     {droppedFile && <span className="text-xs font-medium text-neutral-800 dark:text-primary mt-1 truncate max-w-full px-2">{droppedFile.name}</span>}
                   </Button>
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide">History</p>
-                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label="Refresh" onClick={loadDocumentHistory} icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
+                    <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide">{t('ai.history')}</p>
+                    <IconButton type="button" size="sm" variant="ghost" className="p-1 rounded text-neutral-500 hover:bg-neutral-200" label={t('common.refresh')} onClick={loadDocumentHistory} icon={<svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>} />
                   </div>
                   <ul className="space-y-1.5">
                     {documentHistory.length === 0 ? (
-                      <li className="text-xs text-neutral-400 px-3 py-2.5">No documents yet.</li>
+                      <li className="text-xs text-neutral-400 px-3 py-2.5">{t('ai.noDocumentsYet')}</li>
                     ) : (
                       documentHistory.map((item) => (
                         <li key={item.id}>
@@ -725,7 +730,7 @@ export default function AiSupport() {
               <div className="p-4 flex flex-col min-h-0">
                 <p className="text-xs font-bold text-neutral-900 uppercase tracking-wide mb-2 flex items-center gap-1">
                 <MenuIcon className="w-3.5 h-3.5 text-neutral-500" />
-                Executive summary</p>
+                {t('ai.executiveSummary')}</p>
                 <div className="flex-1 min-h-[200px] rounded-xl border-2 border-neutral-200 bg-[var(--color-surface)] p-4 overflow-y-auto">
                   {summaryText ? (
                     <p className="text-sm text-neutral-700 whitespace-pre-wrap">{summaryText}</p>
@@ -736,8 +741,8 @@ export default function AiSupport() {
                   )}
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <Button variant="primary" size="sm" className="rounded-lg bg-accent hover:bg-accent border-0" onClick={() => setSummaryText(droppedFile ? 'Summary will appear here after processing. (Mock: This is a placeholder summary for ' + droppedFile.name + '.)' : 'Drop or select a PDF first.')}>Summarize</Button>
-                  <Button variant="secondary" size="sm" className="rounded-lg" onClick={() => setSummaryText('')}>Download</Button>
+                  <Button variant="primary" size="sm" className="rounded-lg bg-accent hover:bg-accent border-0" onClick={() => setSummaryText(droppedFile ? t('ai.summaryPlaceholder') : t('ai.dropPdfFirst'))}>{t('ai.summarize')}</Button>
+                  <Button variant="secondary" size="sm" className="rounded-lg" onClick={() => setSummaryText('')}>{t('ai.download')}</Button>
                 </div>
               </div>
             </div>

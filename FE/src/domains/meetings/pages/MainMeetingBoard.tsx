@@ -12,9 +12,14 @@ type Participant = {
   isYou: boolean
 }
 
-function getDisplayName(u: { fullName?: string | null; username?: string | null; userSso?: string | null } | null | undefined) {
-  if (!u) return 'Unknown'
-  return u.fullName || u.username || u.userSso || 'You'
+type TFunc = (key: string, params?: Record<string, string | number>) => string
+
+function getDisplayName(
+  u: { fullName?: string | null; username?: string | null; userSso?: string | null } | null | undefined,
+  t: TFunc
+) {
+  if (!u) return t('meetings.unknownUser')
+  return u.fullName || u.username || u.userSso || t('meetings.youFallback')
 }
 
 /** Google Meet–style grid: fill available space by participant count */
@@ -68,7 +73,7 @@ export default function MainMeetingBoard() {
   const [messages, setMessages] = useState<any[]>([])
   
   const [participants, setParticipants] = useState<Participant[]>(() => {
-    return user ? [{ name: getDisplayName(user), sso: user.userSso || '', isYou: true }] : []
+    return user ? [{ name: getDisplayName(user, t), sso: user.userSso || '', isYou: true }] : []
   })
   const [stompClient, setStompClient] = useState<StompClient | null>(null)
   const [chatInput, setChatInput] = useState('')
@@ -115,7 +120,7 @@ export default function MainMeetingBoard() {
   useEffect(() => {
     if (!user?.userSso) return
     setParticipants((prev) => {
-      const self = { name: getDisplayName(user), sso: user.userSso!, isYou: true }
+      const self = { name: getDisplayName(user, t), sso: user.userSso!, isYou: true }
       if (!prev.some((p) => p.isYou)) return [self, ...prev.filter((p) => p.sso !== user.userSso)]
       return prev.map((p) => (p.isYou ? self : p))
     })
@@ -174,16 +179,16 @@ export default function MainMeetingBoard() {
             clearInterval(interval)
           } else if (attempts > 15) {
             setIsTranscribing(false)
-            setUploadError('AI processing is taking too long. Please check back later.')
+            setUploadError(t('meetings.aiTimeout'))
             clearInterval(interval)
           }
         }, 3000)
       } else {
-        setUploadError(res.message || 'Lỗi khi gửi dữ liệu lên AI.')
+        setUploadError(res.message || t('meetings.aiUploadError'))
         setIsTranscribing(false)
       }
     } catch (err) {
-      setUploadError('Lỗi kết nối khi gửi tệp âm thanh.')
+      setUploadError(t('meetings.aiConnectionError'))
       setIsTranscribing(false)
     }
   }
@@ -417,7 +422,7 @@ export default function MainMeetingBoard() {
       sendSignal('offer', {
         type: 'offer',
         toUser: targetSso,
-        targetName: getDisplayName(userRef.current),
+        targetName: getDisplayName(userRef.current, t),
         data: offer
       })
     } catch (err) {
@@ -478,8 +483,8 @@ export default function MainMeetingBoard() {
     workflowApi.joinMeeting(meetingId).then((res) => {
       if (res.success && res.data) {
         setMeetingInfo({
-          title: res.data.title || `Meeting #${meetingId}`,
-          description: res.data.description || 'No description provided.'
+          title: res.data.title || t('meetings.meetingNumber', { id: meetingId }),
+          description: res.data.description || t('meetings.noDescription')
         })
         const role = String(res.data.currentUserRole || '').toUpperCase()
         setIsOwner(role === 'OWNER')
@@ -499,7 +504,7 @@ export default function MainMeetingBoard() {
         setMessages((prev) => [
           ...prev,
           {
-            user: msg.senderName || msg.senderSso || 'Participant',
+            user: msg.senderName || msg.senderSso || t('meetings.participant'),
             text: msg.message,
             time: msg.sentAt
               ? new Date(msg.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
@@ -542,7 +547,7 @@ export default function MainMeetingBoard() {
             type: 'hello',
             toUser: sender,
             fromUser: me,
-            senderName: getDisplayName(userRef.current)
+            senderName: getDisplayName(userRef.current, t)
           })
           // Lexicographically smaller SSO initiates to avoid glare
           if (me < sender) {
@@ -577,7 +582,7 @@ export default function MainMeetingBoard() {
         sendSignal('join', {
           type: 'join',
           fromUser: user.userSso,
-          senderName: getDisplayName(user)
+          senderName: getDisplayName(user, t)
         })
         broadcastCameraState(videoOn)
       }, 150)
@@ -683,7 +688,7 @@ export default function MainMeetingBoard() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-lg font-extrabold text-neutral-900 tracking-tight">
-              {meetingInfo.title || (meetingId ? `Meeting #${meetingId}` : 'Loading...')}
+              {meetingInfo.title || (meetingId ? t('meetings.meetingNumber', { id: meetingId }) : t('common.loading'))}
             </h1>
             <p className="text-xs text-neutral-500 mt-0.5 line-clamp-1 max-w-2xl">{meetingInfo.description}</p>
           </div>
@@ -696,9 +701,9 @@ export default function MainMeetingBoard() {
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0 gap-3 mt-3">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 gap-3 mt-3 relative">
         {/* Left Area: Video Grid (Meet-style scaling) */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-[40vh] md:min-h-0">
           <div className="flex-1 min-h-0 overflow-auto border-2 border-neutral-300 rounded-xl bg-white p-4 shadow-md flex items-center justify-center">
             {/* Hidden audio elements so remote mic is heard even when camera is off */}
             {Object.entries(remoteStreams).map(([sso, stream]) => (
@@ -780,9 +785,15 @@ export default function MainMeetingBoard() {
           </div>
         </div>
 
-        {/* Right Sidebar: Chat & Notes */}
+        {/* Right Sidebar: Chat & Notes — full-width sheet on mobile */}
         {activeTab && (
-          <aside className="w-[340px] shrink-0 flex flex-col gap-3 min-h-0 transition-all">
+          <aside className="fixed inset-x-2 bottom-2 top-28 z-40 flex flex-col gap-3 min-h-0 md:static md:inset-auto md:z-auto md:w-[340px] md:shrink-0 transition-all">
+            <button
+              type="button"
+              className="md:hidden absolute inset-0 -z-10 bg-black/40 rounded-xl"
+              aria-label={t('meetings.closePanel')}
+              onClick={() => setActiveTab(null)}
+            />
             <div className="flex-1 flex flex-col bg-white rounded-xl border-2 border-neutral-300 overflow-hidden shadow-md min-h-0">
                <div className="p-3 border-b-2 border-neutral-200 bg-neutral-50 flex justify-between items-center flex-shrink-0">
                  <h3 className="text-xs font-bold uppercase text-neutral-800">
@@ -811,8 +822,8 @@ export default function MainMeetingBoard() {
                          if (!chatInput.trim() || !stompClient || !meetingId) return
                          stompClient.send('/app/room.chat', {
                            roomId: String(meetingId),
-                           senderSso: user?.userSso || 'Participant',
-                           senderName: getDisplayName(user),
+                           senderSso: user?.userSso || t('meetings.participant'),
+                           senderName: getDisplayName(user, t),
                            message: chatInput.trim(),
                            sentAt: new Date().toISOString()
                          })
@@ -951,7 +962,7 @@ export default function MainMeetingBoard() {
                  {t('meetings.aiAnalysis')}
                </h2>
                {isTranscribing && (
-                 <Badge variant="milestone" className="animate-pulse">Processing Audio...</Badge>
+                 <Badge variant="milestone" className="animate-pulse">{t('meetings.processingAudio')}</Badge>
                )}
              </div>
 
@@ -961,7 +972,7 @@ export default function MainMeetingBoard() {
                {!summary && isTranscribing && (
                  <div className="flex flex-col items-center justify-center h-full text-neutral-500 py-10">
                     <div className="w-12 h-12 border-4 border-neutral-200 border-t-primary rounded-full animate-spin mb-4"></div>
-                    <p className="text-sm font-medium">Analyzing conversation and generating insights...</p>
+                    <p className="text-sm font-medium">{t('meetings.analyzing')}</p>
                  </div>
                )}
 

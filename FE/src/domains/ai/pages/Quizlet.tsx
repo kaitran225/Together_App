@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { Button, Card, QuizletQuizModal } from '../../../components/common'
 import { MOCK_SETS } from '../../../mocks'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function Quizlet() {
+  const { t } = useTranslation()
   const [showQuizModal, setShowQuizModal] = useState(false)
   const [selectedQuizId, setSelectedQuizId] = useState<number | undefined>(undefined)
   const [quizSets, setQuizSets] = useState<any[]>([])
@@ -55,11 +57,11 @@ export default function Quizlet() {
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl mx-auto p-4">
-      <h1 className="text-xl font-bold uppercase text-neutral-900">Quizlet</h1>
-      <p className="text-sm text-neutral-500">Choose a set and do the quiz.</p>
+      <h1 className="text-xl font-bold uppercase text-neutral-900">{t('ai.quizletTitle')}</h1>
+      <p className="text-sm text-neutral-500">{t('ai.quizletSubtitle')}</p>
       
       {loading ? (
-        <div className="text-center py-8 text-neutral-500 text-sm">Loading quiz sets...</div>
+        <div className="text-center py-8 text-neutral-500 text-sm">{t('ai.loadingQuizSets')}</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {quizSets.map((set) => (
@@ -68,7 +70,7 @@ export default function Quizlet() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-neutral-900">{set.title}</p>
                   {set.isMock && (
-                    <span className="text-[10px] bg-neutral-100 text-neutral-500 px-1.5 py-0.5 rounded font-semibold uppercase">Mock</span>
+                    <span className="text-[10px] bg-neutral-100 text-neutral-500 px-1.5 py-0.5 rounded font-semibold uppercase">{t('ai.mockBadge')}</span>
                   )}
                 </div>
                 <p className="text-xs text-neutral-500 mt-1">{set.description}</p>
@@ -77,13 +79,13 @@ export default function Quizlet() {
                     {set.difficulty || 'MEDIUM'}
                   </span>
                   <span className="text-[10px] text-neutral-500">
-                    {set.questionCount} questions
+                    {t('ai.questionsCount', { count: set.questionCount })}
                   </span>
                 </div>
               </div>
               <div className="flex-shrink-0 pt-3 mt-auto">
                 <Button variant="primary" size="sm" className="w-full" onClick={() => startQuiz(set)}>
-                  Do the quiz
+                  {t('ai.doTheQuiz')}
                 </Button>
               </div>
             </Card>

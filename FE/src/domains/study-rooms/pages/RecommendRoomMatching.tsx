@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button, IconButton, Input } from '../../../components/common'
 import { RECOMMENDED_ROOMS } from '../../../mocks'
 import { readApi, workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function RecommendRoomMatching() {
+  const { t } = useTranslation()
   const [goal, setGoal] = useState('')
   const [subject, setSubject] = useState('')
   const [rooms, setRooms] = useState<any[]>([])
@@ -42,7 +44,7 @@ export default function RecommendRoomMatching() {
 
   const handleMatchRoom = async () => {
     if (!goal.trim()) {
-      setMatchError('Goal is required for AI matching.')
+      setMatchError(t('studyRooms.errorGoalRequiredMatch'))
       return
     }
     setMatchError('')
@@ -61,10 +63,10 @@ export default function RecommendRoomMatching() {
       if (res.success && res.data) {
         navigate(`/study-room?roomId=${res.data.roomId}`)
       } else {
-        setMatchError(res.message || 'Failed to match a room.')
+        setMatchError(res.message || t('studyRooms.errorMatchFailed'))
       }
     } catch (err: any) {
-      setMatchError(err.message || 'An error occurred during matching.')
+      setMatchError(err.message || t('studyRooms.errorMatchOccurred'))
     } finally {
       setMatching(false)
     }
@@ -80,11 +82,11 @@ export default function RecommendRoomMatching() {
       <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-neutral-200">
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 bg-neutral-700 rounded-sm shrink-0" aria-hidden />
-          <h1 className="text-xl font-bold text-neutral-900 uppercase tracking-tight">Matching room</h1>
+          <h1 className="text-xl font-bold text-neutral-900 uppercase tracking-tight">{t('studyRooms.recommendTitle')}</h1>
         </div>
         <Link to="/study-rooms">
           <Button variant="secondary" size="md" className="border-2 border-neutral-200">
-            Go back
+            {t('common.goBack')}
           </Button>
         </Link>
       </div>
@@ -92,10 +94,10 @@ export default function RecommendRoomMatching() {
       {/* AI Matching section */}
       <div className="text-center">
         <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 uppercase tracking-tight mb-3">
-          Find the best study room for you
+          {t('studyRooms.recommendHeading')}
         </h2>
         <p className="text-sm text-neutral-600 mb-8 max-w-xl mx-auto">
-          Describe what you’re studying and Together AI will match you with study groups that fit your goals.
+          {t('studyRooms.recommendDesc')}
         </p>
         
         {matchError && (
@@ -106,9 +108,9 @@ export default function RecommendRoomMatching() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-6">
           <div className="flex flex-col gap-2 text-left">
-            <label className="text-sm font-bold text-neutral-900 uppercase">Goal</label>
+            <label className="text-sm font-bold text-neutral-900 uppercase">{t('studyRooms.goalFieldLabel')}</label>
             <Input
-              placeholder="Goal..."
+              placeholder={t('studyRooms.goalFieldPlaceholder')}
               className="h-14 rounded-lg border-2 border-neutral-200 bg-neutral-50/50 text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-accent focus:border-accent"
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
@@ -116,9 +118,9 @@ export default function RecommendRoomMatching() {
             />
           </div>
           <div className="flex flex-col gap-2 text-left">
-            <label className="text-sm font-bold text-neutral-900 uppercase">Subject</label>
+            <label className="text-sm font-bold text-neutral-900 uppercase">{t('studyRooms.subjectLabel')}</label>
             <Input
-              placeholder="Subject..."
+              placeholder={t('studyRooms.subjectPlaceholder')}
               className="h-14 rounded-lg border-2 border-neutral-200 bg-neutral-50/50 text-neutral-900 placeholder:text-neutral-400 focus:ring-2 focus:ring-accent focus:border-accent"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
@@ -133,7 +135,7 @@ export default function RecommendRoomMatching() {
           onClick={handleMatchRoom}
           disabled={matching}
         >
-          {matching ? 'Matching...' : 'Match with AI'}
+          {matching ? t('studyRooms.matching') : t('studyRooms.matchWithAI')}
         </Button>
       </div>
 
@@ -141,11 +143,11 @@ export default function RecommendRoomMatching() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <span className="px-3 py-1.5 rounded-lg bg-neutral-100 border-2 border-neutral-200 text-neutral-700 text-xs font-semibold">
-            Sessions 4/5
+            {t('studyRooms.sessionsBadge')}
           </span>
-          <h3 className="text-lg font-bold text-neutral-900 uppercase tracking-tight">Recommendations for you</h3>
+          <h3 className="text-lg font-bold text-neutral-900 uppercase tracking-tight">{t('studyRooms.recommendationsTitle')}</h3>
         </div>
-        <p className="text-xs font-semibold text-neutral-600 uppercase">• Live</p>
+        <p className="text-xs font-semibold text-neutral-600 uppercase">{t('studyRooms.live')}</p>
         <div className="relative">
           <div
             ref={scrollRef}
@@ -161,11 +163,11 @@ export default function RecommendRoomMatching() {
                 <p className="text-xs font-semibold text-neutral-600 uppercase tracking-wide">{room.subject}</p>
                 <div className="flex items-center justify-between gap-2 mt-auto pt-2">
                   <span className="px-2.5 py-1 rounded-lg bg-success text-white text-xs font-bold">
-                    {room.active} Active
+                    {t('studyRooms.activeCount', { count: room.active })}
                   </span>
                   <Link to={`/study-room?roomId=${room.id}`}>
                     <Button variant="secondary" size="sm" className="border-2 border-neutral-200 text-xs">
-                      Join
+                      {t('common.join')}
                     </Button>
                   </Link>
                 </div>
@@ -175,7 +177,7 @@ export default function RecommendRoomMatching() {
           <IconButton
             onClick={scrollRight}
             className="absolute right-0 top-1/2 -translate-y-1/2 border-2 border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 shadow-sm -translate-x-2 z-10"
-            label="Scroll right"
+            label={t('studyRooms.scrollRight')}
             icon={(
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />

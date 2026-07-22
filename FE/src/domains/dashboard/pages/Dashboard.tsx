@@ -87,7 +87,7 @@ export default function Dashboard() {
             console.error('Error reloading weekly hours:', err)
           }
         } else {
-          alert(res.message || 'Không thể kết thúc phiên học.')
+          alert(res.message || t('dashboard.cannotEndSession'))
         }
       } else {
         // Bắt đầu phiên học
@@ -97,12 +97,12 @@ export default function Dashboard() {
           setActiveSessionId(sid)
           localStorage.setItem('active_study_session_id', String(sid))
         } else {
-          alert(res.message || 'Không thể bắt đầu phiên học.')
+          alert(res.message || t('dashboard.cannotStartSession'))
         }
       }
     } catch (e: any) {
       console.error(e)
-      alert('Có lỗi xảy ra khi thực hiện chức năng tự học.')
+      alert(t('dashboard.studySessionError'))
     } finally {
       setIsStudyLoading(false)
     }
@@ -149,14 +149,14 @@ export default function Dashboard() {
     try {
       const personalRes = await workflowApi.getFocusRoomTasks()
       if (personalRes.success && personalRes.data) {
-        const personalUncompleted = personalRes.data.filter((t: any) => !t.isCompleted)
-        for (const t of personalUncompleted) {
+        const personalUncompleted = personalRes.data.filter((task: any) => !task.isCompleted)
+        for (const task of personalUncompleted) {
           allTasks.push({
-            id: t.id,
-            title: t.title,
+            id: task.id,
+            title: task.title,
             priority: 'MEDIUM',
             isPersonal: true,
-            dueDate: t.dueDate,
+            dueDate: task.dueDate,
           })
         }
       }
@@ -178,7 +178,7 @@ export default function Dashboard() {
         console.error(err)
       }
     } else {
-      alert('Công việc nhóm cần được cập nhật trạng thái trên bảng Kanban của nhóm.')
+      alert(t('dashboard.teamTaskUpdateKanban'))
     }
   }
 
@@ -193,7 +193,7 @@ export default function Dashboard() {
         console.error(err)
       }
     } else {
-      alert('Không thể xóa công việc nhóm từ Dashboard. Vui lòng thực hiện trên bảng Kanban.')
+      alert(t('dashboard.cannotDeleteTeamTask'))
     }
   }
 
@@ -203,10 +203,10 @@ export default function Dashboard() {
     workflowApi.getMyTeams()
       .then((res) => {
         if (res.success && res.data) {
-          setTeams(res.data.slice(0, 4).map((t: any) => ({
-            name: t.name,
-            active: `${t.currentMemberCount || 1} members`,
-            id: t.teamId,
+          setTeams(res.data.slice(0, 4).map((team: any) => ({
+            name: team.name,
+            active: t('dashboard.membersCount', { count: team.currentMemberCount || 1 }),
+            id: team.teamId,
           })))
         }
       })
@@ -295,12 +295,20 @@ export default function Dashboard() {
   const currentLevelXp = remainingExp
   const xpTarget = nextLevelExp
 
-  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const days = [
+    t('dashboard.dayMon'),
+    t('dashboard.dayTue'),
+    t('dashboard.dayWed'),
+    t('dashboard.dayThu'),
+    t('dashboard.dayFri'),
+    t('dashboard.daySat'),
+    t('dashboard.daySun'),
+  ]
   const maxHours = Math.max(...weeklyHours, 2)
   const studyBars = weeklyHours.map((hours, i) => ({
     day: days[i],
     h: Math.max((hours / maxHours) * 100, 10),
-    label: `${hours.toFixed(1)}h`,
+    label: t('dashboard.hoursShort', { hours: hours.toFixed(1) }),
     active: hours > 0
   }))
 
@@ -320,11 +328,11 @@ export default function Dashboard() {
                 <span className="flex items-center gap-2 text-xs font-bold text-error animate-pulse mr-2 relative">
                   <span className="w-2.5 h-2.5 rounded-full bg-error inline-block animate-ping absolute" style={{ width: '10px', height: '10px' }} />
                   <span className="w-2.5 h-2.5 rounded-full bg-error inline-block" />
-                  ĐANG HỌC TẬP TRUNG
+                  {t('dashboard.focusing')}
                 </span>
                 <Link to="/focus-room">
                   <Button variant="cta" size="md">
-                    Vào lại phòng
+                    {t('dashboard.reenterRoom')}
                   </Button>
                 </Link>
                 <Button 
@@ -333,13 +341,13 @@ export default function Dashboard() {
                   onClick={handleToggleStudySession}
                   disabled={isStudyLoading}
                 >
-                  {isStudyLoading ? 'Đang xử lý...' : 'Dừng học'}
+                  {isStudyLoading ? t('dashboard.processing') : t('dashboard.stopStudy')}
                 </Button>
               </>
             ) : (
               <Link to="/focus-room">
                 <Button variant="cta" size="md">
-                  Bắt đầu học
+                  {t('dashboard.startStudy')}
                 </Button>
               </Link>
             )}
@@ -372,7 +380,7 @@ export default function Dashboard() {
               <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.experiencePoints')}</p>
               <div className="flex items-baseline justify-between gap-2 mt-1">
                 <p className="text-xl font-extrabold text-neutral-900 leading-none">{user ? `${user.exp ?? 0} XP` : '-- XP'}</p>
-                <Badge variant="milestone" className="normal-case tracking-normal">Level {userLevel}</Badge>
+                <Badge variant="milestone" className="normal-case tracking-normal">{t('dashboard.level', { level: userLevel })}</Badge>
               </div>
             </div>
           </div>
@@ -381,7 +389,7 @@ export default function Dashboard() {
               value={currentLevelXp} 
               max={xpTarget} 
               size="sm" 
-              label={<span className="text-[9px] text-neutral-500 font-semibold">{currentLevelXp} / {xpTarget} XP to Lv.{userLevel + 1}</span>}
+              label={<span className="text-[9px] text-neutral-500 font-semibold">{t('dashboard.xpToLevel', { current: currentLevelXp, target: xpTarget, level: userLevel + 1 })}</span>}
               showPercentage
             />
           </div>
@@ -394,7 +402,7 @@ export default function Dashboard() {
           </div>
           <div className="text-right shrink-0">
             <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t('dashboard.walletBalance')}</p>
-            <p className="text-2xl font-extrabold text-primary">{walletBalance.toLocaleString()} Xu</p>
+            <p className="text-2xl font-extrabold text-primary">{walletBalance.toLocaleString()} {t('shop.coins')}</p>
             <Link to="/shop">
               <Badge variant="streak" className="mt-1 normal-case tracking-normal cursor-pointer hover:brightness-95 transition-all">{t('dashboard.topUp')}</Badge>
             </Link>
@@ -403,12 +411,12 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[24fr_36fr_40fr] gap-4 w-full">
-        <Card variant="interactive" className={`${cardCompact}`} heading="Teams joined">
+        <Card variant="interactive" className={`${cardCompact}`} heading={t('dashboard.teamsJoined')}>
           {teams.length === 0 ? (
             <div className="flex flex-col items-center py-6 text-neutral-500">
-              <p className="text-sm">No teams yet.</p>
+              <p className="text-sm">{t('dashboard.noTeams')}</p>
               <Link to="/teams">
-                <Button variant="tonal" size="sm" className="mt-2">Browse teams</Button>
+                <Button variant="tonal" size="sm" className="mt-2">{t('dashboard.browseTeams')}</Button>
               </Link>
             </div>
           ) : (
@@ -421,7 +429,7 @@ export default function Dashboard() {
                   <p className="text-sm font-semibold text-neutral-900 truncate">{team.name}</p>
                   <Badge variant="focus" className="normal-case tracking-normal w-fit">{team.active}</Badge>
                   <Link to={`/teams/board?teamId=${team.id}`}>
-                    <Button variant="secondary" size="sm" className="w-full">Go to board</Button>
+                    <Button variant="secondary" size="sm" className="w-full">{t('dashboard.goToBoard')}</Button>
                   </Link>
                 </div>
               ))}
@@ -431,16 +439,16 @@ export default function Dashboard() {
 
         <Card variant="interactive" className={`${cardCompact}`}>
           <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
-            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Open study rooms</h3>
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">{t('dashboard.openStudyRooms')}</h3>
             <Link to="/study-rooms">
-              <Button variant="ghost" size="sm" className="text-xs shrink-0">Browse all</Button>
+              <Button variant="ghost" size="sm" className="text-xs shrink-0">{t('dashboard.browseAll')}</Button>
             </Link>
           </div>
           {rooms.length === 0 ? (
             <div className="flex flex-col items-center py-6 text-neutral-500">
-              <p className="text-sm">No rooms open.</p>
+              <p className="text-sm">{t('dashboard.noRooms')}</p>
               <Link to="/study-rooms/create">
-                <Button variant="tonal" size="sm" className="mt-2">Create room</Button>
+                <Button variant="tonal" size="sm" className="mt-2">{t('dashboard.createRoom')}</Button>
               </Link>
             </div>
           ) : (
@@ -453,7 +461,7 @@ export default function Dashboard() {
                   <p className="text-sm font-semibold text-neutral-900 truncate">{room.name}</p>
                   <Badge variant="focus" className="normal-case tracking-normal w-fit">{room.active}</Badge>
                   <Link to={`/study-room?roomId=${room.id}`}>
-                    <Button variant="secondary" size="sm" className="w-full">Enter</Button>
+                    <Button variant="secondary" size="sm" className="w-full">{t('dashboard.enter')}</Button>
                   </Link>
                 </div>
               ))}
@@ -461,9 +469,9 @@ export default function Dashboard() {
           )}
         </Card>
 
-        <Card variant="featured" className={`${cardCompact}`} heading="Study time Weekly">
+        <Card variant="featured" className={`${cardCompact}`} heading={t('dashboard.studyTimeWeekly')}>
           <div className="flex justify-between items-center mb-2">
-            <Badge variant="primary" className="normal-case tracking-normal">Weekly pace</Badge>
+            <Badge variant="primary" className="normal-case tracking-normal">{t('dashboard.weeklyPace')}</Badge>
           </div>
           <div className="flex items-end gap-1.5 h-[180px]">
             {studyBars.map((b, i) => (
@@ -484,12 +492,12 @@ export default function Dashboard() {
         </Card>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[24fr_36fr_40fr] gap-4 w-full">
-        <Card variant="interactive" className={`${cardCompact}`} heading="Upcoming meetings">
+        <Card variant="interactive" className={`${cardCompact}`} heading={t('dashboard.upcomingMeetings')}>
           {schedules.length === 0 ? (
             <div className="flex flex-col items-center py-6 text-neutral-500">
-              <p className="text-sm">No meetings scheduled.</p>
+              <p className="text-sm">{t('dashboard.noMeetings')}</p>
               <Link to="/calendar">
-                <Button variant="tonal" size="sm" className="mt-2">Schedule one</Button>
+                <Button variant="tonal" size="sm" className="mt-2">{t('dashboard.scheduleOne')}</Button>
               </Link>
             </div>
           ) : (
@@ -501,7 +509,7 @@ export default function Dashboard() {
                 >
                   <div className="flex justify-between items-start gap-2">
                     <Badge variant="outline" className="normal-case tracking-normal">
-                      {item.location || 'Online'}
+                      {item.location || t('dashboard.online')}
                     </Badge>
                     <span className="text-xs text-neutral-600 dark:text-neutral-400">
                       {formatTime(item.startTime)}
@@ -519,24 +527,24 @@ export default function Dashboard() {
 
         <Card variant="interactive" className={`${cardCompact}`}>
           <div className="flex items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
-            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">Quick links</h3>
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500">{t('dashboard.quickLinks')}</h3>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
             <Link to="/ai-support" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
-              <p className="text-sm font-semibold text-neutral-900">AI Support</p>
-              <Badge variant="focus" className="normal-case tracking-normal mt-1">Chat</Badge>
+              <p className="text-sm font-semibold text-neutral-900">{t('dashboard.aiSupport')}</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">{t('dashboard.chat')}</Badge>
             </Link>
             <Link to="/calendar" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
-              <p className="text-sm font-semibold text-neutral-900">Calendar</p>
-              <Badge variant="focus" className="normal-case tracking-normal mt-1">View</Badge>
+              <p className="text-sm font-semibold text-neutral-900">{t('dashboard.calendar')}</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">{t('dashboard.view')}</Badge>
             </Link>
             <Link to="/shop" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
-              <p className="text-sm font-semibold text-neutral-900">Shop</p>
-              <Badge variant="focus" className="normal-case tracking-normal mt-1">Coins</Badge>
+              <p className="text-sm font-semibold text-neutral-900">{t('dashboard.shop')}</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">{t('shop.coins')}</Badge>
             </Link>
             <Link to="/subscription" className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-accent-muted)] hover:border-primary/40 transition-colors text-center">
-              <p className="text-sm font-semibold text-neutral-900">Subscription</p>
-              <Badge variant="focus" className="normal-case tracking-normal mt-1">Plans</Badge>
+              <p className="text-sm font-semibold text-neutral-900">{t('dashboard.subscription')}</p>
+              <Badge variant="focus" className="normal-case tracking-normal mt-1">{t('dashboard.plans')}</Badge>
             </Link>
           </div>
         </Card>
@@ -545,21 +553,21 @@ export default function Dashboard() {
           <Card variant="interactive" className={`${cardCompact}`}>
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-3 border-b border-[var(--color-border)]">
               <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-neutral-500 break-words">
-                Upcoming tasks
+                {t('dashboard.upcomingTasks')}
               </h3>
               
               <div className="flex items-center gap-1.5 shrink-0">
                 <Button variant="tonal" size="sm" onClick={() => setShowAddTaskModal(true)} className="font-semibold text-xs px-2">
-                  + Add
+                  {t('dashboard.add')}
                 </Button>
                 <Link to="/teams">
-                  <Button variant="tonal" size="sm" className="text-xs px-2">Boards</Button>
+                  <Button variant="tonal" size="sm" className="text-xs px-2">{t('dashboard.boards')}</Button>
                 </Link>
               </div>
             </div>
             {tasks.length === 0 ? (
               <div className="flex flex-col items-center py-6 text-neutral-500">
-                <p className="text-sm">No tasks assigned.</p>
+                <p className="text-sm">{t('dashboard.noTasks')}</p>
               </div>
             ) : (
               <ul className="space-y-2 max-h-[220px] overflow-y-auto">
@@ -576,7 +584,7 @@ export default function Dashboard() {
                           ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
                           : 'border-neutral-400 dark:border-neutral-600 hover:bg-primary/10 hover:border-primary'
                       }`}
-                      title={item.isPersonal ? "Mark as completed" : "Team task (update on board)"}
+                      title={item.isPersonal ? t('dashboard.markCompleted') : t('dashboard.teamTaskUpdateHint')}
                     >
                       {item.isCompleted ? (
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
@@ -594,16 +602,16 @@ export default function Dashboard() {
                             variant={item.isPersonal ? 'info' : (item.priority === 'HIGH' ? 'error' : item.priority === 'MEDIUM' ? 'warning' : 'focus')} 
                             className="normal-case tracking-normal text-[9px]"
                           >
-                            {item.isPersonal ? 'Cá nhân' : item.priority}
+                            {item.isPersonal ? t('dashboard.personal') : item.priority}
                           </Badge>
                           {!item.isPersonal && (
                             <Badge variant="outline" className="normal-case tracking-normal text-[9px] border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.15)]">
-                              Team
+                              {t('dashboard.team')}
                             </Badge>
                           )}
                         </div>
                         <span className="text-[10px] font-bold text-neutral-500 truncate max-w-[100px]">
-                          {item.isPersonal ? 'Personal Task' : item.teamName}
+                          {item.isPersonal ? t('dashboard.personalTask') : item.teamName}
                         </span>
                       </div>
                       <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
@@ -613,7 +621,7 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => handleDeleteTask(item)}
                       className="opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-error shrink-0 transition-all p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg"
-                      title={item.isPersonal ? "Delete task" : "Team task (delete on board)"}
+                      title={item.isPersonal ? t('dashboard.deleteTask') : t('dashboard.teamTaskDeleteHint')}
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -650,7 +658,7 @@ export default function Dashboard() {
                     <p
                       onClick={() => setSelectedNote(n)}
                       className="text-neutral-800 dark:text-neutral-200 truncate flex-1 cursor-pointer hover:underline"
-                      title="Click to view details"
+                      title={t('dashboard.clickToView')}
                     >
                       {n.content}
                     </p>
@@ -714,27 +722,27 @@ export default function Dashboard() {
             className="shadow-2xl border border-emerald-200 bg-emerald-50"
           >
             <div className="flex flex-col gap-0.5 text-emerald-950">
-              <span className="font-extrabold text-sm">🎉 Phiên học hoàn thành!</span>
-              <span className="text-xs">Bạn đã nhận được <strong className="text-emerald-700 font-black">+{sessionExpEarned} XP</strong>. Cố gắng phát huy nhé!</span>
+              <span className="font-extrabold text-sm">🎉 {t('dashboard.sessionComplete')}</span>
+              <span className="text-xs">{t('dashboard.sessionExpEarned', { exp: sessionExpEarned })}</span>
             </div>
           </Toast>
         </div>
       )}
       {showAddTaskModal && (
-        <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title="Tạo nhiệm vụ cá nhân">
+        <Modal open={showAddTaskModal} onClose={() => setShowAddTaskModal(false)} title={t('dashboard.createPersonalTask')}>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Tên nhiệm vụ</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">{t('dashboard.taskName')}</label>
               <input
                 type="text"
-                placeholder="Nhiệm vụ cần làm..."
+                placeholder={t('dashboard.taskPlaceholder')}
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 className="w-full bg-[var(--color-background)] border border-[var(--color-border)] rounded-xl text-sm px-3 py-2 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">Hạn chót (Không bắt buộc)</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">{t('dashboard.dueDateOptional')}</label>
               <input
                 type="date"
                 value={newTaskDueDate}
@@ -743,9 +751,9 @@ export default function Dashboard() {
               />
             </div>
             <div className="flex gap-2 justify-end pt-2 border-t border-[var(--color-border)]">
-              <Button variant="secondary" size="sm" onClick={() => setShowAddTaskModal(false)}>Hủy</Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowAddTaskModal(false)}>{t('common.cancel')}</Button>
               <Button variant="primary" size="sm" onClick={handleCreateTask} disabled={addingTask || !newTaskTitle.trim()}>
-                {addingTask ? 'Đang tạo...' : 'Tạo nhiệm vụ'}
+                {addingTask ? t('dashboard.creating') : t('dashboard.createTask')}
               </Button>
             </div>
           </div>

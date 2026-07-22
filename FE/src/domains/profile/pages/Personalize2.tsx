@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom'
 import { Button, Card, Textarea } from '../../../components/common'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function Personalize2() {
+  const { t } = useTranslation()
+
   return (
     <div className="flex flex-col gap-6 max-w-2xl mx-auto w-full">
       <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold text-neutral-600 uppercase tracking-wide">Step 2/3</span>
+        <span className="text-sm font-semibold text-neutral-600 uppercase tracking-wide">{t('profile.personalizeStep', { current: 2, total: 3 })}</span>
         <div className="flex-1 flex items-center gap-2">
           <div className="flex-1 h-2 bg-neutral-200 rounded-full overflow-hidden">
             <div className="h-full bg-accent rounded-full transition-[width]" style={{ width: '67%' }} />
@@ -15,32 +18,32 @@ export default function Personalize2() {
       </div>
 
       <Card className="p-6 shadow-sm border-2 border-neutral-200">
-        <h1 className="text-2xl font-bold text-neutral-900 mb-6">Personalize your journey</h1>
+        <h1 className="text-2xl font-bold text-neutral-900 mb-6">{t('profile.personalizeTitle')}</h1>
 
         <div className="space-y-5">
           <Textarea
-            label="Your strengths"
-            placeholder="Good at self-study, logical thinking, effective time management..."
+            label={t('profile.personalizeStrengths')}
+            placeholder={t('profile.personalizeStrengthsPlaceholder')}
             className="min-h-[100px]"
           />
           <Textarea
-            label="Points to improve"
-            placeholder="Easily distracted in noisy environments, sometimes perfectionistic, time allocation..."
+            label={t('profile.personalizeImprove')}
+            placeholder={t('profile.personalizeImprovePlaceholder')}
             className="min-h-[100px]"
           />
           <Textarea
-            label="Study habits"
-            placeholder="Plan studies weekly, set daily goals, study at fixed times..."
+            label={t('profile.personalizeHabits')}
+            placeholder={t('profile.personalizeHabitsPlaceholder')}
             className="min-h-[100px]"
           />
         </div>
 
         <div className="flex justify-between mt-8 pt-6 border-t border-neutral-200">
           <Link to="/personalize">
-            <Button variant="secondary">Back</Button>
+            <Button variant="secondary">{t('profile.personalizeBack')}</Button>
           </Link>
           <Link to="/personalize-3">
-            <Button variant="primary">Next →</Button>
+            <Button variant="primary">{t('profile.personalizeNext')}</Button>
           </Link>
         </div>
       </Card>
@@ -52,8 +55,8 @@ export default function Personalize2() {
           </svg>
         </span>
         <div>
-          <p className="text-sm font-semibold text-neutral-900">Unlock your first achievement</p>
-          <p className="text-xs text-neutral-600 mt-0.5">Complete to earn experience points and coins.</p>
+          <p className="text-sm font-semibold text-neutral-900">{t('profile.personalizeUnlockTitle')}</p>
+          <p className="text-xs text-neutral-600 mt-0.5">{t('profile.personalizeUnlockDesc')}</p>
         </div>
       </div>
     </div>

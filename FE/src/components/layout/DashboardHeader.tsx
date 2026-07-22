@@ -111,7 +111,7 @@ const Chevron = () => (
   </span>
 )
 
-export function DashboardHeader() {
+export function DashboardHeader({ onOpenMenu }: { onOpenMenu?: () => void }) {
   const { user, logout } = useAuth()
   const { t } = useTranslation()
   const location = useLocation()
@@ -126,9 +126,21 @@ export function DashboardHeader() {
 
   return (
     <header
-      className="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-card)] shadow-none"
+      className="flex-shrink-0 flex items-center gap-2 px-3 py-2.5 md:px-4 md:py-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-card)] shadow-none"
       role="banner"
     >
+      {onOpenMenu && (
+        <button
+          type="button"
+          onClick={onOpenMenu}
+          className="md:hidden w-9 h-9 inline-flex items-center justify-center rounded-full text-neutral-700 hover:bg-[var(--color-charcoal)] flex-shrink-0"
+          aria-label="Open menu"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <nav aria-label="Breadcrumb" className="inline-flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
@@ -171,11 +183,13 @@ export function DashboardHeader() {
           </>
         )}
       </div>
-      <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
+      <div className="flex shrink-0 items-center justify-end gap-1.5 md:gap-3">
         {isAdminView ? (
           <>
-            <LanguageSwitch />
-            <ThemeSwitch />
+            <div className="hidden sm:contents">
+              <LanguageSwitch />
+              <ThemeSwitch />
+            </div>
             <div className="hidden md:flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-charcoal)] px-3 py-2">
               <svg className="h-4 w-4 text-neutral-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <circle cx="11" cy="11" r="8" />
@@ -226,9 +240,11 @@ export function DashboardHeader() {
           </>
         ) : (
           <>
-            <LanguageSwitch />
-            <ThemeSwitch />
-        <Link to="/transaction" title={t('shop.history')}>
+            <div className="hidden sm:contents">
+              <LanguageSwitch />
+              <ThemeSwitch />
+            </div>
+        <Link to="/transaction" title={t('shop.history')} className="hidden sm:inline-flex">
           <IconButton
             type="button"
             variant="ghost"
@@ -253,7 +269,7 @@ export function DashboardHeader() {
         </Link>
         <Link
           to="/profile"
-          className="flex items-center gap-1.5 p-1 pr-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 flex-shrink-0 transition-colors duration-150 active:scale-[0.98]"
+          className="flex items-center gap-1.5 p-1 pr-1.5 sm:pr-2 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 flex-shrink-0 transition-colors duration-150 active:scale-[0.98]"
         >
           <span
             className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-semibold flex-shrink-0 overflow-hidden"

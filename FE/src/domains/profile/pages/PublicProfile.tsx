@@ -3,14 +3,19 @@ import { useParams, Link } from 'react-router-dom'
 import { authApi, workflowApi } from '../../../api/client'
 import { Card, Modal } from '../../../components/common'
 import type { UserDto } from '../../../types/dto'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function PublicProfile() {
+  const { t } = useTranslation()
   const { sso } = useParams<{ sso: string }>()
   const [profile, setProfile] = useState<UserDto | null>(null)
   const [achievements, setAchievements] = useState<any[]>([])
   const [selectedAchievement, setSelectedAchievement] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const reqLabel = (type: string) =>
+    type === 'STREAK' ? t('profile.reqStreak') : type === 'LEVEL' ? t('profile.reqLevel') : t('profile.reqExp')
 
   useEffect(() => {
     if (!sso) return
@@ -23,7 +28,7 @@ export default function PublicProfile() {
         if (profileRes.success && profileRes.data) {
           setProfile(profileRes.data)
         } else {
-          setError('User not found.')
+          setError(t('profile.userNotFound'))
         }
         if (achievementsRes.success && achievementsRes.data) {
           setAchievements(achievementsRes.data)
@@ -31,7 +36,7 @@ export default function PublicProfile() {
       })
       .catch(err => {
         console.error(err)
-        setError('Failed to load profile.')
+        setError(t('profile.loadFailed'))
       })
       .finally(() => {
         setLoading(false)
@@ -52,15 +57,15 @@ export default function PublicProfile() {
         <svg className="w-16 h-16 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h2 className="text-xl font-bold text-neutral-900">Profile Not Found</h2>
-        <p className="text-sm text-neutral-500">The user you are looking for does not exist or has set their profile to private.</p>
-        <Link to="/dashboard" className="mt-4 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors">Return to Dashboard</Link>
+        <h2 className="text-xl font-bold text-neutral-900">{t('profile.notFoundTitle')}</h2>
+        <p className="text-sm text-neutral-500">{t('profile.notFoundDesc')}</p>
+        <Link to="/dashboard" className="mt-4 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors">{t('profile.returnDashboard')}</Link>
       </div>
     )
   }
 
   const userLevel = profile.level || 1
-  const displayName = profile.fullName || profile.email?.split('@')[0] || 'Guest'
+  const displayName = profile.fullName || profile.email?.split('@')[0] || t('profile.guest')
 
   return (
     <div className="w-full max-w-4xl mx-auto py-8 px-4 h-full">
@@ -71,24 +76,24 @@ export default function PublicProfile() {
           <Card className="p-6 flex flex-col items-center text-center shadow-none border-2 border-neutral-200">
             <div className="w-24 h-24 rounded-full bg-neutral-200 border-4 border-white shadow-sm flex items-center justify-center overflow-hidden mb-4">
               {profile.avatarUrl ? (
-                <img src={profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={profile.avatarUrl} alt={t('profile.avatar')} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-3xl font-bold text-neutral-400">{displayName.charAt(0).toUpperCase()}</span>
               )}
             </div>
             <h1 className="text-2xl font-bold text-neutral-900 uppercase tracking-tight">{displayName}</h1>
-            <p className="text-sm text-neutral-600 mb-2">{profile.planType ?? 'FREE'} · Level {userLevel}</p>
+            <p className="text-sm text-neutral-600 mb-2">{t('profile.planLevel', { plan: profile.planType ?? 'FREE', level: userLevel })}</p>
             <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase mt-2">
-              {profile.status === 'ACTIVE' ? 'Active' : 'Offline'}
+              {profile.status === 'ACTIVE' ? t('profile.active') : t('profile.offline')}
             </span>
           </Card>
 
-          <Card className="p-6 border-2 border-neutral-200 shadow-none" heading="Statistics">
+          <Card className="p-6 border-2 border-neutral-200 shadow-none" heading={t('profile.statistics')}>
             <ul className="space-y-3 text-sm">
-              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">Total study time</span><strong className="text-neutral-900 text-base">{Math.round((profile.exp || 0) / 60)}h</strong></li>
-              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">Streak</span><strong className="text-neutral-900 text-base">{profile.streak ?? 0} days</strong></li>
-              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">Max Streak</span><strong className="text-neutral-900 text-base">{profile.longestStreak ?? 0} days</strong></li>
-              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">Total EXP</span><strong className="text-neutral-900 text-base text-primary">{profile.exp ?? 0}</strong></li>
+              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">{t('profile.totalStudyTime')}</span><strong className="text-neutral-900 text-base">{Math.round((profile.exp || 0) / 60)}h</strong></li>
+              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">{t('profile.streak')}</span><strong className="text-neutral-900 text-base">{t('profile.streakDays', { count: profile.streak ?? 0 })}</strong></li>
+              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">{t('profile.maxStreak')}</span><strong className="text-neutral-900 text-base">{t('profile.streakDays', { count: profile.longestStreak ?? 0 })}</strong></li>
+              <li className="flex justify-between items-center"><span className="text-neutral-600 font-medium">{t('profile.totalExp')}</span><strong className="text-neutral-900 text-base text-primary">{profile.exp ?? 0}</strong></li>
             </ul>
           </Card>
         </div>
@@ -96,7 +101,7 @@ export default function PublicProfile() {
         {/* Right Column - Skills & Goals */}
         <div className="w-full md:w-2/3 flex flex-col gap-6 min-w-0">
           <Card className="p-6 border-2 border-neutral-200 shadow-none flex-1">
-            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">Skills</h2>
+            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">{t('profile.skills')}</h2>
             <div className="flex flex-wrap gap-2 mb-8">
               {profile.skills && profile.skills.length > 0 ? (
                 profile.skills.map((s, idx) => (
@@ -105,11 +110,11 @@ export default function PublicProfile() {
                   </span>
                 ))
               ) : (
-                <p className="text-sm text-neutral-500 italic">This user hasn't added any skills yet.</p>
+                <p className="text-sm text-neutral-500 italic">{t('profile.noSkillsPublic')}</p>
               )}
             </div>
 
-            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">Achievements</h2>
+            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">{t('profile.achievements')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
               {achievements && achievements.length > 0 ? (
                 achievements.map((ach) => {
@@ -140,11 +145,11 @@ export default function PublicProfile() {
                           <p className="text-sm font-bold text-neutral-800 truncate">{ach.displayName}</p>
                           {unlocked ? (
                             <span className="text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-md shrink-0">
-                              Unlocked
+                              {t('profile.unlocked')}
                             </span>
                           ) : (
                             <span className="text-[10px] font-semibold uppercase bg-neutral-200 text-neutral-600 px-1.5 py-0.5 rounded-md shrink-0">
-                              Locked
+                              {t('profile.locked')}
                             </span>
                           )}
                         </div>
@@ -154,11 +159,11 @@ export default function PublicProfile() {
                   )
                 })
               ) : (
-                <p className="text-sm text-neutral-500 italic col-span-2">No achievements found.</p>
+                <p className="text-sm text-neutral-500 italic col-span-2">{t('profile.noAchievements')}</p>
               )}
             </div>
 
-            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">Learning Goals</h2>
+            <h2 className="text-lg font-extrabold text-neutral-900 uppercase tracking-tight mb-4 border-b border-neutral-100 pb-2">{t('profile.learningGoals')}</h2>
             <ul className="space-y-3">
               {profile.learningGoals && profile.learningGoals.length > 0 ? (
                 profile.learningGoals.map((g, idx) => (
@@ -172,7 +177,7 @@ export default function PublicProfile() {
                   </li>
                 ))
               ) : (
-                <p className="text-sm text-neutral-500 italic">No specific learning goals defined.</p>
+                <p className="text-sm text-neutral-500 italic">{t('profile.noGoalsPublic')}</p>
               )}
             </ul>
           </Card>
@@ -183,7 +188,7 @@ export default function PublicProfile() {
         <Modal
           open={!!selectedAchievement}
           onClose={() => setSelectedAchievement(null)}
-          title="Chi Tiết Thành Tựu"
+          title={t('profile.achievementDetails')}
           size="max-w-md"
         >
           <div className="flex flex-col items-center text-center gap-4">
@@ -206,7 +211,7 @@ export default function PublicProfile() {
             <div>
               <h3 className="text-xl font-extrabold text-neutral-800">{selectedAchievement.displayName}</h3>
               <p className="text-[10px] text-neutral-400 font-extrabold uppercase tracking-wider mt-1">
-                Yêu cầu: {selectedAchievement.requirementType}
+                {t('profile.requirement', { type: selectedAchievement.requirementType })}
               </p>
             </div>
 
@@ -216,26 +221,26 @@ export default function PublicProfile() {
 
             <div className="w-full bg-neutral-50 rounded-xl p-3 border border-neutral-100 mt-2 flex flex-col gap-2">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-neutral-500 font-semibold">Mục tiêu</span>
+                <span className="text-neutral-500 font-semibold">{t('profile.target')}</span>
                 <span className="text-neutral-800 font-bold">
-                  {selectedAchievement.requirementValue} {selectedAchievement.requirementType === 'STREAK' ? 'Ngày liên tiếp' : selectedAchievement.requirementType === 'LEVEL' ? 'Cấp độ' : 'EXP'}
+                  {selectedAchievement.requirementValue} {reqLabel(selectedAchievement.requirementType)}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-2">
-                <span className="text-neutral-500 font-semibold">Phần thưởng</span>
+                <span className="text-neutral-500 font-semibold">{t('profile.reward')}</span>
                 <span className="text-amber-600 font-bold flex items-center gap-1">
-                  +{selectedAchievement.expReward} EXP · +{selectedAchievement.coinReward} xu
+                  {t('profile.rewardValue', { exp: selectedAchievement.expReward, coins: selectedAchievement.coinReward })}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs border-t border-neutral-100 pt-2">
-                <span className="text-neutral-500 font-semibold">Trạng thái</span>
+                <span className="text-neutral-500 font-semibold">{t('profile.status')}</span>
                 {selectedAchievement.isUnlocked ? (
                   <span className="text-green-600 font-bold uppercase tracking-wider text-[10px]">
-                    Đã mở khóa
+                    {t('profile.unlocked')}
                   </span>
                 ) : (
                   <span className="text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
-                    Chưa đạt được
+                    {t('profile.notAchieved')}
                   </span>
                 )}
               </div>
@@ -245,7 +250,7 @@ export default function PublicProfile() {
               onClick={() => setSelectedAchievement(null)}
               className="mt-4 w-full py-2 bg-primary text-white text-sm font-bold rounded-xl shadow-md hover:bg-primary-dark transition-all active:scale-[0.98]"
             >
-              Đóng
+              {t('common.close')}
             </button>
           </div>
         </Modal>

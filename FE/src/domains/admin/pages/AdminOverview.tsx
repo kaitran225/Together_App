@@ -3,27 +3,33 @@ import { Button } from '../../../components/common'
 import { ChartContainer, LineChart, PieChart, useChartExport, usePdfExport } from '../charts'
 import { AdminKpiCard, AdminPageSection } from '../components'
 import { workflowApi } from '../../../api/client'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export default function AdminOverview() {
+  const { t } = useTranslation()
   const growthExport = useChartExport()
   const distExport = useChartExport()
   const { exportSingleChartPdf, exportPageChartsPdf } = usePdfExport()
 
   const [kpis, setKpis] = useState([
-    { label: 'Total Users', value: '—', hint: 'Loading...' },
-    { label: 'Active Users', value: '—', hint: 'Loading...' },
+    { label: t('admin.overview.totalUsers'), value: '—', hint: t('common.loading') },
+    { label: t('admin.overview.activeUsers'), value: '—', hint: t('common.loading') },
   ])
   const [userGrowthSeries, setUserGrowthSeries] = useState<{ label: string; series: { users: number } }[]>([])
   const [planDistribution, setPlanDistribution] = useState<{ label: string; value: number }[]>([])
 
   useEffect(() => {
+    setKpis([
+      { label: t('admin.overview.totalUsers'), value: '—', hint: t('common.loading') },
+      { label: t('admin.overview.activeUsers'), value: '—', hint: t('common.loading') },
+    ])
     workflowApi.getAdminOverview()
       .then((res) => {
         if (res.success && res.data) {
           const d = res.data
           setKpis([
-            { label: 'Total Users', value: String(d.totalUsers ?? 0), hint: 'Tổng số người dùng' },
-            { label: 'Active Users', value: String(d.activeUsers ?? 0), hint: 'Hoạt động trong 30 ngày qua' },
+            { label: t('admin.overview.totalUsers'), value: String(d.totalUsers ?? 0), hint: t('admin.overview.totalUsersHint') },
+            { label: t('admin.overview.activeUsers'), value: String(d.activeUsers ?? 0), hint: t('admin.overview.activeUsersHint') },
           ])
         }
       })
@@ -44,25 +50,25 @@ export default function AdminOverview() {
         }
       })
       .catch((err) => console.error('Failed to load plan distribution:', err))
-  }, [])
+  }, [t])
 
   return (
     <div className="flex flex-col gap-5">
       <AdminPageSection
-        title="Dashboard"
-        subtitle="Platform performance snapshot"
+        title={t('admin.overview.title')}
+        subtitle={t('admin.overview.subtitle')}
         action={
           <Button
             size="sm"
             variant="secondary"
             onClick={() =>
               exportPageChartsPdf([growthExport.chartRef.current, distExport.chartRef.current], {
-                title: 'Admin Dashboard Charts',
-                subtitle: 'Generated from admin overview',
+                title: t('admin.overview.pdfTitle'),
+                subtitle: t('admin.overview.pdfSubtitle'),
               })
             }
           >
-            Export Page PDF
+            {t('admin.exportPagePdf')}
           </Button>
         }
       >
@@ -76,53 +82,53 @@ export default function AdminOverview() {
       <div className="grid gap-4 xl:grid-cols-2">
         <div ref={growthExport.chartRef}>
           <ChartContainer
-            title="User growth"
-            subtitle="Monthly user signups"
+            title={t('admin.overview.userGrowth')}
+            subtitle={t('admin.overview.userGrowthSubtitle')}
             action={
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={() =>
                   exportSingleChartPdf(growthExport.chartRef.current, {
-                    title: 'User Growth',
-                    subtitle: 'Monthly user signups',
+                    title: t('admin.overview.userGrowthPdf'),
+                    subtitle: t('admin.overview.userGrowthSubtitle'),
                   })
                 }
               >
-                Export PDF
+                {t('common.exportPdf')}
               </Button>
             }
-            legend={[{ label: 'Users', color: '#5CB5F2' }]}
+            legend={[{ label: t('admin.legendUsers'), color: '#5CB5F2' }]}
           >
             <LineChart
               data={userGrowthSeries}
-              series={[{ key: 'users', label: 'Users', color: '#5CB5F2' }]}
+              series={[{ key: 'users', label: t('admin.legendUsers'), color: '#5CB5F2' }]}
             />
           </ChartContainer>
         </div>
 
         <div ref={distExport.chartRef}>
           <ChartContainer
-            title="Plan distribution"
-            subtitle="Current subscription split"
+            title={t('admin.overview.planDistribution')}
+            subtitle={t('admin.overview.planDistributionSubtitle')}
             action={
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={() =>
                   exportSingleChartPdf(distExport.chartRef.current, {
-                    title: 'Plan Distribution',
-                    subtitle: 'Current subscription split',
+                    title: t('admin.overview.planDistributionPdf'),
+                    subtitle: t('admin.overview.planDistributionSubtitle'),
                   })
                 }
               >
-                Export PDF
+                {t('common.exportPdf')}
               </Button>
             }
             legend={[
-              { label: 'Basic', color: '#8FC766' },
-              { label: 'Pro', color: '#5CB5F2' },
-              { label: 'Premium', color: '#A896F2' },
+              { label: t('admin.planBasic'), color: '#8FC766' },
+              { label: t('admin.planPro'), color: '#5CB5F2' },
+              { label: t('admin.planPremium'), color: '#A896F2' },
             ]}
           >
             <PieChart data={planDistribution} colors={['#8FC766', '#5CB5F2', '#A896F2']} />

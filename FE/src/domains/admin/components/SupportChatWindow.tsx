@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Button, Input } from '../../../components/common'
 import { AdminStatusBadge } from './AdminStatusBadge'
+import { useTranslation } from '../../../contexts/LanguageContext'
 
 export type SupportMessage = {
   id: string
@@ -16,6 +17,7 @@ interface SupportChatWindowProps {
 }
 
 export function SupportChatWindow({ user, messages, onSend }: SupportChatWindowProps) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState('')
   const rendered = useMemo(() => messages, [messages])
 
@@ -58,14 +60,13 @@ export function SupportChatWindow({ user, messages, onSend }: SupportChatWindowP
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type support reply..."
+            placeholder={t('admin.support.replyPlaceholder')}
           />
           <Button type="submit" variant="primary" size="md">
-            Send
+            {t('common.send')}
           </Button>
         </form>
       </footer>
     </section>
   )
 }
-
