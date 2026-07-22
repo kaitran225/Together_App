@@ -113,8 +113,8 @@ services:
       PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID}
       PAYOS_API_KEY: ${PAYOS_API_KEY}
       PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY}
-      PAYOS_RETURN_URL: https://${DOMAIN}/billing/payment-result
-      PAYOS_CANCEL_URL: https://${DOMAIN}/billing/payment-result
+      PAYOS_RETURN_URL: https://${DOMAIN}/subscription
+      PAYOS_CANCEL_URL: https://${DOMAIN}/subscription
       # LAN_TEST_ORIGIN lets you test via the machine's LAN IP (e.g. https://192.168.1.19) before
       # the real domain is publicly reachable. Remove it from .env once testing is done externally.
       CORS_ALLOWED_ORIGINS: https://${DOMAIN}${LAN_TEST_ORIGIN:+,${LAN_TEST_ORIGIN}}

@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * - Reset streak hằng ngày vào lúc nửa đêm
  * - Gửi thông báo nhắc nhở task sắp đến hạn
  * - Dọn dẹp notification đã hết hạn
+ * - Hết hạn payment PENDING quá 15 phút → FAILED
  */
 @SpringBootApplication(scanBasePackages = { "app.together.cronjob", "app.together.common.shared",
         "app.together.common.workflow" })

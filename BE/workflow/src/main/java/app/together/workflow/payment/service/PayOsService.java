@@ -169,9 +169,25 @@ public class PayOsService {
     }
 
     private CheckoutResponse createPayOsCheckout(PaymentTransaction saved, String description) {
+        // PayOS orderCode must be globally unique across retries; payment_id reuses after rollbacks.
+        long orderCode = System.currentTimeMillis();
+        try {
+            Map<String, Object> metaMap = new java.util.HashMap<>();
+            if (saved.getMetadata() != null && !saved.getMetadata().isBlank()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> existing = objectMapper.readValue(saved.getMetadata(), Map.class);
+                metaMap.putAll(existing);
+            }
+            metaMap.put("payosOrderCode", orderCode);
+            saved.setMetadata(objectMapper.writeValueAsString(metaMap));
+            paymentTransactionRepository.save(saved);
+        } catch (Exception e) {
+            throw new BadRequestException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID);
+        }
+
         // 2. Tạo chữ ký Checksum cho đơn hàng của PayOS
         String signatureData = String.format("amount=%d&cancelUrl=%s&description=%s&orderCode=%d&returnUrl=%s",
-                saved.getAmount().longValue(), cancelUrl, description, saved.getPaymentId(), returnUrl);
+                saved.getAmount().longValue(), cancelUrl, description, orderCode, returnUrl);
 
         String signature = hmacSha256(signatureData, payosChecksumKey);
 
@@ -179,7 +195,7 @@ public class PayOsService {
         try {
             RestClient restClient = RestClient.create();
             Map<String, Object> body = Map.of(
-                    "orderCode", saved.getPaymentId(),
+                    "orderCode", orderCode,
                     "amount", saved.getAmount().longValue(),
                     "description", description,
                     "cancelUrl", cancelUrl,
@@ -234,48 +250,118 @@ public class PayOsService {
 
     /**
      * Xử lý Webhook (Callback) tự động gọi về khi chuyển khoản thành công.
+     * PayOS also POSTs a sample payload when confirming the webhook URL — unknown
+     * orderCodes must be acknowledged without error.
      */
-    public void handlePayOsWebHook(PayOsWebhookPayload payload) {
-        // 1. Kiểm tra chữ ký bảo mật từ Webhook PayOS
-        if (!verifyWebhookSignature(payload.data(), payload.signature())) {
-            log.warn("DETECTED MALICIOUS WEBHOOK CALL - SIGNATURE MISMATCH!");
-            throw new BadRequestException(MessageConstants.MESSAGE_SIGNATURE_INVALID, payload.signature());
+    @SuppressWarnings("unchecked")
+    public void handlePayOsWebHook(Map<String, Object> body) {
+        if (body == null || body.isEmpty()) {
+            return;
+        }
+        Object dataObj = body.get("data");
+        if (!(dataObj instanceof Map<?, ?> dataRaw)) {
+            log.info("PayOS webhook without data map — acknowledging");
+            return;
+        }
+        Map<String, Object> data = (Map<String, Object>) dataRaw;
+        String signature = body.get("signature") != null ? String.valueOf(body.get("signature")) : null;
+
+        if (!verifyWebhookDataSignature(data, signature)) {
+            log.warn("PayOS webhook signature mismatch — acknowledging without fulfilling");
+            return;
         }
 
-        PayOsWebhookData data = payload.data();
-        PaymentTransaction transaction = paymentTransactionRepository.findById(data.orderCode())
-                .orElseThrow(() -> new ResourceNotFoundException(MessageConstants.MESSAGE_PAYMENT_TRANSACTION_INVALID, data.orderCode()));
+        Long orderCode = toLong(data.get("orderCode"));
+        if (orderCode == null) {
+            log.info("PayOS webhook missing orderCode — acknowledging");
+            return;
+        }
 
-        if (TransactionType.PAID.name().equals(data.status()) && PaymentStatus.PENDING.name().equals(transaction.getStatus())) {
-            Instant now = Instant.now();
+        PaymentTransaction transaction = paymentTransactionRepository.findById(orderCode)
+                .or(() -> paymentTransactionRepository.findByPayOsOrderCode(orderCode))
+                .orElse(null);
+        if (transaction == null) {
+            // Sample confirm payload uses orderCode=123 which is not in our DB.
+            log.info("PayOS webhook for unknown orderCode {} — acknowledging (confirm sample?)", orderCode);
+            return;
+        }
 
-            // 2. Chuyển trạng thái giao dịch sang PAID (giữ string PAID để tương thích revenue admin)
-            transaction.setStatus(TransactionType.PAID.name());
-            transaction.setPaidAt(now);
-            paymentTransactionRepository.save(transaction);
+        String status = data.get("status") != null ? String.valueOf(data.get("status")) : null;
+        String dataCode = data.get("code") != null ? String.valueOf(data.get("code")) : null;
+        boolean paid = "PAID".equalsIgnoreCase(status) || "00".equals(dataCode);
+        if (!paid || !PaymentStatus.PENDING.name().equals(transaction.getStatus())) {
+            log.info("PayOS webhook orderCode {} ignored (status={}, code={}, txStatus={})",
+                    orderCode, status, dataCode, transaction.getStatus());
+            return;
+        }
 
-            String productType = "COIN_PACKAGE";
-            Long planId = null;
-            try {
-                if (transaction.getMetadata() != null && !transaction.getMetadata().isBlank()) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> meta = objectMapper.readValue(transaction.getMetadata(), Map.class);
-                    if (meta.get("productType") != null) {
-                        productType = String.valueOf(meta.get("productType"));
-                    }
-                    if (meta.get("planId") != null) {
-                        planId = Long.valueOf(String.valueOf(meta.get("planId")));
-                    }
+        Instant now = Instant.now();
+        transaction.setStatus(TransactionType.PAID.name());
+        transaction.setPaidAt(now);
+        paymentTransactionRepository.save(transaction);
+
+        String productType = "COIN_PACKAGE";
+        Long planId = null;
+        try {
+            if (transaction.getMetadata() != null && !transaction.getMetadata().isBlank()) {
+                Map<String, Object> meta = objectMapper.readValue(transaction.getMetadata(), Map.class);
+                if (meta.get("productType") != null) {
+                    productType = String.valueOf(meta.get("productType"));
                 }
-            } catch (Exception e) {
-                log.warn("Unable to parse payment metadata for #{}: {}", transaction.getPaymentId(), e.getMessage());
+                if (meta.get("planId") != null) {
+                    planId = Long.valueOf(String.valueOf(meta.get("planId")));
+                }
             }
+        } catch (Exception e) {
+            log.warn("Unable to parse payment metadata for #{}: {}", transaction.getPaymentId(), e.getMessage());
+        }
 
-            if ("SUBSCRIPTION".equalsIgnoreCase(productType)) {
-                fulfillSubscriptionPayment(transaction, planId);
-            } else {
-                fulfillCoinPayment(transaction, now);
+        if ("SUBSCRIPTION".equalsIgnoreCase(productType)) {
+            fulfillSubscriptionPayment(transaction, planId);
+        } else {
+            fulfillCoinPayment(transaction, now);
+        }
+    }
+
+    /**
+     * PayOS signs the full {@code data} object: all keys sorted alphabetically,
+     * null → empty string, then HMAC-SHA256 with checksum key.
+     */
+    private boolean verifyWebhookDataSignature(Map<String, Object> data, String signature) {
+        if (signature == null || signature.isBlank() || data == null) {
+            return false;
+        }
+        Map<String, Object> sorted = new TreeMap<>(data);
+        StringBuilder rawData = new StringBuilder();
+        for (Map.Entry<String, Object> e : sorted.entrySet()) {
+            if (rawData.length() > 0) {
+                rawData.append('&');
             }
+            Object value = e.getValue();
+            String asString;
+            if (value == null || "null".equalsIgnoreCase(String.valueOf(value))
+                    || "undefined".equalsIgnoreCase(String.valueOf(value))) {
+                asString = "";
+            } else {
+                asString = String.valueOf(value);
+            }
+            rawData.append(e.getKey()).append('=').append(asString);
+        }
+        String calculated = hmacSha256(rawData.toString(), payosChecksumKey);
+        return calculated.equalsIgnoreCase(signature);
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+        try {
+            return Long.valueOf(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
@@ -337,26 +423,6 @@ public class PayOsService {
 
             log.info("Successfully processed PayOS payment for transaction #{}. Credited {} coins to userSso {}.",
                     transaction.getPaymentId(), coins, transaction.getUserSso());
-    }
-
-    private boolean verifyWebhookSignature(PayOsWebhookData data, String signature) {
-        Map<String, Object> sortedMap = new TreeMap<>();
-        sortedMap.put("amount", data.amount());
-        sortedMap.put("accountNumber", "");
-        sortedMap.put("description", data.description());
-        sortedMap.put("orderCode", data.orderCode());
-        sortedMap.put("paymentLinkId", data.paymentLinkId());
-        sortedMap.put("reference", data.reference());
-        sortedMap.put("status", data.status());
-
-        StringBuilder rawData = new StringBuilder();
-        sortedMap.forEach((key, value) -> {
-            if (rawData.length() > 0) rawData.append("&");
-            rawData.append(key).append("=").append(value != null ? value : "");
-        });
-
-        String calculatedSignature = hmacSha256(rawData.toString(), payosChecksumKey);
-        return calculatedSignature.equals(signature);
     }
 
     private String hmacSha256(String data, String key) {

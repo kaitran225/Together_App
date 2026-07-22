@@ -35,7 +35,7 @@ public class DocumentAndMindmapService {
     // Quản lý tài liệu
     public DocumentResponse uploadDocumentFile(String userSso, org.springframework.web.multipart.MultipartFile file, String title) throws java.io.IOException {
         requireUserSso(userSso);
-        featureUsageService.chargeIfFree(userSso, "PDF_UPLOAD", 0);
+        featureUsageService.chargeUploadIfRequired(userSso);
 
         long fileSize = file.getSize();
         String originalFilename = file.getOriginalFilename();

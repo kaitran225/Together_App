@@ -114,6 +114,7 @@ public final class RoomDtos {
         public record ChatMessage(
                         String roomId,
                         String senderSso,
+                        String senderName,
                         String message,
                         Instant sentAt) {
         }

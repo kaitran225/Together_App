@@ -363,7 +363,8 @@ export default function StudyRoom() {
 
         client.subscribe(`/topic/rooms/${roomId}/chat`, (msg) => {
           const senderSso = msg.senderSso || 'Participant'
-          const senderName = userNameCacheRef.current[senderSso]
+          const senderName = msg.senderName
+            || userNameCacheRef.current[senderSso]
             || (senderSso === user?.userSso ? getDisplayName(user) : senderSso)
           setMessages((prev) => [
             ...prev,
@@ -872,6 +873,7 @@ export default function StudyRoom() {
                 stompClient.send('/app/room.chat', {
                   roomId: String(roomId),
                   senderSso: user?.userSso || 'Participant',
+                  senderName: getDisplayName(user),
                   message: chatInput.trim(),
                   sentAt: new Date().toISOString()
                 })

@@ -13,7 +13,6 @@ import app.together.common.workflow.entity.TeamMember;
 import app.together.common.workflow.entity.TeamMemberId;
 import app.together.common.workflow.repository.TeamMemberRepository;
 import app.together.common.workflow.repository.TeamRepository;
-import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.personal.service.NotificationPublisher;
 import app.together.workflow.team.dto.TeamDtos.*;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,6 @@ public class TeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final PermissionCheckService permissionCheckService;
     private final UserRepository userRepository;
-    private final FeatureUsageService featureUsageService;
     private final NotificationPublisher notificationPublisher;
 
     // ── Tạo Team mới ──
@@ -45,7 +43,6 @@ public class TeamService {
         if (request.name() == null || request.name().isBlank()) {
             throw new BadRequestException(MessageConstants.MESSAGE_TEAM_NAME_REQUIRED);
         }
-        featureUsageService.chargeIfFree(userSso, "TEAM_CREATE", 0);
 
         Team team = Team.builder()
                 .name(request.name().trim())

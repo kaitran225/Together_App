@@ -53,6 +53,7 @@ import {
   AdminSupport,
   AdminBilling,
 } from './pages/app'
+import { ServerBusyOverlay } from './components/ServerBusyOverlay'
 
 const STANDALONE_PATHS = ['/callback', '/welcome', '/sign-up', '/confirm-mail', '/reset-password', '/verify-email', '/debug']
 
@@ -86,6 +87,7 @@ export default function App() {
 
   return (
     <div className={isStandalone ? 'min-h-screen' : ''}>
+      <ServerBusyOverlay />
       <Routes>
         <Route
           path="/"

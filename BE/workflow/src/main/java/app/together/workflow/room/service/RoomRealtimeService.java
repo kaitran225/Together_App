@@ -84,7 +84,12 @@ public class RoomRealtimeService {
             throw new BadRequestException(MessageConstants.MESSAGE_ROOM_SIGNAL_ROOM_ID_REQUIRED);
         }
         Long roomId = parseRoomId(message.roomId());
-        // Tạo payload sự kiện Chat và broadcast đến toàn bộ thành viên trong phòng
-        messagingTemplate.convertAndSend(ROOM_SIGNAL_TOPIC_PREFIX + roomId + "/chat", message);
+        ChatMessage outbound = new ChatMessage(
+                message.roomId(),
+                message.senderSso(),
+                message.senderName(),
+                message.message(),
+                message.sentAt() != null ? message.sentAt() : Instant.now());
+        messagingTemplate.convertAndSend(ROOM_SIGNAL_TOPIC_PREFIX + roomId + "/chat", outbound);
     }
 }

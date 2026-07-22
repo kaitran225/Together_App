@@ -6,7 +6,14 @@ import {
   updateUser,
   verifyUserPassword,
 } from '../mocks/auth'
-import { authApi, getStoredToken, setStoredToken, clearStoredToken } from '../api/client'
+import {
+  authApi,
+  getStoredToken,
+  setStoredToken,
+  clearStoredToken,
+  setStoredRefreshToken,
+  clearStoredRefreshToken,
+} from '../api/client'
 import type { UserDto } from '../types/dto'
 
 const useMock = import.meta.env.VITE_USE_MOCK === 'true'
@@ -69,29 +76,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
     const token = getStoredToken()
-    if (!token) {
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (!token && !refreshToken) {
       setIsAuthReady(true)
       return
     }
     let cancelled = false
-    authApi.me(token)
-      .then((res) => {
-        if (cancelled) return
-        if (res.success && res.data) {
-          setUser(mapToUserDto(res.data))
-        } else {
-          clearStoredToken()
-          setUser(null)
+    ;(async () => {
+      try {
+        let access = token
+        if (access) {
+          const res = await authApi.me(access)
+          if (cancelled) return
+          if (res.success && res.data) {
+            setUser(mapToUserDto(res.data))
+            return
+          }
         }
-      })
-      .catch(() => {
+        if (refreshToken) {
+          const refreshed = await authApi.refreshToken(refreshToken)
+          if (cancelled) return
+          if (refreshed.success && refreshed.data?.accessToken) {
+            access = refreshed.data.accessToken
+            setStoredToken(access)
+            if (refreshed.data.refreshToken) {
+              setStoredRefreshToken(refreshed.data.refreshToken)
+            }
+            const res = await authApi.me(access)
+            if (cancelled) return
+            if (res.success && res.data) {
+              setUser(mapToUserDto(res.data))
+              return
+            }
+          }
+        }
+        clearStoredToken()
+        clearStoredRefreshToken()
+        setUser(null)
+      } catch {
         if (cancelled) return
         clearStoredToken()
+        clearStoredRefreshToken()
         setUser(null)
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setIsAuthReady(true)
-      })
+      }
+    })()
     return () => {
       cancelled = true
     }
@@ -112,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.success && res.data?.accessToken) {
         const { accessToken, refreshToken } = res.data
         setStoredToken(accessToken)
-        localStorage.setItem('refresh_token', refreshToken)
+        setStoredRefreshToken(refreshToken)
         const profileRes = await authApi.me(accessToken)
         if (profileRes.success && profileRes.data) {
           const mappedUser = mapToUserDto(profileRes.data)
@@ -139,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.success && res.data?.accessToken) {
         const { accessToken, refreshToken } = res.data
         setStoredToken(accessToken)
-        localStorage.setItem('refresh_token', refreshToken)
+        setStoredRefreshToken(refreshToken)
         const profileRes = await authApi.me(accessToken)
         if (profileRes.success && profileRes.data) {
           const mappedUser = mapToUserDto(profileRes.data)
@@ -160,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authApi.logout(refreshToken).catch((e) => console.error('Logout error:', e))
       }
       clearStoredToken()
-      localStorage.removeItem('refresh_token')
+      clearStoredRefreshToken()
     }
     setUser(null)
   }, [])

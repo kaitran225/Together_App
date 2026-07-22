@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Button } from '../../../components/common'
+import { Button, Modal } from '../../../components/common'
 import { workflowApi } from '../../../api/client'
 import { useTranslation } from '../../../contexts/LanguageContext'
+import { useAuth } from '../../../contexts/AuthContext'
 
 function FeatureItem({ text }: { text: string }) {
   return (
@@ -12,11 +13,21 @@ function FeatureItem({ text }: { text: string }) {
   )
 }
 
+function normalizeTier(raw?: string | null): string {
+  const s = (raw || 'FREE').trim().toUpperCase()
+  if (s === 'PERSONAL') return 'PLUS'
+  if (s === 'TEAMS') return 'TEAM'
+  return s || 'FREE'
+}
+
 export default function Subscription() {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const currentTier = normalizeTier(user?.planType)
   const [plans, setPlans] = useState<any[]>([])
   const [checkingOutPlanId, setCheckingOutPlanId] = useState<number | null>(null)
   const [message, setMessage] = useState('')
+  const [detailPlan, setDetailPlan] = useState<any | null>(null)
 
   useEffect(() => {
     workflowApi.getSubscriptionPlans().then((res) => {
@@ -60,6 +71,9 @@ export default function Subscription() {
           const priceVnd = Number(plan.priceVnd ?? 0)
           const days = plan.durationDays ?? 30
           const isPopular = plan.isPopular === true
+          const tier = normalizeTier(plan.tierCode)
+          const isFree = tier === 'FREE' || priceVnd <= 0
+          const isCurrent = tier === currentTier
 
           return (
             <div
@@ -70,10 +84,14 @@ export default function Subscription() {
                   : 'border border-white/10 shadow-none'
               }`}
             >
-              {/* Nhãn nổi bật cho gói Popular */}
               {isPopular && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow whitespace-nowrap">
                   {t('shop.mostPopular')}
+                </span>
+              )}
+              {isCurrent && (
+                <span className="absolute top-3 right-3 rounded-full bg-neutral-900 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  Đang dùng
                 </span>
               )}
 
@@ -82,9 +100,11 @@ export default function Subscription() {
                   <h3 className="text-xl font-bold uppercase leading-8 text-neutral-900 sm:text-2xl">{plan.name}</h3>
                   <div className="flex items-baseline gap-1 flex-wrap">
                     <span className="text-3xl font-bold leading-[2.5rem] text-neutral-900 sm:text-4xl sm:leading-[3rem]">
-                      {priceVnd.toLocaleString('vi-VN')}₫
+                      {isFree ? 'Miễn phí' : `${priceVnd.toLocaleString('vi-VN')}₫`}
                     </span>
-                    <span className="text-sm text-neutral-500">{t('subscription.perDays', { days })}</span>
+                    {!isFree && (
+                      <span className="text-sm text-neutral-500">{t('subscription.perDays', { days })}</span>
+                    )}
                   </div>
                   <p className="text-sm font-normal leading-6 text-neutral-700 sm:text-base">{plan.description}</p>
                 </div>
@@ -96,15 +116,27 @@ export default function Subscription() {
                   ))}
                 </ul>
               </div>
-              <Button
-                variant={isPopular ? 'primary' : 'secondary'}
-                size="md"
-                className="w-full uppercase"
-                disabled={checkingOutPlanId === plan.planId}
-                onClick={() => handleCheckout(plan.planId)}
-              >
-                {checkingOutPlanId === plan.planId ? t('subscription.redirecting') : t('subscription.pay')}
-              </Button>
+
+              {isFree ? null : isCurrent ? (
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="w-full uppercase"
+                  onClick={() => setDetailPlan(plan)}
+                >
+                  Chi tiết
+                </Button>
+              ) : (
+                <Button
+                  variant={isPopular ? 'primary' : 'secondary'}
+                  size="md"
+                  className="w-full uppercase"
+                  disabled={checkingOutPlanId === plan.planId}
+                  onClick={() => handleCheckout(plan.planId)}
+                >
+                  {checkingOutPlanId === plan.planId ? t('subscription.redirecting') : t('subscription.pay')}
+                </Button>
+              )}
             </div>
           )
         })}
@@ -112,6 +144,27 @@ export default function Subscription() {
           <p className="col-span-full text-center text-sm text-neutral-500">{t('subscription.empty')}</p>
         )}
       </div>
+
+      <Modal
+        open={!!detailPlan}
+        onClose={() => setDetailPlan(null)}
+        title={detailPlan?.name || 'Chi tiết gói'}
+      >
+        {detailPlan && (
+          <div className="flex flex-col gap-3 text-sm text-neutral-800">
+            <p>{detailPlan.description}</p>
+            <p className="font-semibold">
+              {Number(detailPlan.priceVnd ?? 0).toLocaleString('vi-VN')}₫
+              <span className="font-normal text-neutral-500"> / {detailPlan.durationDays ?? 30} ngày</span>
+            </p>
+            <ul className="flex flex-col gap-2">
+              {(detailPlan.features || []).map((f: string) => (
+                <li key={f}><FeatureItem text={f} /></li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -18,7 +18,6 @@ import app.together.common.workflow.enums.RoomRequestStatus;
 import app.together.common.workflow.enums.RoomStatus;
 import app.together.workflow.manager.room.RoomDomainManager;
 import app.together.workflow.manager.room.RoomDomainManagerRegistry;
-import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.room.dto.RoomDtos.CreateRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.JoinRoomRequest;
 import app.together.workflow.room.dto.RoomDtos.RoomMemberActionRequest;
@@ -55,14 +54,12 @@ public class RoomService {
     private final RoomActivityRepository roomActivityRepository;
     private final UserMasterDataRepository userMasterDataRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final FeatureUsageService featureUsageService;
 
     public RoomResponse createRoom(String userSso, CreateRoomRequest request) {
         permissionCheckService.requireSystemPermission(Permission.ROOM_CREATE);
         roomValidator.validateCreateRoomRequest(userSso, request);
 
         roomValidator.validateAndReserveSlot(userSso);
-        featureUsageService.chargeIfFree(userSso, "ROOM_CREATE", 0);
 
         Instant now = Instant.now();
         boolean isPublic = Boolean.TRUE.equals(request.isPublic());

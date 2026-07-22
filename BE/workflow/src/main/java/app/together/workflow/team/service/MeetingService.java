@@ -13,7 +13,6 @@ import app.together.common.workflow.repository.*;
 import app.together.common.auth.repository.UserRepository;
 import app.together.common.auth.entity.User;
 import app.together.common.auth.enums.UserTier;
-import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.personal.service.NotificationPublisher;
 import app.together.workflow.team.dto.MeetingDtos.*;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +40,6 @@ public class MeetingService {
     private final UserRepository userRepository;
     private final PermissionCheckService permissionCheckService;
     private final GenerateAiSummary generateAiSummary;
-    private final FeatureUsageService featureUsageService;
     private final NotificationPublisher notificationPublisher;
     private final TeamRepository teamRepository;
 
@@ -63,8 +61,6 @@ public class MeetingService {
         if (meetingRepository.findFirstByTeamIdAndActualEndIsNullOrderByCreatedAtDesc(teamId).isPresent()) {
             throw new BadRequestException("Đang có một cuộc họp diễn ra trong nhóm, không thể tạo mới.");
         }
-
-        featureUsageService.chargeIfFree(userSso, "MEETING_CREATE", 0);
 
         Meeting meeting = Meeting.builder()
                 .teamId(teamId)

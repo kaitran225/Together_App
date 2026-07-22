@@ -9,7 +9,6 @@ import app.together.common.workflow.repository.ChatMessageRepository;
 import app.together.common.workflow.repository.DocumentRepository;
 import app.together.common.workflow.entity.Document;
 import app.together.common.workflow.enums.ProcessingStatus;
-import app.together.workflow.payment.service.FeatureUsageService;
 import app.together.workflow.personal.service.ai.OllamaAiService;
 import app.together.workflow.personal.dto.ChatDtos.*;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +28,6 @@ public class PersonalChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final DocumentRepository documentRepository;
     private final OllamaAiService ollamaAiService;
-    private final FeatureUsageService featureUsageService;
     private final PersonalScheduleService personalScheduleService;
 
     /**
@@ -58,8 +56,6 @@ public class PersonalChatService {
         if (!conversation.getUserSso().equals(userSso)) {
             throw new BadRequestException("Bạn không có quyền gửi tin nhắn vào luồng hội thoại này.");
         }
-
-        featureUsageService.chargeIfFree(userSso, "AI_CHAT", 60);
 
         Instant now = Instant.now();
 
